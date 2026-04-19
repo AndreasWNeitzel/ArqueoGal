@@ -1,0 +1,54 @@
+# Context
+context/
+
+# Logs
+logs/
+
+# PDF Reports
+reports/figures/**/*.pdf
+
+# Data — never committed
+data/raw/
+data/interim/
+data/processed/
+data/external/
+data/fire2/
+# ...but keep README stubs and directory markers
+!data/**/README.md
+!data/**/.gitkeep
+# ...and keep provenance sidecars (they ARE committed — see data_acquisition.md §14.4)
+!data/provenance/
+!data/provenance/**
+
+# Trained models
+models/
+!models/**/README.md
+!models/**/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Ruff / mypy / pytest cache
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
