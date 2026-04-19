@@ -1,0 +1,99 @@
+# XP → Abundances: Baseline Configuration
+# ========================================
+# First experiment: reproduce TESS_ML results with DR19 labels and architectural fixes.
+
+paths:
+  data: data/processed/xp_apogee_dr19_crossmatch.parquet
+  output_root: output/xp_abundances
+  # Subdirectories created automatically: models/, figures/, diagnostics/, logs/
+
+data:
+  feature_prefixes: [bp_coefficient_, rp_coefficient_]
+  label_columns: [apodr19_fe_h, apodr19_alpha_m]
+  label_names: [fe_h, alpha_m]
+  label_latex: ["$\\mathrm{[Fe/H]}$", "$\\mathrm{[\\alpha/M]}$"]
+  label_units: dex
+  source_id_column: source_id
+  is_preprocessed: false   # explicit flag — no auto-detection
+
+model:
+  latent_dim: 32
+  dropout: 0.10
+  log_var_clamp: [-6.0, 4.0]
+  use_flow_head: false     # set true for normalizing flow posterior
+
+training:
+  epochs: 1000
+  batch_size: 2048
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  val_frac: 0.10
+  stratified_split: true    # stratify on label quantiles
+  patience: 20
+  grad_clip_norm: 1.0
+  amp_dtype: bfloat16       # bfloat16 | float16 | none
+  use_compile: true
+  random_seed: 42
+  scheduler:
+    name: one_cycle
+    pct_start: 0.15
+
+losses:
+  # Supervised contrastive
+  contrastive:
+    type: supcon             # supcon | rnc
+    sigma: 0.10              # Gaussian kernel bandwidth (dex), ignored for rnc
+    temperature:
+      initial: 0.10
+      learnable: true
+      bounds: [0.01, 0.50]
+      warmup_frac: 0.30      # fix temperature for first 30% of training
+  # Regression
+  regression:
+    type: beta_nll            # beta_nll | gaussian_nll | mse
+    beta: 0.5                 # Beta-NLL exponent (0 = standard NLL, 1 = max down-weight)
+  # Redundancy reduction
+  redundancy:
+    type: vicreg              # vicreg | barlow
+    weight: 0.005
+  # Semi-supervised (Mean Teacher)
+  semi_supervised:
+    enabled: false            # enable when unlabeled data is available
+    ema_decay: 0.999
+    consistency_weight: 1.0
+    augmentation:
+      noise_std: 0.02         # Gaussian noise on normalized coefficients
+      channel_dropout: 0.05   # fraction of coefficients to zero
+
+  # Queue (for contrastive negatives)
+  queue:
+    size: 8192
+    warm_start: false         # cold start — ramp up contrastive weight during warmup
+
+calibration:
+  isotonic: true
+  conformal: true
+  conformal_alpha: [0.10, 0.05, 0.01]  # produce 90%, 95%, 99% intervals
+  ood_mahalanobis: true
+
+plotting:
+  label_range:
+    fe_h: [-2.5, 0.6]
+    alpha_m: [-0.15, 0.40]
+  histogram_bins: 128
+  figure_format: png
+  dpi: 300
+
+prediction_output:
+  columns:
+    fe_h_pred: fe_h_pred
+    alpha_m_pred: alpha_m_pred
+    fe_h_sigma_raw: fe_h_sigma_raw
+    alpha_m_sigma_raw: alpha_m_sigma_raw
+    fe_h_sigma_cal: fe_h_sigma_cal
+    alpha_m_sigma_cal: alpha_m_sigma_cal
+    fe_h_conformal_lo_90: fe_h_conformal_lo_90
+    fe_h_conformal_hi_90: fe_h_conformal_hi_90
+    alpha_m_conformal_lo_90: alpha_m_conformal_lo_90
+    alpha_m_conformal_hi_90: alpha_m_conformal_hi_90
+    ood_flag: ood_flag

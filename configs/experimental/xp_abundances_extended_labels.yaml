@@ -1,0 +1,91 @@
+# XP → Abundances: Extended Labels Configuration
+# ================================================
+# Predict additional labels beyond [Fe/H] and [α/M].
+# Run ablation tests to validate which are genuinely constrained by XP.
+
+paths:
+  data: data/processed/xp_apogee_dr19_crossmatch.parquet
+  output_root: output/xp_abundances_extended
+
+data:
+  feature_prefixes: [bp_coefficient_, rp_coefficient_]
+  label_columns: [apodr19_fe_h, apodr19_alpha_m, apodr19_mg_fe, apodr19_c_n, apodr19_si_fe]
+  label_names: [fe_h, alpha_m, mg_fe, c_n, si_fe]
+  label_latex:
+    - "$\\mathrm{[Fe/H]}$"
+    - "$\\mathrm{[\\alpha/M]}$"
+    - "$\\mathrm{[Mg/Fe]}$"
+    - "$\\mathrm{[C/N]}$"
+    - "$\\mathrm{[Si/Fe]}$"
+  label_units: dex
+  source_id_column: source_id
+  is_preprocessed: false
+
+model:
+  latent_dim: 64             # larger latent for more labels
+  dropout: 0.10
+  log_var_clamp: [-6.0, 4.0]
+  use_flow_head: false
+
+training:
+  epochs: 1000
+  batch_size: 2048
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  val_frac: 0.10
+  stratified_split: true
+  patience: 20
+  grad_clip_norm: 1.0
+  amp_dtype: bfloat16
+  use_compile: true
+  random_seed: 42
+  scheduler:
+    name: one_cycle
+    pct_start: 0.15
+
+losses:
+  contrastive:
+    type: supcon
+    sigma: 0.10
+    temperature:
+      initial: 0.10
+      learnable: true
+      bounds: [0.01, 0.50]
+      warmup_frac: 0.30
+  regression:
+    type: beta_nll
+    beta: 0.5
+  redundancy:
+    type: vicreg
+    weight: 0.005
+  semi_supervised:
+    enabled: false
+  queue:
+    size: 8192
+    warm_start: false
+
+# Ablation testing configuration
+ablation:
+  enabled: true
+  # For each label, train a model with that label permuted.
+  # Compare validation RMSE with and without permutation.
+  # If RMSE barely changes, the label is predicted from correlations, not XP.
+  permute_labels: [mg_fe, c_n, si_fe]  # test these beyond the base pair
+  n_seeds: 3                            # repeat with different seeds for significance
+
+calibration:
+  isotonic: true
+  conformal: true
+  conformal_alpha: [0.10, 0.05]
+  ood_mahalanobis: true
+
+plotting:
+  label_range:
+    fe_h: [-2.5, 0.6]
+    alpha_m: [-0.15, 0.40]
+    mg_fe: [-0.15, 0.50]
+    c_n: [-0.60, 0.50]
+    si_fe: [-0.15, 0.40]
+  histogram_bins: 128
+  figure_format: png
+  dpi: 300
