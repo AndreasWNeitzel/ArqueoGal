@@ -1,0 +1,197 @@
+{
+  "verdict": "PASS",
+  "any_hard_fail": false,
+  "any_soft_fail": false,
+  "parquet": "data/processed/pipeline1_features_stream1.parquet",
+  "n_rows": 324054,
+  "n_cols": 316,
+  "checks": [
+    {
+      "name": "xp_feature_nan_invariant",
+      "level": "HARD",
+      "passed": true,
+      "summary": "no unexpected NaN in 110 XP feature columns (flagged-out rows: 14,183/324,054)",
+      "details": {
+        "n_flagged_out_rows": 14183,
+        "n_xp_columns_checked": 110,
+        "surprise_counts_per_column": {},
+        "expected_mask": "ye2024_flag != 0 OR xp_fit_flag_residual_high != 0/NA OR bp_coef_0 <= 0 OR rp_coef_0 <= 0"
+      }
+    },
+    {
+      "name": "tier1_label_completeness",
+      "level": "HARD",
+      "passed": true,
+      "summary": "all 3 Tier-1 atmospheric labels finite on 324,054 flag_bad==0 rows",
+      "details": {
+        "n_flag_bad_zero_rows": 324054,
+        "tier1_atmospheric_labels": [
+          "teff_apogee",
+          "logg_apogee",
+          "mh_apogee"
+        ],
+        "nan_counts_per_label": {}
+      }
+    },
+    {
+      "name": "parameter_bounds",
+      "level": "HARD",
+      "passed": true,
+      "summary": "all 5 parameters within physical bounds",
+      "details": {
+        "violations": {},
+        "bounds": {
+          "teff_apogee": [
+            3000.0,
+            8000.0
+          ],
+          "logg_apogee": [
+            -0.5,
+            5.5
+          ],
+          "fe_h_apogee": [
+            -4.0,
+            1.1
+          ],
+          "mh_apogee": [
+            -4.0,
+            1.0
+          ],
+          "alpha_m_apogee": [
+            -0.8,
+            0.8
+          ]
+        }
+      }
+    },
+    {
+      "name": "per_element_nan_rates",
+      "level": "SOFT",
+      "passed": true,
+      "summary": "per-element NaN baseline on 324,054 flag_bad==0 rows; top-3: v_h_apogee 5.35%, s_h_apogee 4.87%, k_h_apogee 4.87%",
+      "details": {
+        "n_flag_bad_zero_rows": 324054,
+        "rates": {
+          "fe_h_apogee": {
+            "n_nan": 5234,
+            "rate": 0.016151629049479407
+          },
+          "alpha_m_apogee": {
+            "n_nan": 0,
+            "rate": 0.0
+          },
+          "mg_h_apogee": {
+            "n_nan": 5222,
+            "rate": 0.016114598184253242
+          },
+          "c_h_apogee": {
+            "n_nan": 15689,
+            "rate": 0.04841477037777654
+          },
+          "n_h_apogee": {
+            "n_nan": 15766,
+            "rate": 0.04865238509631111
+          },
+          "o_h_apogee": {
+            "n_nan": 15766,
+            "rate": 0.04865238509631111
+          },
+          "na_h_apogee": {
+            "n_nan": 15766,
+            "rate": 0.04865238509631111
+          },
+          "al_h_apogee": {
+            "n_nan": 15689,
+            "rate": 0.04841477037777654
+          },
+          "si_h_apogee": {
+            "n_nan": 15766,
+            "rate": 0.04865238509631111
+          },
+          "s_h_apogee": {
+            "n_nan": 15771,
+            "rate": 0.04866781462348868
+          },
+          "k_h_apogee": {
+            "n_nan": 15771,
+            "rate": 0.04866781462348868
+          },
+          "ca_h_apogee": {
+            "n_nan": 15689,
+            "rate": 0.04841477037777654
+          },
+          "ti_h_apogee": {
+            "n_nan": 15766,
+            "rate": 0.04865238509631111
+          },
+          "v_h_apogee": {
+            "n_nan": 17347,
+            "rate": 0.05353120158985848
+          },
+          "cr_h_apogee": {
+            "n_nan": 15689,
+            "rate": 0.04841477037777654
+          },
+          "mn_h_apogee": {
+            "n_nan": 15771,
+            "rate": 0.04866781462348868
+          },
+          "ni_h_apogee": {
+            "n_nan": 15766,
+            "rate": 0.04865238509631111
+          },
+          "ce_h_apogee": {
+            "n_nan": 15689,
+            "rate": 0.04841477037777654
+          }
+        }
+      }
+    },
+    {
+      "name": "zscore_validity",
+      "level": "SOFT",
+      "passed": true,
+      "summary": "z-score stats within tolerance on 309,871 reference rows: BP mu=-0.0000 \u03c3=1.0000, RP mu=+0.0000 \u03c3=1.0000",
+      "details": {
+        "n_reference_rows": 309871,
+        "bp_mean": -1.575756591876143e-08,
+        "bp_std": 1.0,
+        "rp_mean": 3.151513050525523e-09,
+        "rp_std": 0.9999998807907104,
+        "mean_tol": 0.001,
+        "std_tol": 0.005
+      }
+    },
+    {
+      "name": "dedup_idempotency",
+      "level": "SOFT",
+      "passed": true,
+      "summary": "dedup rows_out=292,948 matches expected 292,948",
+      "details": {
+        "rows_in": 324054,
+        "rows_out": 292948,
+        "expected_rows_out": 292948,
+        "n_duplicate_stars": 25531,
+        "max_duplicates_per_star": 15,
+        "sort_column": "snr",
+        "duplicate_histogram": {
+          "1": 267417,
+          "2": 21332,
+          "3": 3426,
+          "4": 553,
+          "5": 123,
+          "6": 37,
+          "7": 11,
+          "8": 3,
+          "9": 3,
+          "10": 7,
+          "11": 9,
+          "12": 14,
+          "13": 6,
+          "14": 2,
+          "15": 5
+        }
+      }
+    }
+  ]
+}

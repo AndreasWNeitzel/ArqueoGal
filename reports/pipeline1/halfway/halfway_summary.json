@@ -1,0 +1,22 @@
+{
+  "ckpt": "/home/aneitzel/projects/ArqueoGal/models/main/xp_abundances/20260419_nogit_ed7849c/xp_abundances_main_contrastive_seed0_best.pt",
+  "parquet": "/home/aneitzel/projects/ArqueoGal/data/processed/pipeline1_features_stream1.parquet",
+  "device": "cuda",
+  "n_stars": 10000,
+  "n_finite_per_label": {
+    "teff_apogee": 10000,
+    "mh_apogee": 10000,
+    "logg_apogee": 10000
+  },
+  "umap": {
+    "n_neighbors": 30,
+    "min_dist": 0.1,
+    "seed": 0
+  },
+  "plots": [
+    "/home/aneitzel/projects/ArqueoGal/reports/pipeline1/halfway/halfway_umap_teff_apogee.png",
+    "/home/aneitzel/projects/ArqueoGal/reports/pipeline1/halfway/halfway_umap_mh_apogee.png",
+    "/home/aneitzel/projects/ArqueoGal/reports/pipeline1/halfway/halfway_umap_logg_apogee.png"
+  ],
+  "verdict": "PENDING_VISUAL_INSPECTION"
+}
