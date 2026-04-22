@@ -1,6 +1,10 @@
 # Context
 context/
 
+# Personal tooling notes (not part of the published project)
+CLAUDE.md
+AGENTS.md
+
 # Logs
 logs/
 
