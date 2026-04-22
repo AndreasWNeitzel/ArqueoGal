@@ -47,6 +47,11 @@ from arqueogal.xp_abundances.main.model import (
     XpAbundanceModel,
     default_pipeline1_layout,
 )
+from arqueogal.xp_abundances.main.release import (
+    annotate_parquet,
+    assign_release_tier,
+    tier_counts,
+)
 from arqueogal.xp_abundances.main.tier_promotion import (
     TestResult,
     TierPromotionReport,
@@ -94,7 +99,9 @@ __all__ = [
     "XpAbundanceDataset",
     "XpAbundanceModel",
     "XpFeatureAdapter",
+    "annotate_parquet",
     "apply_calibration",
+    "assign_release_tier",
     "audit_gate",
     "audit_report",
     "beta_nll_block_cholesky",
@@ -123,6 +130,7 @@ __all__ = [
     "shuffled_spectrum_null",
     "stratified_split_ids",
     "supcon_soft_positive",
+    "tier_counts",
     "tier_promotion_report",
     "train_ensemble",
     "train_model",

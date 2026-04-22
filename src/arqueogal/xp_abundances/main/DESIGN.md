@@ -519,6 +519,23 @@ over cool-giant samples should take the reported σ at face value.
 - **§3.3 six-test promotion protocol** before any Tier-3 → Tier-2 element enters
   the catalogue.
 
+## Per-star release_tier column
+
+Every Stream-3 prediction parquet carries a `release_tier ∈ {1, 2, 3}` column
+assigned by `release.assign_release_tier()`:
+
+| tier | consumer use                           | failure mode |
+|------|----------------------------------------|--------------|
+| 1    | per-star science                       | —            |
+| 2    | statistical / ensemble only            | `regime_b_flag`, `mode_ambiguous_flag`, `ood_disagreement_flag`, or `aux_missing_any` |
+| 3    | do not release                         | `ood_joint_flag`, `latent_support_flag`, or NaN in any `*_pred` column |
+
+Hard-kill (Tier 3) trumps caveat (Tier 2). Missing flag columns are treated
+as `False` — demotions must be explicit in the input. Contract is frozen:
+changes require an ADR + DESIGN.md update in the same commit (invariant #15).
+Counts and the flag-column provenance are emitted to
+`<parquet>.release_tier.json` alongside each annotated parquet.
+
 ## Tests
 
 Under `tests/xp_abundances/main/`. Smoke tests for model forward/backward,
