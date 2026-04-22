@@ -1,0 +1,52 @@
+2026-04-21 22:03:39,253 INFO run_dir=/home/aneitzel/projects/ArqueoGal/models/main/xp_abundances/20260421_38a993e_1371f1a cfg_hash=1371f1a sha=38a993e
+2026-04-21 22:03:39,357 INFO device=cuda
+2026-04-21 22:03:46,949 INFO dropping 13906/292948 rows with NaN in XP features
+2026-04-21 22:03:48,293 INFO fit label scaler on 195295 train stars — Teff mean=4614.9 scale=267.5, logg mean=2.36 scale=0.52, [M/H] mean=-0.26 scale=0.34
+2026-04-21 22:04:05,091 INFO epoch 0: train_loss=5.6217 val_loss=5.6520 tau=0.102 grad_max=1.73 grad_mean=0.39
+2026-04-21 22:04:12,776 INFO epoch 1: train_loss=5.5516 val_loss=5.5370 tau=0.103 grad_max=11.55 grad_mean=2.28
+2026-04-21 22:04:19,215 INFO epoch 2: train_loss=5.4486 val_loss=5.4126 tau=0.104 grad_max=44.60 grad_mean=11.58
+2026-04-21 22:04:25,431 INFO epoch 3: train_loss=5.3449 val_loss=5.3073 tau=0.104 grad_max=86.42 grad_mean=26.91
+2026-04-21 22:04:32,135 INFO epoch 4: train_loss=5.1772 val_loss=5.0766 tau=0.103 grad_max=224.04 grad_mean=71.33
+2026-04-21 22:04:38,905 INFO epoch 5: train_loss=5.0807 val_loss=4.9981 tau=0.104 grad_max=319.11 grad_mean=95.89
+2026-04-21 22:04:44,914 INFO epoch 6: train_loss=5.0431 val_loss=5.0868 tau=0.104 grad_max=295.31 grad_mean=116.52
+2026-04-21 22:04:51,484 INFO epoch 7: train_loss=5.0362 val_loss=4.9685 tau=0.104 grad_max=366.18 grad_mean=116.43
+2026-04-21 22:04:57,941 INFO epoch 8: train_loss=4.9634 val_loss=4.9058 tau=0.103 grad_max=293.03 grad_mean=121.01
+2026-04-21 22:05:04,449 INFO epoch 9: train_loss=4.9067 val_loss=4.7744 tau=0.101 grad_max=359.23 grad_mean=122.23
+2026-04-21 22:05:10,829 INFO epoch 10: train_loss=4.8454 val_loss=4.8339 tau=0.100 grad_max=298.09 grad_mean=119.58
+2026-04-21 22:05:17,173 INFO epoch 11: train_loss=4.7579 val_loss=4.6815 tau=0.098 grad_max=347.41 grad_mean=127.12
+2026-04-21 22:05:24,390 INFO epoch 12: train_loss=4.7173 val_loss=4.5438 tau=0.096 grad_max=393.84 grad_mean=130.12
+2026-04-21 22:05:31,816 INFO epoch 13: train_loss=4.6502 val_loss=4.4198 tau=0.094 grad_max=309.85 grad_mean=125.27
+2026-04-21 22:05:39,397 INFO epoch 14: train_loss=4.6633 val_loss=4.7085 tau=0.094 grad_max=301.29 grad_mean=126.77
+2026-04-21 22:05:45,479 INFO epoch 15: train_loss=4.5632 val_loss=4.5599 tau=0.092 grad_max=365.79 grad_mean=129.64
+2026-04-21 22:05:51,667 INFO epoch 16: train_loss=4.4714 val_loss=4.4604 tau=0.090 grad_max=310.56 grad_mean=135.17
+2026-04-21 22:05:57,754 INFO epoch 17: train_loss=4.4767 val_loss=4.3783 tau=0.090 grad_max=295.82 grad_mean=131.53
+2026-04-21 22:06:04,002 INFO epoch 18: train_loss=4.4300 val_loss=4.1834 tau=0.088 grad_max=339.38 grad_mean=127.64
+2026-04-21 22:06:10,191 INFO epoch 19: train_loss=4.3631 val_loss=4.2135 tau=0.085 grad_max=283.91 grad_mean=129.16
+2026-04-21 22:06:17,343 INFO epoch 20: train_loss=4.3298 val_loss=4.2172 tau=0.083 grad_max=314.48 grad_mean=125.26
+2026-04-21 22:06:23,840 INFO epoch 21: train_loss=4.2745 val_loss=4.3300 tau=0.080 grad_max=329.41 grad_mean=124.32
+2026-04-21 22:06:30,198 INFO epoch 22: train_loss=4.2690 val_loss=4.2033 tau=0.079 grad_max=281.54 grad_mean=122.07
+2026-04-21 22:06:36,426 INFO epoch 23: train_loss=4.2260 val_loss=4.0996 tau=0.077 grad_max=308.66 grad_mean=120.39
+2026-04-21 22:06:42,580 INFO epoch 24: train_loss=4.1413 val_loss=4.0977 tau=0.075 grad_max=310.32 grad_mean=123.34
+2026-04-21 22:06:48,861 INFO epoch 25: train_loss=4.1531 val_loss=4.1734 tau=0.073 grad_max=283.79 grad_mean=121.34
+2026-04-21 22:06:57,793 INFO epoch 26: train_loss=4.1307 val_loss=4.0359 tau=0.072 grad_max=290.99 grad_mean=113.81
+2026-04-21 22:07:05,554 INFO epoch 27: train_loss=4.0853 val_loss=4.0452 tau=0.070 grad_max=292.93 grad_mean=115.17
+2026-04-21 22:07:11,866 INFO epoch 28: train_loss=4.0686 val_loss=4.1680 tau=0.068 grad_max=254.79 grad_mean=116.97
+2026-04-21 22:07:17,840 INFO epoch 29: train_loss=4.0648 val_loss=3.9758 tau=0.067 grad_max=277.36 grad_mean=112.72
+2026-04-21 22:07:24,226 INFO epoch 30: train_loss=4.0185 val_loss=3.9660 tau=0.065 grad_max=294.23 grad_mean=110.00
+2026-04-21 22:07:30,944 INFO epoch 31: train_loss=3.9854 val_loss=3.9507 tau=0.064 grad_max=259.48 grad_mean=106.77
+2026-04-21 22:07:37,157 INFO epoch 32: train_loss=3.9723 val_loss=3.8546 tau=0.063 grad_max=240.49 grad_mean=104.35
+2026-04-21 22:07:43,263 INFO epoch 33: train_loss=3.9474 val_loss=3.9128 tau=0.062 grad_max=247.96 grad_mean=107.22
+2026-04-21 22:07:49,331 INFO epoch 34: train_loss=3.9159 val_loss=3.8071 tau=0.060 grad_max=238.01 grad_mean=104.63
+2026-04-21 22:07:55,604 INFO epoch 35: train_loss=3.8941 val_loss=3.8257 tau=0.059 grad_max=275.49 grad_mean=109.44
+2026-04-21 22:08:01,854 INFO epoch 36: train_loss=3.8751 val_loss=3.7732 tau=0.058 grad_max=214.26 grad_mean=97.71
+2026-04-21 22:08:08,094 INFO epoch 37: train_loss=3.8679 val_loss=3.8310 tau=0.057 grad_max=246.47 grad_mean=97.23
+2026-04-21 22:08:14,026 INFO epoch 38: train_loss=3.8658 val_loss=3.7822 tau=0.056 grad_max=259.13 grad_mean=100.09
+2026-04-21 22:08:20,227 INFO epoch 39: train_loss=3.8254 val_loss=3.7683 tau=0.055 grad_max=239.01 grad_mean=98.96
+2026-04-21 22:08:26,094 INFO epoch 40: train_loss=3.8121 val_loss=3.7181 tau=0.055 grad_max=207.51 grad_mean=95.27
+2026-04-21 22:08:32,964 INFO epoch 41: train_loss=3.8032 val_loss=3.8494 tau=0.054 grad_max=201.61 grad_mean=95.17
+2026-04-21 22:08:40,684 INFO epoch 42: train_loss=3.7848 val_loss=3.7463 tau=0.053 grad_max=236.38 grad_mean=104.66
+2026-04-21 22:08:48,100 INFO epoch 43: train_loss=3.7593 val_loss=3.8090 tau=0.053 grad_max=193.94 grad_mean=89.51
+2026-04-21 22:08:55,149 INFO epoch 44: train_loss=3.7574 val_loss=3.7428 tau=0.052 grad_max=182.28 grad_mean=91.02
+2026-04-21 22:09:02,121 INFO epoch 45: train_loss=3.7416 val_loss=3.7087 tau=0.051 grad_max=242.02 grad_mean=97.38
+2026-04-21 22:09:02,121 INFO early stopping at epoch 45 (best 40)
+2026-04-21 22:09:02,160 INFO done: best_val_loss=3.7181 at epoch 40, saved to /home/aneitzel/projects/ArqueoGal/models/main/xp_abundances/20260421_38a993e_1371f1a/xp_abundances_main_contrastive_seed0_best.pt

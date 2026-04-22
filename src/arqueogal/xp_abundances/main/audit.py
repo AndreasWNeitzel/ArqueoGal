@@ -1,5 +1,9 @@
 """Information-content audit — research_brief §9.2 per-label report card.
 
+Audit-protocol version: **v1.1** (2026-04-19). See :data:`AUDIT_PROTOCOL_VERSION`
+and the "Audit protocol" changelog in ``src/arqueogal/xp_abundances/DESIGN.md``
+for the v1 → v1.1 deprecation of the 2-D XP summary in Test 5.
+
 Six tests (research_brief §9.2):
 
 1. **LOOCO** — Leave-one-coefficient-out at inference. :func:`leave_one_coeff_out`.
@@ -9,11 +13,42 @@ Six tests (research_brief §9.2):
 4. **Shuffled-spectrum null** — within-cell permutation of spectrum columns.
    :func:`shuffled_spectrum_null`.
 5. **Mutual information** with conditional form. :func:`mutual_information_ksg`
-   and :func:`conditional_mi_ksg`.
+   and :func:`conditional_mi_ksg`. **PCA-summary KSG CMI is the primary
+   Test-5 estimator as of v1.1** — see :func:`test5_conditional_mi` and
+   the deprecation notes below.
 6. **Decorrelated sub-sample test** — :func:`decorrelated_subsample`.
 
 :func:`audit_report` aggregates tests 1, 2, 4, 5, 6 into one JSON-serialisable
 dict — the report card DESIGN §Release gates requires for every released label.
+
+Test 5 — PCA-summary CMI as primary estimator (v1.1)
+----------------------------------------------------
+The v1 audit used a 2-D ``(|BP|-sum, |RP|-sum)`` XP summary for Test 5. The
+Pipeline 1 v1 release exposed that this summary is substantially biased for
+three of five labels: Teff 4.6× upward inflation (0.1352 → 0.0296 nats under
+PCA), [M/H] 4× underestimation (0.0088 → 0.0357), and [Mg/H] a pathological
+collapse (0 → 0.0357). See ``docs/research_brief.md §9.2.1`` for the bias
+profile and ``reports/pipeline1/audit/SUMMARY.md`` for the decision record.
+
+**As of v1.1 the 2-D summary is deprecated.** The primary Test-5 estimator is
+:func:`conditional_mi_ksg` fed by a PCA summary of the BP + RP normalised
+Hermite coefficients with ≥ 95% variance retained (default ``n_pca_components
+= 7`` for Gaia XP). The 2-D estimator is retained behind the ``legacy_2d``
+flag for reproducibility of historical report cards only; it raises a
+``DeprecationWarning`` on use.
+
+High-order-signal escape hatch — the [α/M] finding
+..................................................
+The 7-component default recovers 95.8% of the XP variance on the Pipeline 1
+v1 val split and resolves the Teff / [M/H] / [Mg/H] biases. For [α/M] the
+7-PC summary still returns 0.0000 nats; a follow-up triage
+(``reports/pipeline1/audit/alpha_m_triage.md``) showed that the cause is **aux
+absorption** (H2), not missing variance: with parallax-only conditioning the
+same 15-PC summary produces CMI = 0.1125 nats. Users auditing labels
+suspected of aux correlation should pass a richer PCA summary
+(``n_pca_components = 15`` retains ~99% variance) and consider reduced
+conditioning sets; see ``scripts/triage_alpha_m_cmi.py`` for the reference
+driver.
 
 Style notes
 -----------
@@ -25,8 +60,9 @@ the audit budget.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final
 
 import numpy as np
 import torch
@@ -36,6 +72,19 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 _EPS: float = 1e-12
+
+#: Audit-protocol version. Bumped v1 → v1.1 on 2026-04-19 when the 2-D XP
+#: summary was deprecated from Test 5 in favour of PCA-summary KSG CMI.
+#: See the module docstring, ``docs/research_brief.md §9.2.1`` and the
+#: "Audit protocol" changelog in ``src/arqueogal/xp_abundances/DESIGN.md``.
+AUDIT_PROTOCOL_VERSION: Final[str] = "v1.1"
+
+#: Default number of PCA components for Test-5 CMI when ``legacy_2d=False``.
+#: Chosen to retain ≥ 95% of the BP+RP normalised-shape variance on Gaia XP.
+#: The Pipeline 1 v1 val split recovered 95.8% at this setting. Labels whose
+#: [α/M]-triage-style aux absorption is suspected should pass
+#: ``n_pca_components=15`` (≈ 99% variance) per the triage finding.
+DEFAULT_PCA_COMPONENTS_TEST5: Final[int] = 7
 
 
 # --- helpers ----------------------------------------------------------------
@@ -265,6 +314,126 @@ def conditional_mi_ksg(
     return float(max(cmi, 0.0))
 
 
+def _pca_project(x: np.ndarray, n_components: int) -> tuple[np.ndarray, float]:
+    """PCA-project ``x`` to ``n_components`` dimensions; centre internally.
+
+    Parameters
+    ----------
+    x
+        ``(N, D)`` real array. No centring is assumed.
+    n_components
+        Exact number of components to retain.
+
+    Returns
+    -------
+    (projection, cumulative_variance_retained)
+        ``projection`` is ``(N, min(n_components, D))`` float64. The second
+        element is the cumulative explained-variance ratio up to the
+        retained component count.
+    """
+    if x.ndim != 2:  # noqa: PLR2004
+        raise ValueError(f"x must be 2-D, got {x.shape}")
+    Xc = x - x.mean(axis=0, keepdims=True)
+    U, s, _Vt = np.linalg.svd(Xc.astype(np.float64), full_matrices=False)
+    var = (s ** 2) / max(Xc.shape[0] - 1, 1)
+    cum = np.cumsum(var) / var.sum()
+    k = int(min(n_components, len(s)))
+    proj = U[:, :k] * s[:k]
+    return proj.astype(np.float64), float(cum[k - 1])
+
+
+def test5_conditional_mi(  # noqa: PLR0913
+    xp_block: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray,
+    *,
+    n_pca_components: int = DEFAULT_PCA_COMPONENTS_TEST5,
+    k: int = 8,
+    legacy_2d: bool = False,
+) -> dict[str, float]:
+    """§9.2 Test 5 — conditional MI on XP → label | aux.
+
+    Primary estimator (v1.1): PCA summary of the BP+RP normalised Hermite
+    coefficients with ``n_pca_components`` retained, fed to
+    :func:`conditional_mi_ksg`. Legacy 2-D summary
+    (``(|BP|-sum, |RP|-sum)``) is retained behind ``legacy_2d=True`` for
+    reproducibility of pre-v1.1 report cards only and emits a
+    ``DeprecationWarning``.
+
+    Parameters
+    ----------
+    xp_block
+        ``(N, D_xp)`` array of normalised Hermite-shape coefficients
+        (BP + RP concatenated; c0 scalars and aux features excluded). For
+        the Pipeline 1 v1 release ``D_xp = 108``.
+    y
+        ``(N,)`` label values.
+    z
+        ``(N, D_z)`` conditioning variables (aux features). Must match the
+        row-alignment of ``xp_block`` and ``y``.
+    n_pca_components
+        Number of PCA components to retain for the primary PCA summary. Seven
+        retains ≥ 95% variance on Gaia XP in the v1 audit. Pass ``15`` for
+        richer summaries (≈ 99% variance) when aux-absorption is suspected
+        (see ``reports/pipeline1/audit/alpha_m_triage.md``).
+    k
+        KSG neighbour count. Default 8 matches the Pipeline 1 v1 driver.
+    legacy_2d
+        If True, use the deprecated 2-D summary (``(|BP|-sum, |RP|-sum)``).
+        Emits a ``DeprecationWarning``. Intended only for reproducing
+        historical report cards.
+
+    Returns
+    -------
+    dict with keys:
+        ``"cmi_nats"`` — conditional MI estimate in nats.
+        ``"estimator"`` — ``"pca_summary"`` or ``"legacy_2d"``.
+        ``"n_pca_components"`` — components retained (0 for legacy).
+        ``"pca_variance_retained"`` — cumulative variance (NaN for legacy).
+        ``"ksg_k"`` — neighbour count used.
+    """
+    if xp_block.ndim != 2:  # noqa: PLR2004
+        raise ValueError(f"xp_block must be 2-D, got {xp_block.shape}")
+    if legacy_2d:
+        warnings.warn(
+            "Test-5 2-D XP summary (|BP|-sum, |RP|-sum) is deprecated as of "
+            "audit protocol v1.1 (2026-04-19). The v1 Pipeline 1 release "
+            "showed substantial bias under this summary for three of five "
+            "labels (Teff 4.6× inflation, [M/H] 4× underestimation, [Mg/H] "
+            "pathological collapse). Use the default PCA-summary estimator "
+            "unless reproducing a pre-v1.1 report card.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # BP is assumed to occupy the first half of xp_block and RP the
+        # second half, matching the Pipeline 1 FeatureLayout packing.
+        split = xp_block.shape[1] // 2
+        summary = np.column_stack(
+            [
+                np.abs(xp_block[:, :split]).sum(axis=1),
+                np.abs(xp_block[:, split:]).sum(axis=1),
+            ],
+        ).astype(np.float64)
+        cmi = conditional_mi_ksg(summary, y, z, k=k)
+        return {
+            "cmi_nats": float(cmi),
+            "estimator": "legacy_2d",
+            "n_pca_components": 0,
+            "pca_variance_retained": float("nan"),
+            "ksg_k": int(k),
+        }
+
+    summary, var_retained = _pca_project(xp_block.astype(np.float64), n_pca_components)
+    cmi = conditional_mi_ksg(summary, y, z, k=k)
+    return {
+        "cmi_nats": float(cmi),
+        "estimator": "pca_summary",
+        "n_pca_components": int(summary.shape[1]),
+        "pca_variance_retained": float(var_retained),
+        "ksg_k": int(k),
+    }
+
+
 # --- §9.2 Test 6: Decorrelated sub-sample -----------------------------------
 
 def decorrelated_subsample(
@@ -416,6 +585,8 @@ def audit_report(  # noqa: PLR0913 — orchestrator with per-test knobs
 
 
 __all__ = [
+    "AUDIT_PROTOCOL_VERSION",
+    "DEFAULT_PCA_COMPONENTS_TEST5",
     "AuditReport",
     "audit_report",
     "conditional_mi_ksg",
@@ -424,4 +595,5 @@ __all__ = [
     "mutual_information_ksg",
     "permutation_feature_importance",
     "shuffled_spectrum_null",
+    "test5_conditional_mi",
 ]

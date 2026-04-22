@@ -74,7 +74,7 @@ class EnsemblePrediction:
     - ``sigma_total``: ``(B, n)`` — ``sqrt(diag(Σ_total))`` marginals.
     - ``Sigma_aleatoric`` / ``Sigma_epistemic`` / ``Sigma_total``: full
       covariance tensors ``(B, n, n)`` for callers that need cross-label
-      correlations (e.g. Pipeline 2's MC ensemble).
+      correlations (e.g. Starfold's MC ensemble, downstream, separate repo).
     - ``per_member_mu``: ``(M, B, n)`` — calibrated per-member means.
     - ``y``: ``(B, n)`` ground truth if the loader supplied it, else None.
     """

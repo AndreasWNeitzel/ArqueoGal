@@ -36,6 +36,16 @@ class LossWeights:
     supcon_sigma: float = 0.10  # label-space Gaussian-kernel bandwidth.
     supcon_label_n_first: int | None = None
 
+    # --- Barlow Twins auxiliary (TESS_ML joint-loss recipe) ---
+    barlow: float = 0.0
+    """Barlow-Twins weight on the trunk hidden state. ``>0`` enables the
+    redundancy-reduction term — required by the TESS_ML-style joint-training
+    recipe to prevent latent collapse when SupCon and β-NLL train jointly.
+    Default 0 keeps legacy two-stage runs unchanged."""
+
+    barlow_lam: float = 0.005
+    """Off-diagonal coupling in the Barlow loss. TESS_ML default 0.005."""
+
 
 @dataclass(frozen=True, slots=True)
 class TrainingConfig:
@@ -135,12 +145,56 @@ class TrainingConfig:
     upward (e.g. ``1e6``) since one epoch on 48 samples cannot learn bulk
     offsets. Setting ``inf`` disables the check."""
 
+    stage_dataset_on_gpu: bool = False
+    """If True and CUDA is available, stage the full train/val tensors on the
+    GPU at Dataset construction and disable DataLoader workers. Eliminates
+    per-batch host→device transfer; the entire Stream-1 training set (~195k
+    stars × 139 floats ≈ 109 MB) fits trivially in 6 GB VRAM. Large datasets
+    that exceed VRAM should leave this ``False``."""
+
+    # --- momentum queue for SupCon (TESS_ML joint-loss recipe) ---
+    queue_size: int = 0
+    """Size of the SupCon momentum queue. ``0`` disables the queue — SupCon
+    sees only in-batch keys (legacy two-stage pretraining). ``8192`` matches
+    the TESS_ML prototype and gives SupCon an effective key count of
+    ``batch_size + 8192`` per step, which is what was empirically required
+    to separate low-α and high-α disc stars in chemistry-latent space."""
+
+    queue_warm_start: bool = True
+    """Initialise the queue full of unit-norm random vectors (labels zero,
+    kernel weight ≈0 until overwritten). Keeps ``K`` static from step 1 so
+    CUDA graph capture is stable. Default True per TESS_ML prototype."""
+
     grad_norm_abort_threshold: float = float("inf")
     """Hard upper bound on pre-clip gradient norm in any single training
     batch. If exceeded, training aborts with a diagnostic RuntimeError. Used
     by the β=0 retrain canary (#135 escalation): pure Gaussian NLL can
     explode on high-σ samples. Typical β=0.5 grads land in 0.5–5; ``500.0``
     is a safe β=0 canary. ``inf`` (default) disables the check."""
+
+    # --- inverse-frequency [M/H] weighting (#198, v1.1) ---
+    inverse_freq_weighting: bool = False
+    """Up-weight stars in rare [M/H] bins during training. v1 (``False``)
+    averaged NLL uniformly, which let the [α/M] head regress to the disc
+    mean — metal-poor stars at [M/H]≈-1 were predicted at [α/M]≈+0.11
+    when training truth says +0.23. Enable for v1.1."""
+
+    inverse_freq_mh_column: str = "mh_apogee"
+    """Label column used to bin stars for inverse-frequency weighting.
+    Must appear in ``tiers.all_labels`` — used to look up the index in ``Y``
+    before ``LabelScaler`` has run (weights are computed on raw-unit
+    [M/H])."""
+
+    inverse_freq_bin_edges: tuple[float, ...] = (-1.5, -1.0, -0.5, 0.0)
+    """Interior bin edges in raw [M/H] dex. With the default edges, five
+    bins span (-∞, -1.5), [-1.5, -1.0), [-1.0, -0.5), [-0.5, 0.0),
+    [0.0, +∞). Star with NaN [M/H] keeps weight 1.0."""
+
+    inverse_freq_clip: float = 5.0
+    """Maximum allowed ``1/p(bin)`` weight before mean-1 normalisation.
+    Caps gradient variance on near-empty bins. 5.0 lets the [-1.5,-1.0)
+    bin (~2% of training) be fully inverse-frequency-weighted; the very
+    rare [<-1.5] bin gets clipped."""
 
 
 __all__ = ["LossWeights", "TrainingConfig"]

@@ -202,6 +202,22 @@ class LabelTiers:
             tier3=(),
         )
 
+    @classmethod
+    def two_label(cls) -> "LabelTiers":
+        """TESS_ML-matched tier set — {[M/H], [α/M]}.
+
+        Capacity-dilution test: the reference TESS_ML prototype predicts exactly
+        these two abundances (see ``TESS_ML/configs/contrastive.yaml``) and hits
+        RMSE 0.07 / 0.03 dex respectively. Retraining on the same two labels
+        falsifies whether 5-label capacity dilution is the dominant source of
+        the RMSE gap to TESS_ML on the same encoder + σ=0.10 recipe.
+        """
+        return cls(
+            tier1=("mh_apogee", "alpha_m_apogee"),
+            tier2=(),
+            tier3=(),
+        )
+
     @property
     def all_labels(self) -> tuple[str, ...]:
         return (*self.tier1, *self.tier2, *self.tier3)
@@ -452,16 +468,26 @@ class LabelScaler:
 class XpAbundanceDataset(Dataset):
     """In-memory Dataset over preloaded arrays from :func:`load_arrays`.
 
-    Yields ``(X, Y)`` or ``(X, Y, sigma_Y)`` tensors per index. The source_id
-    array is retained for diagnostics but not returned per-sample — fetch it
-    off the dataset attribute instead.
+    Yields ``(X, Y)``, ``(X, Y, w)``, or ``(X, Y, sigma_Y)`` tensors per
+    index. ``w`` (per-star weight) and ``sigma_Y`` are mutually exclusive:
+    if ``weights`` is provided at construction, it takes precedence over
+    ``sigma_Y`` in the per-sample tuple. The source_id array is retained
+    for diagnostics but not returned per-sample — fetch it off the
+    dataset attribute instead.
+
+    ``device`` stages the cached tensors on a specific torch device. Default
+    ``"cpu"`` matches prior behaviour. Set ``"cuda"`` to eliminate per-batch
+    host→device transfer on GPU runs — pairs with ``num_workers=0`` in the
+    DataLoader (CUDA tensors can't be forked across worker processes).
     """
 
     X: np.ndarray
     Y: np.ndarray
     sigma_Y: np.ndarray | None = None  # noqa: N815 — σ_Y convention (uppercase Y = matrix)
     source_id: np.ndarray | None = None
+    weights: np.ndarray | None = None
     dtype: torch.dtype = torch.float32
+    device: str = "cpu"
     _cache: dict[str, torch.Tensor] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -471,10 +497,21 @@ class XpAbundanceDataset(Dataset):
             raise ValueError(
                 f"sigma_Y length mismatch: {len(self.sigma_Y)} vs {len(self.X)}"
             )
-        self._cache["X"] = torch.as_tensor(self.X, dtype=self.dtype)
-        self._cache["Y"] = torch.as_tensor(self.Y, dtype=self.dtype)
-        if self.sigma_Y is not None:
-            self._cache["sigma_Y"] = torch.as_tensor(self.sigma_Y, dtype=self.dtype)
+        if self.weights is not None and len(self.weights) != len(self.X):
+            raise ValueError(
+                f"weights length mismatch: {len(self.weights)} vs {len(self.X)}"
+            )
+        dev = torch.device(self.device)
+        self._cache["X"] = torch.as_tensor(self.X, dtype=self.dtype).to(dev)
+        self._cache["Y"] = torch.as_tensor(self.Y, dtype=self.dtype).to(dev)
+        if self.weights is not None:
+            self._cache["weights"] = torch.as_tensor(
+                self.weights, dtype=self.dtype,
+            ).to(dev)
+        elif self.sigma_Y is not None:
+            self._cache["sigma_Y"] = torch.as_tensor(
+                self.sigma_Y, dtype=self.dtype,
+            ).to(dev)
 
     def __len__(self) -> int:
         return len(self.X)
@@ -482,6 +519,8 @@ class XpAbundanceDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, ...]:
         x = self._cache["X"][idx]
         y = self._cache["Y"][idx]
+        if "weights" in self._cache:
+            return x, y, self._cache["weights"][idx]
         if "sigma_Y" in self._cache:
             return x, y, self._cache["sigma_Y"][idx]
         return x, y

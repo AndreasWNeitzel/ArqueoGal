@@ -9,7 +9,14 @@ Architectural decisions inherited from :mod:`run_supervised_finetune`:
 - ``use_c0_scalars=True``
 - ``encoder_lr_ratio=0.1``
 - ``pretrained_encoder_ckpt=<contrastive pretrain ckpt>``
-- ``LossWeights(supcon=0, beta_nll=1)``
+- ``LossWeights(supcon=0.1, beta_nll=1.0, beta=0.0)`` — β=0 exposes per-cell
+  μ bias as explicit mean error instead of letting β-NLL (β=0.5) absorb it
+  into inflated σ. A small SupCon auxiliary term (supcon=0.1) keeps the
+  latent structure from collapsing while the head re-learns with the
+  honest NLL. See 2026-04-21 catastrophe diagnosis (prototype attractor
+  at [α/M]=+0.11, [M/H]=-1).
+- ``grad_norm_abort_threshold=500.0`` — β=0 canary. Pure Gaussian NLL can
+  explode on high-σ samples; abort early if grads diverge.
 - ``early_stop_patience=3``, ``epochs=10``
 - ``output_prefix="xp_abundances_main_ensemble"``
 
@@ -71,6 +78,8 @@ def build_ensemble_config(
     *, parquet: Path, output_dir: Path, pretrained_ckpt: Path,
     epochs: int, batch_size: int, seeds: tuple[int, ...],
     output_prefix: str = "xp_abundances_main_ensemble",
+    inverse_freq_weighting: bool = False,
+    inverse_freq_clip: float = 5.0,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -93,11 +102,14 @@ def build_ensemble_config(
         checkpoint_every_n_epochs=0,  # per-member only keeps best-val
         output_prefix=output_prefix,
         loss_weights=LossWeights(
-            supcon=0.0, beta_nll=1.0,
-            beta=0.5, supcon_sigma=0.10, supcon_label_n_first=None,
+            supcon=0.1, beta_nll=1.0,
+            beta=0.0, supcon_sigma=0.10, supcon_label_n_first=None,
         ),
+        grad_norm_abort_threshold=500.0,
         temperature_init=0.10,
         ensemble_seeds=seeds,
+        inverse_freq_weighting=inverse_freq_weighting,
+        inverse_freq_clip=inverse_freq_clip,
     )
 
 
@@ -115,6 +127,16 @@ def main() -> None:
         help="21 = default LabelTiers (production, 4-block Cholesky). "
              "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} "
              "with a single 5×5 full Cholesky block (production as of #143).",
+    )
+    parser.add_argument(
+        "--inverse-freq", action="store_true",
+        help="Enable inverse-frequency [M/H]-bin weighting in the NLL. "
+             "v1.1 fix for the metal-poor [α/M] regression-to-mean "
+             "surfaced downstream of v1 (#198).",
+    )
+    parser.add_argument(
+        "--inverse-freq-clip", type=float, default=5.0,
+        help="Max w = 1/p(bin) before mean-1 normalisation. Default 5.0.",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -135,6 +157,8 @@ def main() -> None:
         pretrained_ckpt=args.pretrained,
         epochs=args.epochs, batch_size=args.batch_size, seeds=seeds,
         output_prefix=output_prefix,
+        inverse_freq_weighting=args.inverse_freq,
+        inverse_freq_clip=args.inverse_freq_clip,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
     ensemble_dir = args.model_dir / f"{date_tag}_{sha7}_{cfg_hash}{ensemble_suffix}"
@@ -145,6 +169,8 @@ def main() -> None:
         pretrained_ckpt=args.pretrained,
         epochs=args.epochs, batch_size=args.batch_size, seeds=seeds,
         output_prefix=output_prefix,
+        inverse_freq_weighting=args.inverse_freq,
+        inverse_freq_clip=args.inverse_freq_clip,
     )
     layout = FeatureLayout()
 

@@ -1,0 +1,12 @@
+2026-04-22 00:02:22,089 INFO device=cuda
+2026-04-22 00:02:22,554 INFO loaded 5 ensemble members from models/main/xp_abundances/20260421_38a993e_712b774_ensemble_5label
+2026-04-22 00:02:22,640 INFO basis fingerprint OK (0d34b5659e97e589...); n_ref=309871
+2026-04-22 00:02:26,031 INFO input data/processed/pipeline1_features_stream3.parquet: n=613939 schema=raw
+2026-04-22 00:02:47,514 INFO aux-missingness: ir=0.0036 parallax=0.0105 extinction=0.0000 any=0.0141
+2026-04-22 00:02:49,039 INFO running ensemble on 613939 stars, batch_size=4096
+2026-04-22 00:03:41,648 INFO fitting OOD Mahalanobis bundle from /home/aneitzel/projects/ArqueoGal/data/processed/pipeline1_features_stream1.parquet
+2026-04-22 00:04:13,224 INFO OOD: mahalanobis_rate=0.1990 ensemble_rate=0.0000 joint_rate=0.1990
+2026-04-22 00:04:13,239 INFO Regime B: 11089/613939 (1.806%) inside envelope (excluded from Tier 1)
+2026-04-22 00:04:13,298 INFO mode-ambiguous: 294869/613939 (48.029%) flagged (293987 in-grid bimodal + 882 out-of-grid)
+2026-04-22 00:04:15,091 INFO wrote data/processed/pipeline1_predictions_stream3_v2.parquet (613939 rows, 42 cols)
+2026-04-22 00:04:18,995 INFO wrote data/processed/pipeline1_predictions_stream3_v2.parquet.provenance.json

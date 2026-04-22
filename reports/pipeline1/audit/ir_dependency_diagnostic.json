@@ -1,0 +1,92 @@
+{
+  "artefact": "ir_dependency_diagnostic",
+  "ensemble_dir": "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label",
+  "stream1_parquet": "data/processed/pipeline1_features_stream1.parquet",
+  "n_val": 41851,
+  "split_seed": 0,
+  "ir_columns": [
+    "j_mag",
+    "h_mag",
+    "k_mag",
+    "w1_mag",
+    "w2_mag"
+  ],
+  "ir_feature_positions": [
+    126,
+    127,
+    128,
+    129,
+    130
+  ],
+  "ir_native_nan_counts_in_val": {
+    "j_mag": 38,
+    "h_mag": 38,
+    "k_mag": 38,
+    "w1_mag": 60,
+    "w2_mag": 49
+  },
+  "baseline_vs_summary_drift_pct": {
+    "teff": 3.647498469646546e-05,
+    "logg": -0.007216144739270893,
+    "mh": -0.013039352022266698,
+    "alpha_m": 0.06424566645600338,
+    "mg_h": -0.03562693275361785
+  },
+  "expected_baseline_rmse": {
+    "teff": 67.0956,
+    "logg": 0.1571,
+    "mh": 0.1154,
+    "alpha_m": 0.0547,
+    "mg_h": 0.1041
+  },
+  "adapter_nan_behavior": "first-member forward did NOT raise on NaN-IR input; output NaN counts per tensor: {'out_0': 5, 'out_1': 15, 'out_2': 32, 'out_3': 32}. Interpretation: adapter is a pass-through (no imputation); the XpFeatureAdapter only optionally zeroes c0 scalars. NaN in IR positions propagates through the linear trunk and contaminates every downstream activation -> \u03bc and L_chol are NaN -> predictions are NaN.",
+  "per_label": {
+    "teff": {
+      "rmse_baseline": 67.09562447310984,
+      "rmse_zero": 170.42703391337963,
+      "rmse_nan": NaN,
+      "delta_pct_zero": 154.00618185122087,
+      "delta_pct_nan": NaN,
+      "verdict": "divergent"
+    },
+    "logg": {
+      "rmse_baseline": 0.1570886634366146,
+      "rmse_zero": 0.4878531591274677,
+      "rmse_nan": NaN,
+      "delta_pct_zero": 210.55911257677536,
+      "delta_pct_nan": NaN,
+      "verdict": "divergent"
+    },
+    "mh": {
+      "rmse_baseline": 0.1153849525877663,
+      "rmse_zero": 0.26638485902668047,
+      "rmse_nan": NaN,
+      "delta_pct_zero": 130.86620313342652,
+      "delta_pct_nan": NaN,
+      "verdict": "divergent"
+    },
+    "alpha_m": {
+      "rmse_baseline": 0.05473514237955143,
+      "rmse_zero": 0.07023398532394916,
+      "rmse_nan": NaN,
+      "delta_pct_zero": 28.316073130720415,
+      "delta_pct_nan": NaN,
+      "verdict": "divergent"
+    },
+    "mg_h": {
+      "rmse_baseline": 0.10406291236300348,
+      "rmse_zero": 0.25628347497338505,
+      "rmse_nan": NaN,
+      "delta_pct_zero": 146.2774384781673,
+      "delta_pct_nan": NaN,
+      "verdict": "divergent"
+    }
+  },
+  "n_finite_pred_per_label_nan_condition": {
+    "teff": 0,
+    "logg": 0,
+    "mh": 0,
+    "alpha_m": 0,
+    "mg_h": 0
+  }
+}

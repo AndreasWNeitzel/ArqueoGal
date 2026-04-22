@@ -7,9 +7,14 @@ decisions call for:
 - ``use_c0_scalars=False`` — XP c0 scalars zeroed via the #130 adapter so
   positive pairs in the same (Teff, logg, [M/H]) cell do not align on
   luminosity/extinction confounders.
-- ``LossWeights(supcon=1.0, beta_nll=0.0, supcon_label_n_first=3)`` — SupCon
-  Gaussian-kernel pair weighting on Tier-1 atmospheric labels only
-  (`teff_apogee`, `logg_apogee`, `mh_apogee`).
+- ``LossWeights(supcon=1.0, beta_nll=0.0, supcon_label_n_first=None)`` — SupCon
+  Gaussian-kernel pair weighting on **all** production labels (Tier-1
+  atmospherics + [α/M] + [Mg/H] for the 5-label head). The pre-v2 run used
+  ``supcon_label_n_first=3`` (atmospherics only), which trained the encoder
+  to treat stars with identical Teff/logg/[M/H] as maximally positive
+  regardless of chemistry → encoder became α/M-blind → supervised head
+  developed a prototype attractor at `[α/M]=+0.11, [M/H]=-1`. See
+  ``docs/decisions/0014_contrastive_alpham_blind_catastrophe.md``.
 - Relative min-delta early stopping (``early_stop_min_delta=0.01,
   relative_min_delta=True``) — SupCon loss magnitudes drift over training so
   absolute deltas are misleading; 1 % relative improvement is the patience
@@ -95,7 +100,7 @@ def build_contrastive_config(
         loss_weights=LossWeights(
             supcon=1.0, beta_nll=0.0,
             beta=0.5, supcon_sigma=0.10,
-            supcon_label_n_first=3,  # Tier-1 only
+            supcon_label_n_first=None,  # All 5 labels — fixes α/M-blind encoder (2026-04-21).
         ),
         temperature_init=0.10,
         ensemble_seeds=(0,),
@@ -111,6 +116,14 @@ def main() -> None:
                         help="Hard cap per Run A directive; patience stops earlier.")
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--label-set", choices=("21", "5"), default="5",
+        help="21 = default LabelTiers (21 columns, several with 1-5%% NaN). "
+             "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} — "
+             "matches the 5-label production head's label space, so the "
+             "SupCon kernel trains the encoder to respect the same geometry "
+             "the supervised head will fine-tune on. Default.",
+    )
     parser.add_argument("--dry-run", action="store_true",
                         help="Build cfg + model scaffold, skip training (smoke test).")
     args = parser.parse_args()
@@ -135,7 +148,7 @@ def main() -> None:
         epochs=args.epochs, batch_size=args.batch_size,
     )
     layout = FeatureLayout()
-    tiers = LabelTiers()
+    tiers = LabelTiers.five_label() if args.label_set == "5" else LabelTiers()
 
     with (args.report_dir / "contrastive_config.json").open("w") as f:
         payload = asdict(cfg)

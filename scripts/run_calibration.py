@@ -64,7 +64,7 @@ DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet
 
 
 def _build_cfg_for_val_loader(
-    parquet: Path, pretrained_ckpt: Path, batch_size: int, seed: int,
+    parquet: Path, pretrained_ckpt: Path | None, batch_size: int, seed: int,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -401,9 +401,7 @@ def main() -> None:
     if args.ensemble is not None:
         _LOG.info("device=%s ensemble=%s", device, args.ensemble)
         member_ckpts: list[Path] = sorted(
-            [p for p in args.ensemble.glob(
-                "member_seed*/xp_abundances_main_ensemble*_seed*_best.pt",
-            )],
+            [p for p in args.ensemble.glob("member_seed*/*_seed*_best.pt")],
         )
         if not member_ckpts:
             raise FileNotFoundError(f"no member checkpoints under {args.ensemble}")
@@ -421,7 +419,8 @@ def main() -> None:
     # Reload the first member's cfg so we rebuild a val loader with the same split.
     first_blob = load_checkpoint(member_ckpts[0], map_location="cpu")
     first_cfg_yaml = json.loads(first_blob["config_yaml"])
-    pretrained_ckpt = Path(first_cfg_yaml["pretrained_encoder_ckpt"])
+    _pretrained_raw = first_cfg_yaml.get("pretrained_encoder_ckpt")
+    pretrained_ckpt = Path(_pretrained_raw) if _pretrained_raw else None
     split_seed = int(first_cfg_yaml.get("split_seed", 0))
 
     # Reconstruct tiers + block_layout from the checkpoint so the 5-label and

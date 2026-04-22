@@ -127,29 +127,29 @@ def panel_01_data_flow() -> None:
         "+ Tier 2 abundances, covariant σ",
         "#bbdefb", weight="bold")
     box(4.5, 1.9, 4.0, 1.4,
-        "Pipeline 2  —  population_classifier (main)\n"
-        "10–11D chrono-chemo-kinematic →\n"
-        "Parametric UMAP + HDBSCAN soft clusters",
+        "Starfold  —  population classification\n"
+        "(separate repo; consumes Pipeline-1 predictions)\n"
+        "10–11D chrono-chemo-kinematic → UMAP + HDBSCAN",
         "#c8e6c9", weight="bold")
 
     box(9.6, 5.2, 3.2, 0.9, "D-Cat-b\nXP-based abundance catalog", "#fff9c4")
-    box(9.6, 3.9, 3.2, 0.9, "D5.1  —  Dec 2026\nML classifier tool (open-source)", "#fff9c4")
-    box(9.6, 2.6, 3.2, 0.9, "D-Cat-d  —  Feb 2027\nCluster membership probabilities", "#fff9c4")
+    box(9.6, 3.9, 3.2, 0.9, "D5.1  —  Dec 2026\nML classifier tool (Starfold)", "#fff9c4")
+    box(9.6, 2.6, 3.2, 0.9, "D-Cat-d  —  Feb 2027\nCluster memberships (Starfold)", "#fff9c4")
 
     # Streams → Pipelines
     arrow(3.0, 5.6, 4.5, 5.0)                        # Stream 1 → Pipeline 1 (training)
     arrow(3.0, 2.8, 4.5, 4.7)                        # Stream 3 → Pipeline 1 (inference)
     arrow(3.0, 1.4, 4.5, 4.5, linestyle="--")        # External priors → Pipeline 1
-    arrow(3.0, 1.4, 4.5, 2.3)                        # External (kinematics) → Pipeline 2
-    # Pipeline 1 → Pipeline 2
+    arrow(3.0, 1.4, 4.5, 2.3)                        # External (kinematics) → Starfold
+    # Pipeline 1 → Starfold
     arrow(6.5, 4.3, 6.5, 3.3)
     # Pipelines → Deliverables
     arrow(8.5, 5.0, 9.6, 5.6)                        # Pipeline 1 → D-Cat-b
-    arrow(8.5, 2.6, 9.6, 4.3)                        # Pipeline 2 → D5.1 (tool release)
-    arrow(8.5, 2.6, 9.6, 3.0)                        # Pipeline 2 → D-Cat-d
+    arrow(8.5, 2.6, 9.6, 4.3)                        # Starfold → D5.1 (tool release)
+    arrow(8.5, 2.6, 9.6, 3.0)                        # Starfold → D-Cat-d
 
     ax.text(6.5, 0.3,
-            "Training flows Stream 1 → Pipeline 1.  Inference flows Stream 3 → Pipeline 1 → Pipeline 2.\n"
+            "Training flows Stream 1 → Pipeline 1.  Inference flows Stream 3 → Pipeline 1 → Starfold (separate repo).\n"
             "Dashed arrow: external priors (dust, distances) feed Pipeline 1 features.  "
             "Stream 2 is pre-staged for Task 4 asteroseismic ages (led externally) and is not yet consumed.",
             ha="center", fontsize=8.5, style="italic")
@@ -229,7 +229,7 @@ def panel_04_tinsley_wallerstein() -> None:
     ax.set_xlabel(r"[Fe/H]  (APOGEE DR19)")
     ax.set_ylabel(r"[$\alpha$/M]  (APOGEE DR19)")
     ax.set_title(f"Stream 1 Tinsley–Wallerstein — N={len(df):,}\n"
-                 r"disc bimodality in [$\alpha$/M] is the key structural signal for Pipeline 2")
+                 r"disc bimodality in [$\alpha$/M] is the key structural signal for downstream population classification (Starfold)")
     ax.axhline(0, color="black", linewidth=0.5, alpha=0.5)
     ax.grid(alpha=0.3)
     cbar = fig.colorbar(hb, ax=ax, label="stars per hex bin (number density)")

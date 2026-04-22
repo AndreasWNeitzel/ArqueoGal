@@ -296,6 +296,25 @@ def five_label_block_layout() -> CovarianceBlockLayout:
     )
 
 
+_TWO_LABEL: tuple[str, ...] = ("mh_apogee", "alpha_m_apogee")
+
+
+def two_label_block_layout() -> CovarianceBlockLayout:
+    """Single full 2×2 Cholesky block for the TESS_ML-matched {[M/H], [α/M]} variant.
+
+    Block and human orders match :class:`LabelTiers.two_label`. Three Cholesky
+    parameters — captures the chemistry-plane correlation that drives bimodal
+    disc segregation.
+    """
+    return CovarianceBlockLayout(
+        block_sizes=(2,),
+        n_diagonal_only=0,
+        label_order_block=_TWO_LABEL,
+        label_order_human=_TWO_LABEL,
+        block_names=("all_2",),
+    )
+
+
 # --- ModelConfig / Encoder / Head / Wrapper ---------------------------------
 
 @dataclass(frozen=True, slots=True)

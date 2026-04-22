@@ -24,6 +24,8 @@ Usage
 from __future__ import annotations
 
 import logging
+import random
+import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Literal
@@ -58,6 +60,42 @@ AIP sync queries time out at ~90 s (data_acquisition.md §13.11).
 BATCH_PLACEHOLDER = "__batch__"
 
 DEFAULT_ASYNC_TIMEOUT_SEC = 3600
+
+# Transient backend errors we should retry on (ESA is flaky on multi-schema
+# LEFT JOIN uploads — e.g. ``java.sql.SQLException: PooledConnection has
+# already been closed``; empirically ~40% succeed per attempt, so 6 retries
+# gets P(success) > 95%). Also catches generic 5xx-gateway and connection
+# reset flavours seen intermittently on AIP and GAVO.
+_TRANSIENT_ERROR_MARKERS: tuple[str, ...] = (
+    "PooledConnection has already been closed",
+    "connection has already been closed",
+    "statement timeout",
+    "read timed out",
+    "500 Server Error",
+    "500 for url",
+    "502 Bad Gateway",
+    "503 Service",
+    "504 Gateway Timeout",
+    "connection reset",
+    "temporarily unavailable",
+    # ESA's anonymous async submit queue intermittently 500s under load;
+    # pyvo wraps it as DALServiceError. The string form matches both the
+    # HTTPError and the DALServiceError messages.
+    #
+    # AIP's async scheduler occasionally kills a job mid-execution and
+    # returns a bare ERROR phase with no structured error body. pyvo
+    # surfaces this as "DALQueryError: Query Error: <No useful error
+    # from server>". Empirically retrying a fresh job submission on a
+    # different worker succeeds >90% of the time on the 2MASS/AllWISE
+    # best-neighbour upload queries.
+    "No useful error from server",
+)
+
+
+def _is_transient_tap_error(exc: BaseException) -> bool:
+    """Heuristic: is this TAP error likely transient (retryable)?"""
+    msg = str(exc)
+    return any(m.lower() in msg.lower() for m in _TRANSIENT_ERROR_MARKERS)
 """Hard ceiling on async job wait; raise rather than block forever."""
 
 
@@ -456,6 +494,8 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
     timeout_sec: float | None = DEFAULT_ASYNC_TIMEOUT_SEC,
     queue: str | None = None,
     runid: str | None = None,
+    max_retries: int = 6,
+    retry_base_delay: float = 4.0,
 ) -> pd.DataFrame:
     """Chunked TAP UPLOAD fetch — each batch POSTs a VOTable instead of IN (…).
 
@@ -489,6 +529,15 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
         Forwarded to ``job.wait``.
     queue, runid
         Forwarded to ``submit_job``. ``queue="2h"`` recommended on AIP.
+    max_retries
+        Per-batch retry budget for transient backend errors (PooledConnection
+        drops on ESA, 5xx gateway hiccups on AIP, etc.). Default 6 — the
+        observed ~40% single-try success rate on the ESA 2MASS 2-join
+        pushes P(success) past 95% at this budget. Set to 0 to disable.
+    retry_base_delay
+        Base seconds for exponential backoff. Delay on attempt ``k`` is
+        ``retry_base_delay * 2**k`` plus a ±25% jitter. Default 4 s → 4, 8,
+        16, 32, 64, 128 s ceiling for the 6 retries.
 
     Returns
     -------
@@ -543,21 +592,54 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
             "batch %d/%d: upload %d ids to tap_upload.%s",
             idx + 1, n_batches, len(chunk), upload_name,
         )
-        job: AsyncTAPJob = service.submit_job(
-            adql_template, uploads={upload_name: upload}, **submit_kwargs
-        )
-        try:
-            job.run()
-            job.wait(phases=["COMPLETED", "ERROR", "ABORTED"], timeout=timeout_sec)
-            if job.phase != "COMPLETED":
-                raise RuntimeError(
-                    f"async TAP upload job ended in {job.phase!r}: "
-                    f"{_safe_error_message(job)}"
+
+        frame: pd.DataFrame | None = None
+        last_exc: BaseException | None = None
+        for attempt in range(max_retries + 1):
+            # Submit is inside the try: ESA's async endpoint intermittently
+            # 500s at submit time too (not just during job execution). Treat
+            # the whole submit+run+fetch as a single retryable unit.
+            job: AsyncTAPJob | None = None
+            try:
+                job = service.submit_job(
+                    adql_template, uploads={upload_name: upload}, **submit_kwargs
                 )
-            logger.info("batch %d/%d completed: %s", idx + 1, n_batches, job.url)
-            frame = job.fetch_result().to_table().to_pandas()
-        finally:
-            _safe_delete(job)
+                job.run()
+                job.wait(phases=["COMPLETED", "ERROR", "ABORTED"], timeout=timeout_sec)
+                if job.phase != "COMPLETED":
+                    raise RuntimeError(
+                        f"async TAP upload job ended in {job.phase!r}: "
+                        f"{_safe_error_message(job)}"
+                    )
+                logger.info(
+                    "batch %d/%d completed on attempt %d: %s",
+                    idx + 1, n_batches, attempt + 1, job.url,
+                )
+                frame = job.fetch_result().to_table().to_pandas()
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < max_retries and _is_transient_tap_error(exc):
+                    delay = retry_base_delay * (2**attempt)
+                    jitter = delay * 0.25 * (2 * random.random() - 1)  # noqa: S311
+                    sleep_for = max(0.5, delay + jitter)
+                    logger.warning(
+                        "batch %d/%d attempt %d/%d transient error; "
+                        "retrying in %.1fs: %s",
+                        idx + 1, n_batches, attempt + 1, max_retries + 1,
+                        sleep_for, str(exc)[:180],
+                    )
+                    time.sleep(sleep_for)
+                    continue
+                raise
+            finally:
+                if job is not None:
+                    _safe_delete(job)
+        if frame is None:
+            # Should be unreachable: the loop either sets frame or re-raises.
+            raise RuntimeError(
+                f"batch {idx+1}/{n_batches} exhausted {max_retries+1} attempts"
+            ) from last_exc
 
         if batch_file is not None:
             tmp = batch_file.with_suffix(batch_file.suffix + ".part")

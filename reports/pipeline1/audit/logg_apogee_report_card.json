@@ -1,0 +1,82 @@
+{
+  "label": "logg_apogee",
+  "label_idx": 1,
+  "verdict": "prior-augmented",
+  "tier_recommendation": "tier-1-caveat",
+  "halt_triggered": false,
+  "baseline_rmse": 0.15708865225315094,
+  "sigma_truth": 0.5159252285957336,
+  "real_skill": 0.6955205065650283,
+  "null_rmse": 0.20381595194339752,
+  "null_skill": 0.6049506001128262,
+  "null_skill_ratio": 0.869781112710105,
+  "xp_joint_shuffle_frac": 0.0905699064522021,
+  "permutation_family_delta_rmse": {
+    "bp_shape": 0.0029081682916040773,
+    "rp_shape": 0.001860623006467466,
+    "xp_c0": 0.00045645982027053833,
+    "residual": 0.0,
+    "aux": 0.058274200902535364
+  },
+  "permutation_family_delta_frac": {
+    "bp_shape": 0.0056368018666574,
+    "rp_shape": 0.003606381125287836,
+    "xp_c0": 0.0008847402588025193,
+    "residual": 0.0,
+    "aux": 0.11295086511111012
+  },
+  "top_coeffs_permutation": [
+    {
+      "feature_idx": 124,
+      "delta_rmse": 0.4616141766309738
+    },
+    {
+      "feature_idx": 123,
+      "delta_rmse": 0.3590845912694931
+    },
+    {
+      "feature_idx": 132,
+      "delta_rmse": 0.16349183022975922
+    },
+    {
+      "feature_idx": 125,
+      "delta_rmse": 0.15165261924266815
+    },
+    {
+      "feature_idx": 116,
+      "delta_rmse": 0.07069048285484314
+    },
+    {
+      "feature_idx": 128,
+      "delta_rmse": 0.06413252651691437
+    },
+    {
+      "feature_idx": 127,
+      "delta_rmse": 0.055049002170562744
+    },
+    {
+      "feature_idx": 129,
+      "delta_rmse": 0.040472522377967834
+    },
+    {
+      "feature_idx": 130,
+      "delta_rmse": 0.027225136756896973
+    },
+    {
+      "feature_idx": 117,
+      "delta_rmse": 0.023259922862052917
+    }
+  ],
+  "looco_family_mean_delta_rmse": {
+    "bp_shape": 0.009826515684835613,
+    "rp_shape": 0.009413446377341947,
+    "xp_c0": 0.0071596503257751465
+  },
+  "conditional_mutual_information_nats": 0.04014386689455196,
+  "thresholds": {
+    "null_skill_halt_ratio": 0.2,
+    "perm_importance_xp_count": 3,
+    "perm_importance_frac": 0.02,
+    "cmi_min": 0.02
+  }
+}

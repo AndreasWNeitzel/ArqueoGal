@@ -1,0 +1,82 @@
+{
+  "label": "mg_h_apogee",
+  "label_idx": 4,
+  "verdict": "information-rich",
+  "tier_recommendation": "tier-1",
+  "halt_triggered": false,
+  "baseline_rmse": 0.10406290739774704,
+  "sigma_truth": 0.29024985432624817,
+  "real_skill": 0.6414712846650469,
+  "null_rmse": 0.2787178158760071,
+  "null_skill": 0.03973141856353457,
+  "null_skill_ratio": 0.06193795344133118,
+  "xp_joint_shuffle_frac": 0.6017398661015123,
+  "permutation_family_delta_rmse": {
+    "bp_shape": 0.007922849721378751,
+    "rp_shape": 0.003188702795240614,
+    "xp_c0": 0.00027563050389289856,
+    "residual": 7.450580596923828e-09,
+    "aux": 0.033179934781331286
+  },
+  "permutation_family_delta_frac": {
+    "bp_shape": 0.027296653566872314,
+    "rp_shape": 0.010986061655887797,
+    "xp_c0": 0.000949631842306053,
+    "residual": 2.566954121034351e-08,
+    "aux": 0.11431507815344569
+  },
+  "top_coeffs_permutation": [
+    {
+      "feature_idx": 123,
+      "delta_rmse": 0.36097217351198196
+    },
+    {
+      "feature_idx": 124,
+      "delta_rmse": 0.15773115307092667
+    },
+    {
+      "feature_idx": 2,
+      "delta_rmse": 0.12967421859502792
+    },
+    {
+      "feature_idx": 125,
+      "delta_rmse": 0.11201529949903488
+    },
+    {
+      "feature_idx": 132,
+      "delta_rmse": 0.09808982163667679
+    },
+    {
+      "feature_idx": 1,
+      "delta_rmse": 0.058893077075481415
+    },
+    {
+      "feature_idx": 14,
+      "delta_rmse": 0.039518408477306366
+    },
+    {
+      "feature_idx": 0,
+      "delta_rmse": 0.034191496670246124
+    },
+    {
+      "feature_idx": 116,
+      "delta_rmse": 0.031292326748371124
+    },
+    {
+      "feature_idx": 3,
+      "delta_rmse": 0.030310235917568207
+    }
+  ],
+  "looco_family_mean_delta_rmse": {
+    "bp_shape": 0.011568738966835317,
+    "rp_shape": 0.009528517442824389,
+    "xp_c0": 0.0038828481920063496
+  },
+  "conditional_mutual_information_nats": 0.0,
+  "thresholds": {
+    "null_skill_halt_ratio": 0.2,
+    "perm_importance_xp_count": 3,
+    "perm_importance_frac": 0.02,
+    "cmi_min": 0.02
+  }
+}

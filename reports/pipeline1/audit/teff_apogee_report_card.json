@@ -1,0 +1,82 @@
+{
+  "label": "teff_apogee",
+  "label_idx": 0,
+  "verdict": "prior-augmented",
+  "tier_recommendation": "tier-1-caveat",
+  "halt_triggered": false,
+  "baseline_rmse": 67.09562683105469,
+  "sigma_truth": 267.55877685546875,
+  "real_skill": 0.7492303275579005,
+  "null_rmse": 124.37944030761719,
+  "null_skill": 0.5351322734787164,
+  "null_skill_ratio": 0.7142426751770288,
+  "xp_joint_shuffle_frac": 0.2140980540791841,
+  "permutation_family_delta_rmse": {
+    "bp_shape": 5.082282313594112,
+    "rp_shape": 1.1955757141113281,
+    "xp_c0": 0.036739349365234375,
+    "residual": 0.0,
+    "aux": 16.148538442758415
+  },
+  "permutation_family_delta_frac": {
+    "bp_shape": 0.01899501251023989,
+    "rp_shape": 0.004468460082537902,
+    "xp_c0": 0.00013731319075763461,
+    "residual": 0.0,
+    "aux": 0.06035510639025538
+  },
+  "top_coeffs_permutation": [
+    {
+      "feature_idx": 124,
+      "delta_rmse": 177.7100067138672
+    },
+    {
+      "feature_idx": 123,
+      "delta_rmse": 101.97123718261719
+    },
+    {
+      "feature_idx": 125,
+      "delta_rmse": 65.95848083496094
+    },
+    {
+      "feature_idx": 2,
+      "delta_rmse": 65.03665161132812
+    },
+    {
+      "feature_idx": 1,
+      "delta_rmse": 62.555877685546875
+    },
+    {
+      "feature_idx": 0,
+      "delta_rmse": 40.05596160888672
+    },
+    {
+      "feature_idx": 3,
+      "delta_rmse": 35.19800567626953
+    },
+    {
+      "feature_idx": 132,
+      "delta_rmse": 23.830459594726562
+    },
+    {
+      "feature_idx": 14,
+      "delta_rmse": 13.692924499511719
+    },
+    {
+      "feature_idx": 4,
+      "delta_rmse": 13.172660827636719
+    }
+  ],
+  "looco_family_mean_delta_rmse": {
+    "bp_shape": 8.641230307243488,
+    "rp_shape": 5.3053609585320505,
+    "xp_c0": 1.1888761520385742
+  },
+  "conditional_mutual_information_nats": 0.13518416869473637,
+  "thresholds": {
+    "null_skill_halt_ratio": 0.2,
+    "perm_importance_xp_count": 3,
+    "perm_importance_frac": 0.02,
+    "cmi_min": 0.02
+  }
+}

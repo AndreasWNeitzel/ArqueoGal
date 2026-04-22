@@ -199,7 +199,7 @@ def test_provenance_lists_all_three_corrections(
     joined = " | ".join(meta["corrections"]).lower()
     assert "mészáros" in joined or "meszaros" in joined
     assert "lindegren" in joined
-    assert "cantat-gaudin" in joined or "brandt" in joined
+    assert "riello" in joined
 
 
 def test_provenance_records_http_and_tap_sources(

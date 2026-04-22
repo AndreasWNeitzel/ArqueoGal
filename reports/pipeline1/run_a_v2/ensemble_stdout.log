@@ -1,0 +1,133 @@
+2026-04-21 22:10:59,166 INFO ensemble_dir=/home/aneitzel/projects/ArqueoGal/models/main/xp_abundances/20260421_38a993e_712b774_ensemble_5label cfg_hash=712b774 sha=38a993e seeds=(0, 1, 2, 3, 4)
+2026-04-21 22:10:59,273 INFO device=cuda
+2026-04-21 22:10:59,273 INFO === training ensemble member seed=0 ===
+2026-04-21 22:11:05,679 INFO dropping 13906/292948 rows with NaN in XP features
+2026-04-21 22:11:06,549 INFO fit label scaler on 195295 train stars — Teff mean=4614.9 scale=267.5, logg mean=2.36 scale=0.52, [M/H] mean=-0.26 scale=0.34
+2026-04-21 22:11:06,558 INFO inverse-freq bin 0 (-inf, -1.50): n=2332 (p=0.0119) → w_mean=1.748
+2026-04-21 22:11:06,559 INFO inverse-freq bin 1 [-1.50, -1.00): n=4623 (p=0.0237) → w_mean=1.748
+2026-04-21 22:11:06,560 INFO inverse-freq bin 2 [-1.00, -0.50): n=26622 (p=0.1363) → w_mean=1.748
+2026-04-21 22:11:06,561 INFO inverse-freq bin 3 [-0.50, 0.00): n=119670 (p=0.6128) → w_mean=0.571
+2026-04-21 22:11:06,562 INFO inverse-freq bin 4 [0.00, +inf): n=42048 (p=0.2153) → w_mean=1.624
+2026-04-21 22:11:06,562 INFO inverse-freq weights: n_finite=195295, n_nan=0, clip=5.0, w range [0.571, 1.748], mean=1.0000
+2026-04-21 22:11:07,235 INFO loaded pretrained encoder from models/main/xp_abundances/20260421_38a993e_1371f1a/xp_abundances_main_contrastive_seed0_best.pt (reload_head=False)
+2026-04-21 22:11:24,734 INFO epoch 0: train_loss=0.8929 val_loss=0.3372 tau=0.090 grad_max=289.51 grad_mean=31.67
+2026-04-21 22:11:25,500 INFO first-epoch sanity teff_apogee: mean_pred=4606 mean_truth=4615 std_truth=267.6 dev=9.31
+2026-04-21 22:11:25,501 INFO first-epoch sanity logg_apogee: mean_pred=2.401 mean_truth=2.362 std_truth=0.5159 dev=0.03951
+2026-04-21 22:11:25,501 INFO first-epoch sanity mh_apogee: mean_pred=-0.2465 mean_truth=-0.2572 std_truth=0.3443 dev=0.01073
+2026-04-21 22:11:25,502 INFO first-epoch sanity alpha_m_apogee: mean_pred=0.09129 mean_truth=0.0866 std_truth=0.09543 dev=0.004683
+2026-04-21 22:11:25,502 INFO first-epoch sanity mg_h_apogee: mean_pred=-0.1291 mean_truth=-0.1514 std_truth=0.2902 dev=0.02235
+2026-04-21 22:11:33,960 INFO epoch 1: train_loss=0.4015 val_loss=0.2916 tau=0.084 grad_max=159.87 grad_mean=58.77
+2026-04-21 22:11:42,006 INFO epoch 2: train_loss=0.3330 val_loss=0.2318 tau=0.082 grad_max=185.85 grad_mean=64.84
+2026-04-21 22:11:50,605 INFO epoch 3: train_loss=0.2945 val_loss=0.2110 tau=0.080 grad_max=205.81 grad_mean=61.15
+2026-04-21 22:11:58,817 INFO epoch 4: train_loss=0.2624 val_loss=0.1979 tau=0.079 grad_max=191.23 grad_mean=55.23
+2026-04-21 22:12:07,413 INFO epoch 5: train_loss=0.2340 val_loss=0.1619 tau=0.078 grad_max=150.97 grad_mean=50.07
+2026-04-21 22:12:15,780 INFO epoch 6: train_loss=0.2145 val_loss=0.1455 tau=0.077 grad_max=115.55 grad_mean=44.11
+2026-04-21 22:12:24,622 INFO epoch 7: train_loss=0.1921 val_loss=0.1279 tau=0.076 grad_max=79.05 grad_mean=34.92
+2026-04-21 22:12:33,827 INFO epoch 8: train_loss=0.1803 val_loss=0.1264 tau=0.076 grad_max=95.74 grad_mean=32.61
+2026-04-21 22:12:42,258 INFO epoch 9: train_loss=0.1715 val_loss=0.1216 tau=0.076 grad_max=85.37 grad_mean=27.42
+2026-04-21 22:12:42,313 INFO member seed=0: best_val_loss=0.1216 at epoch 9
+2026-04-21 22:12:42,313 INFO === training ensemble member seed=1 ===
+2026-04-21 22:12:47,109 INFO dropping 13906/292948 rows with NaN in XP features
+2026-04-21 22:12:47,889 INFO fit label scaler on 195295 train stars — Teff mean=4614.9 scale=267.5, logg mean=2.36 scale=0.52, [M/H] mean=-0.26 scale=0.34
+2026-04-21 22:12:47,900 INFO inverse-freq bin 0 (-inf, -1.50): n=2332 (p=0.0119) → w_mean=1.748
+2026-04-21 22:12:47,901 INFO inverse-freq bin 1 [-1.50, -1.00): n=4623 (p=0.0237) → w_mean=1.748
+2026-04-21 22:12:47,902 INFO inverse-freq bin 2 [-1.00, -0.50): n=26622 (p=0.1363) → w_mean=1.748
+2026-04-21 22:12:47,903 INFO inverse-freq bin 3 [-0.50, 0.00): n=119670 (p=0.6128) → w_mean=0.571
+2026-04-21 22:12:47,904 INFO inverse-freq bin 4 [0.00, +inf): n=42048 (p=0.2153) → w_mean=1.624
+2026-04-21 22:12:47,904 INFO inverse-freq weights: n_finite=195295, n_nan=0, clip=5.0, w range [0.571, 1.748], mean=1.0000
+2026-04-21 22:12:48,129 INFO loaded pretrained encoder from models/main/xp_abundances/20260421_38a993e_1371f1a/xp_abundances_main_contrastive_seed0_best.pt (reload_head=False)
+2026-04-21 22:12:56,060 INFO epoch 0: train_loss=0.8443 val_loss=0.3565 tau=0.090 grad_max=187.57 grad_mean=32.36
+2026-04-21 22:12:56,740 INFO first-epoch sanity teff_apogee: mean_pred=4623 mean_truth=4615 std_truth=267.6 dev=8.235
+2026-04-21 22:12:56,741 INFO first-epoch sanity logg_apogee: mean_pred=2.368 mean_truth=2.362 std_truth=0.5159 dev=0.006024
+2026-04-21 22:12:56,741 INFO first-epoch sanity mh_apogee: mean_pred=-0.2601 mean_truth=-0.2572 std_truth=0.3443 dev=0.002858
+2026-04-21 22:12:56,742 INFO first-epoch sanity alpha_m_apogee: mean_pred=0.08828 mean_truth=0.0866 std_truth=0.09543 dev=0.001677
+2026-04-21 22:12:56,742 INFO first-epoch sanity mg_h_apogee: mean_pred=-0.1615 mean_truth=-0.1514 std_truth=0.2902 dev=0.01004
+2026-04-21 22:13:04,614 INFO epoch 1: train_loss=0.3787 val_loss=0.4378 tau=0.083 grad_max=176.99 grad_mean=57.21
+2026-04-21 22:13:12,652 INFO epoch 2: train_loss=0.3288 val_loss=0.2832 tau=0.080 grad_max=224.21 grad_mean=63.72
+2026-04-21 22:13:21,136 INFO epoch 3: train_loss=0.2976 val_loss=0.2341 tau=0.079 grad_max=165.79 grad_mean=58.87
+2026-04-21 22:13:29,459 INFO epoch 4: train_loss=0.2527 val_loss=0.1911 tau=0.077 grad_max=129.22 grad_mean=53.72
+2026-04-21 22:13:37,848 INFO epoch 5: train_loss=0.2261 val_loss=0.1574 tau=0.076 grad_max=135.80 grad_mean=51.41
+2026-04-21 22:13:46,427 INFO epoch 6: train_loss=0.2075 val_loss=0.1427 tau=0.076 grad_max=97.62 grad_mean=43.45
+2026-04-21 22:13:53,823 INFO epoch 7: train_loss=0.1892 val_loss=0.1231 tau=0.075 grad_max=96.65 grad_mean=40.61
+2026-04-21 22:14:01,739 INFO epoch 8: train_loss=0.1757 val_loss=0.1202 tau=0.075 grad_max=89.76 grad_mean=34.98
+2026-04-21 22:14:09,665 INFO epoch 9: train_loss=0.1692 val_loss=0.1152 tau=0.075 grad_max=89.78 grad_mean=30.02
+2026-04-21 22:14:09,709 INFO member seed=1: best_val_loss=0.1152 at epoch 9
+2026-04-21 22:14:09,709 INFO === training ensemble member seed=2 ===
+2026-04-21 22:14:11,817 INFO dropping 13906/292948 rows with NaN in XP features
+2026-04-21 22:14:12,639 INFO fit label scaler on 195295 train stars — Teff mean=4614.9 scale=267.5, logg mean=2.36 scale=0.52, [M/H] mean=-0.26 scale=0.34
+2026-04-21 22:14:12,650 INFO inverse-freq bin 0 (-inf, -1.50): n=2332 (p=0.0119) → w_mean=1.748
+2026-04-21 22:14:12,650 INFO inverse-freq bin 1 [-1.50, -1.00): n=4623 (p=0.0237) → w_mean=1.748
+2026-04-21 22:14:12,651 INFO inverse-freq bin 2 [-1.00, -0.50): n=26622 (p=0.1363) → w_mean=1.748
+2026-04-21 22:14:12,652 INFO inverse-freq bin 3 [-0.50, 0.00): n=119670 (p=0.6128) → w_mean=0.571
+2026-04-21 22:14:12,653 INFO inverse-freq bin 4 [0.00, +inf): n=42048 (p=0.2153) → w_mean=1.624
+2026-04-21 22:14:12,653 INFO inverse-freq weights: n_finite=195295, n_nan=0, clip=5.0, w range [0.571, 1.748], mean=1.0000
+2026-04-21 22:14:12,861 INFO loaded pretrained encoder from models/main/xp_abundances/20260421_38a993e_1371f1a/xp_abundances_main_contrastive_seed0_best.pt (reload_head=False)
+2026-04-21 22:14:21,144 INFO epoch 0: train_loss=0.7709 val_loss=0.3363 tau=0.090 grad_max=100.88 grad_mean=28.76
+2026-04-21 22:14:21,847 INFO first-epoch sanity teff_apogee: mean_pred=4625 mean_truth=4615 std_truth=267.6 dev=10.46
+2026-04-21 22:14:21,848 INFO first-epoch sanity logg_apogee: mean_pred=2.383 mean_truth=2.362 std_truth=0.5159 dev=0.02121
+2026-04-21 22:14:21,849 INFO first-epoch sanity mh_apogee: mean_pred=-0.2466 mean_truth=-0.2572 std_truth=0.3443 dev=0.01066
+2026-04-21 22:14:21,849 INFO first-epoch sanity alpha_m_apogee: mean_pred=0.08595 mean_truth=0.0866 std_truth=0.09543 dev=0.0006585
+2026-04-21 22:14:21,850 INFO first-epoch sanity mg_h_apogee: mean_pred=-0.1419 mean_truth=-0.1514 std_truth=0.2902 dev=0.00947
+2026-04-21 22:14:29,941 INFO epoch 1: train_loss=0.3921 val_loss=0.2928 tau=0.083 grad_max=238.80 grad_mean=57.77
+2026-04-21 22:14:37,935 INFO epoch 2: train_loss=0.3364 val_loss=0.2048 tau=0.081 grad_max=200.13 grad_mean=63.17
+2026-04-21 22:14:45,948 INFO epoch 3: train_loss=0.2766 val_loss=0.2358 tau=0.079 grad_max=179.44 grad_mean=59.04
+2026-04-21 22:14:53,908 INFO epoch 4: train_loss=0.2590 val_loss=0.2222 tau=0.078 grad_max=201.69 grad_mean=57.05
+2026-04-21 22:15:01,686 INFO epoch 5: train_loss=0.2307 val_loss=0.1809 tau=0.077 grad_max=155.91 grad_mean=52.92
+2026-04-21 22:15:09,682 INFO epoch 6: train_loss=0.2061 val_loss=0.1461 tau=0.076 grad_max=126.49 grad_mean=46.95
+2026-04-21 22:15:17,623 INFO epoch 7: train_loss=0.1909 val_loss=0.1356 tau=0.076 grad_max=101.60 grad_mean=43.11
+2026-04-21 22:15:25,325 INFO epoch 8: train_loss=0.1803 val_loss=0.1221 tau=0.075 grad_max=109.51 grad_mean=36.64
+2026-04-21 22:15:32,981 INFO epoch 9: train_loss=0.1736 val_loss=0.1217 tau=0.075 grad_max=88.13 grad_mean=29.87
+2026-04-21 22:15:33,021 INFO member seed=2: best_val_loss=0.1217 at epoch 9
+2026-04-21 22:15:33,021 INFO === training ensemble member seed=3 ===
+2026-04-21 22:15:35,492 INFO dropping 13906/292948 rows with NaN in XP features
+2026-04-21 22:15:36,269 INFO fit label scaler on 195295 train stars — Teff mean=4614.9 scale=267.5, logg mean=2.36 scale=0.52, [M/H] mean=-0.26 scale=0.34
+2026-04-21 22:15:36,278 INFO inverse-freq bin 0 (-inf, -1.50): n=2332 (p=0.0119) → w_mean=1.748
+2026-04-21 22:15:36,279 INFO inverse-freq bin 1 [-1.50, -1.00): n=4623 (p=0.0237) → w_mean=1.748
+2026-04-21 22:15:36,280 INFO inverse-freq bin 2 [-1.00, -0.50): n=26622 (p=0.1363) → w_mean=1.748
+2026-04-21 22:15:36,281 INFO inverse-freq bin 3 [-0.50, 0.00): n=119670 (p=0.6128) → w_mean=0.571
+2026-04-21 22:15:36,282 INFO inverse-freq bin 4 [0.00, +inf): n=42048 (p=0.2153) → w_mean=1.624
+2026-04-21 22:15:36,282 INFO inverse-freq weights: n_finite=195295, n_nan=0, clip=5.0, w range [0.571, 1.748], mean=1.0000
+2026-04-21 22:15:36,486 INFO loaded pretrained encoder from models/main/xp_abundances/20260421_38a993e_1371f1a/xp_abundances_main_contrastive_seed0_best.pt (reload_head=False)
+2026-04-21 22:15:44,151 INFO epoch 0: train_loss=0.8679 val_loss=0.3198 tau=0.090 grad_max=279.59 grad_mean=29.46
+2026-04-21 22:15:44,870 INFO first-epoch sanity teff_apogee: mean_pred=4624 mean_truth=4615 std_truth=267.6 dev=9.222
+2026-04-21 22:15:44,871 INFO first-epoch sanity logg_apogee: mean_pred=2.354 mean_truth=2.362 std_truth=0.5159 dev=0.007529
+2026-04-21 22:15:44,872 INFO first-epoch sanity mh_apogee: mean_pred=-0.2565 mean_truth=-0.2572 std_truth=0.3443 dev=0.0007732
+2026-04-21 22:15:44,872 INFO first-epoch sanity alpha_m_apogee: mean_pred=0.08416 mean_truth=0.0866 std_truth=0.09543 dev=0.002446
+2026-04-21 22:15:44,873 INFO first-epoch sanity mg_h_apogee: mean_pred=-0.1592 mean_truth=-0.1514 std_truth=0.2902 dev=0.007788
+2026-04-21 22:15:52,755 INFO epoch 1: train_loss=0.3954 val_loss=0.2712 tau=0.083 grad_max=303.02 grad_mean=57.85
+2026-04-21 22:16:00,501 INFO epoch 2: train_loss=0.3350 val_loss=0.2889 tau=0.081 grad_max=279.32 grad_mean=63.40
+2026-04-21 22:16:08,261 INFO epoch 3: train_loss=0.2909 val_loss=0.2079 tau=0.079 grad_max=243.66 grad_mean=61.26
+2026-04-21 22:16:16,263 INFO epoch 4: train_loss=0.2631 val_loss=0.2244 tau=0.078 grad_max=149.68 grad_mean=55.50
+2026-04-21 22:16:24,501 INFO epoch 5: train_loss=0.2333 val_loss=0.1699 tau=0.077 grad_max=120.98 grad_mean=49.54
+2026-04-21 22:16:32,527 INFO epoch 6: train_loss=0.2123 val_loss=0.1478 tau=0.076 grad_max=112.39 grad_mean=43.30
+2026-04-21 22:16:40,502 INFO epoch 7: train_loss=0.1942 val_loss=0.1312 tau=0.076 grad_max=119.91 grad_mean=40.58
+2026-04-21 22:16:48,648 INFO epoch 8: train_loss=0.1811 val_loss=0.1224 tau=0.075 grad_max=101.39 grad_mean=33.73
+2026-04-21 22:16:56,475 INFO epoch 9: train_loss=0.1743 val_loss=0.1200 tau=0.075 grad_max=101.98 grad_mean=28.21
+2026-04-21 22:16:56,518 INFO member seed=3: best_val_loss=0.1200 at epoch 9
+2026-04-21 22:16:56,518 INFO === training ensemble member seed=4 ===
+2026-04-21 22:16:58,553 INFO dropping 13906/292948 rows with NaN in XP features
+2026-04-21 22:16:59,338 INFO fit label scaler on 195295 train stars — Teff mean=4614.9 scale=267.5, logg mean=2.36 scale=0.52, [M/H] mean=-0.26 scale=0.34
+2026-04-21 22:16:59,346 INFO inverse-freq bin 0 (-inf, -1.50): n=2332 (p=0.0119) → w_mean=1.748
+2026-04-21 22:16:59,346 INFO inverse-freq bin 1 [-1.50, -1.00): n=4623 (p=0.0237) → w_mean=1.748
+2026-04-21 22:16:59,347 INFO inverse-freq bin 2 [-1.00, -0.50): n=26622 (p=0.1363) → w_mean=1.748
+2026-04-21 22:16:59,348 INFO inverse-freq bin 3 [-0.50, 0.00): n=119670 (p=0.6128) → w_mean=0.571
+2026-04-21 22:16:59,349 INFO inverse-freq bin 4 [0.00, +inf): n=42048 (p=0.2153) → w_mean=1.624
+2026-04-21 22:16:59,349 INFO inverse-freq weights: n_finite=195295, n_nan=0, clip=5.0, w range [0.571, 1.748], mean=1.0000
+2026-04-21 22:16:59,559 INFO loaded pretrained encoder from models/main/xp_abundances/20260421_38a993e_1371f1a/xp_abundances_main_contrastive_seed0_best.pt (reload_head=False)
+2026-04-21 22:17:07,337 INFO epoch 0: train_loss=0.8811 val_loss=0.3356 tau=0.090 grad_max=244.00 grad_mean=34.57
+2026-04-21 22:17:08,007 INFO first-epoch sanity teff_apogee: mean_pred=4615 mean_truth=4615 std_truth=267.6 dev=0.2964
+2026-04-21 22:17:08,008 INFO first-epoch sanity logg_apogee: mean_pred=2.368 mean_truth=2.362 std_truth=0.5159 dev=0.005713
+2026-04-21 22:17:08,008 INFO first-epoch sanity mh_apogee: mean_pred=-0.2664 mean_truth=-0.2572 std_truth=0.3443 dev=0.009161
+2026-04-21 22:17:08,009 INFO first-epoch sanity alpha_m_apogee: mean_pred=0.09001 mean_truth=0.0866 std_truth=0.09543 dev=0.003403
+2026-04-21 22:17:08,009 INFO first-epoch sanity mg_h_apogee: mean_pred=-0.1523 mean_truth=-0.1514 std_truth=0.2902 dev=0.000858
+2026-04-21 22:17:15,530 INFO epoch 1: train_loss=0.3777 val_loss=0.2460 tau=0.083 grad_max=170.89 grad_mean=61.54
+2026-04-21 22:17:23,011 INFO epoch 2: train_loss=0.3427 val_loss=0.2346 tau=0.081 grad_max=244.41 grad_mean=62.60
+2026-04-21 22:17:30,390 INFO epoch 3: train_loss=0.2921 val_loss=0.2024 tau=0.079 grad_max=183.35 grad_mean=61.52
+2026-04-21 22:17:38,040 INFO epoch 4: train_loss=0.2540 val_loss=0.2122 tau=0.078 grad_max=147.58 grad_mean=56.75
+2026-04-21 22:17:45,516 INFO epoch 5: train_loss=0.2328 val_loss=0.1777 tau=0.077 grad_max=175.97 grad_mean=51.87
+2026-04-21 22:17:53,216 INFO epoch 6: train_loss=0.2104 val_loss=0.1363 tau=0.076 grad_max=127.02 grad_mean=46.01
+2026-04-21 22:18:01,029 INFO epoch 7: train_loss=0.1913 val_loss=0.1372 tau=0.075 grad_max=118.81 grad_mean=39.32
+2026-04-21 22:18:09,340 INFO epoch 8: train_loss=0.1803 val_loss=0.1175 tau=0.075 grad_max=102.31 grad_mean=35.02
+2026-04-21 22:18:18,757 INFO epoch 9: train_loss=0.1712 val_loss=0.1157 tau=0.075 grad_max=83.60 grad_mean=29.14
+2026-04-21 22:18:18,802 INFO member seed=4: best_val_loss=0.1157 at epoch 9
+2026-04-21 22:18:18,804 INFO ensemble done: mean val loss=0.1188, spread=0.0065, 5 members

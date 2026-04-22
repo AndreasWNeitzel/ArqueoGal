@@ -1,0 +1,33 @@
+{
+  "output_file": "reports/selection_function/selection_function_v1.1.parquet",
+  "script": "scripts/build_selection_function_v11.py",
+  "sources": [
+    {
+      "name": "Stream 1 Pipeline 1 features",
+      "path": "data/processed/pipeline1_features_stream1.parquet",
+      "sha256": "4a98caa75f7ce940be8d9d5f9f8593cd3313eb6b97351871993b8110ea629cc1",
+      "kind": "local"
+    },
+    {
+      "name": "Ye+2024 NO_SYNTH_PHOT retention v1 grid",
+      "path": "reports/selection_function/selection_function_v1.parquet",
+      "sha256": "da0c83d47967d5e29cbcf1cbf0c251f14d7296a6d58e43b4511b4af252c95aae",
+      "kind": "local"
+    }
+  ],
+  "cuts_applied": [],
+  "corrections": [],
+  "row_count_before": null,
+  "row_count_after": 25,
+  "random_seed": null,
+  "notes": "Compound selection function v1.1: p_compound = p_ye \u00b7 p_ir \u00b7 p_parallax \u00b7 p_extinction. p_ye from v1 (unchanged). p_ir from IR-completeness marginal on |b|\u00d7G. p_parallax and p_extinction are 0/1 gates. This Parquet stores the |b|\u00d7G marginal view (25 rows); the full 4-D IR grid lives in ir_completeness_v1.parquet.",
+  "extra": {
+    "method_version": "v1.1-compound-bxg-marginal",
+    "prob_floor": 0.01,
+    "prob_ceil": 1.0,
+    "compound_floor": 0.0001
+  },
+  "schema_version": 1,
+  "git_sha": "38a993e",
+  "timestamp_utc": "2026-04-19T21:05:11Z"
+}

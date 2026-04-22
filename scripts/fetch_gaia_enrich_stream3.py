@@ -127,7 +127,8 @@ def main() -> None:
         row_count_after=int(len(df)),
         notes=(
             "Raw AIP Gaia DR3 enrichment for Stream 3 (Pipeline-1 inference "
-            "set + Pipeline-2 feature basis). TAP UPLOAD batches of 10 k. "
+            "set; predictions are downstream-consumed by Starfold). "
+            "TAP UPLOAD batches of 10 k. "
             "Downstream: Lindegren+2021 zpt + Riello+2021 G correction, then "
             "merge with BJ21 + stream3_av for processed feature matrices."
         ),

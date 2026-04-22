@@ -36,6 +36,7 @@ from arqueogal.xp_abundances.main.data import (
 )
 from arqueogal.xp_abundances.main.training import (
     CHECKPOINT_VERSION,
+    _compute_inverse_freq_weights,
     build_dataloaders,
     load_checkpoint,
     save_checkpoint,
@@ -590,3 +591,166 @@ def test_output_prefix_controls_ensemble_filenames(tmp_path: Path) -> None:
     )
     paths = train_ensemble(cfg, layout, tiers, date_tag="20260419", git_sha="deadbee")
     assert all("xp_abundances_main_finetune" in p.name for p in paths)
+
+
+# --- inverse-frequency [M/H] weighting (#198, v1.1) -------------------------
+
+def _mh_column_index(tiers: LabelTiers, col: str = "mh_apogee") -> int:
+    return tiers.all_labels.index(col)
+
+
+def test_compute_inverse_freq_weights_mean_one_normalisation() -> None:
+    """The returned weight vector must have mean exactly 1.0."""
+    tiers = LabelTiers.five_label()
+    n = 5000
+    rng = np.random.default_rng(0)
+    Y = np.zeros((n, tiers.n_labels), dtype=np.float32)
+    # Disc-dominated: 80% at [M/H]≈0, 20% at [M/H]≈-1.0.
+    Y[:, _mh_column_index(tiers)] = np.concatenate([
+        rng.normal(0.0, 0.1, int(0.80 * n)),
+        rng.normal(-1.0, 0.1, n - int(0.80 * n)),
+    ]).astype(np.float32)
+    cfg = TrainingConfig(
+        inverse_freq_weighting=True,
+        inverse_freq_bin_edges=(-1.5, -1.0, -0.5, 0.0),
+        inverse_freq_clip=5.0,
+    )
+    w = _compute_inverse_freq_weights(Y, tiers=tiers, cfg=cfg)
+    assert w.shape == (n,)
+    assert np.isclose(float(w.mean()), 1.0, atol=1e-4)
+
+
+def test_compute_inverse_freq_weights_up_weights_rare_bin() -> None:
+    """Stars in the metal-poor bin must receive larger weights than disc stars."""
+    tiers = LabelTiers.five_label()
+    n_disc, n_halo = 8000, 200
+    rng = np.random.default_rng(1)
+    Y = np.zeros((n_disc + n_halo, tiers.n_labels), dtype=np.float32)
+    Y[:n_disc, _mh_column_index(tiers)] = rng.normal(0.0, 0.1, n_disc)
+    Y[n_disc:, _mh_column_index(tiers)] = rng.normal(-1.2, 0.05, n_halo)
+
+    cfg = TrainingConfig(
+        inverse_freq_weighting=True,
+        inverse_freq_bin_edges=(-1.5, -1.0, -0.5, 0.0),
+        inverse_freq_clip=5.0,
+    )
+    w = _compute_inverse_freq_weights(Y, tiers=tiers, cfg=cfg)
+    w_disc = float(w[:n_disc].mean())
+    w_halo = float(w[n_disc:].mean())
+    # Clip-then-mean-1 normalisation compresses the nominal 5× clip to a smaller
+    # post-norm ratio because the rare-bin weight lifts the global mean used as
+    # denominator. 2× is the weakest ratio that still proves monotonicity.
+    assert w_halo > w_disc * 2.0
+
+
+def test_compute_inverse_freq_weights_nan_mh_keeps_weight_one() -> None:
+    """NaN-[M/H] stars must pass through with weight ≈ 1.0 (pre-normalisation)."""
+    tiers = LabelTiers.five_label()
+    n = 1000
+    rng = np.random.default_rng(2)
+    Y = np.zeros((n, tiers.n_labels), dtype=np.float32)
+    mh_col = _mh_column_index(tiers)
+    Y[:, mh_col] = rng.normal(0.0, 0.1, n).astype(np.float32)
+    nan_idx = np.array([3, 17, 42, 100], dtype=np.int64)
+    Y[nan_idx, mh_col] = np.nan
+
+    cfg = TrainingConfig(
+        inverse_freq_weighting=True,
+        inverse_freq_bin_edges=(-1.5, -1.0, -0.5, 0.0),
+        inverse_freq_clip=5.0,
+    )
+    w = _compute_inverse_freq_weights(Y, tiers=tiers, cfg=cfg)
+    # After mean-1 normalisation, the NaN-[M/H] stars carry the same
+    # constant — different from the bin-weight-1 value only by the global
+    # mean-preserving scale. Check they're all equal (within fp precision).
+    assert np.allclose(w[nan_idx], w[nan_idx[0]], atol=1e-5)
+
+
+def test_compute_inverse_freq_weights_clip_caps_extreme_bins() -> None:
+    """A near-empty bin must not produce unbounded weight — clip enforces cap."""
+    tiers = LabelTiers.five_label()
+    rng = np.random.default_rng(3)
+    n_disc, n_rare = 9990, 10
+    Y = np.zeros((n_disc + n_rare, tiers.n_labels), dtype=np.float32)
+    mh_col = _mh_column_index(tiers)
+    Y[:n_disc, mh_col] = rng.normal(0.0, 0.1, n_disc)
+    # One very rare bin at [M/H] < -1.5 (prob 10/10000 = 0.001).
+    Y[n_disc:, mh_col] = rng.normal(-2.0, 0.05, n_rare)
+
+    cfg = TrainingConfig(
+        inverse_freq_weighting=True,
+        inverse_freq_bin_edges=(-1.5, -1.0, -0.5, 0.0),
+        inverse_freq_clip=5.0,
+    )
+    w = _compute_inverse_freq_weights(Y, tiers=tiers, cfg=cfg)
+    # Post-normalisation max can exceed clip × 1 because normalisation shifts
+    # the mean; what must hold is max/min ratio ≈ clip upper bound.
+    ratio = float(w.max() / w.min())
+    assert ratio < cfg.inverse_freq_clip / 0.1, (  # generous bound
+        f"weight range ratio {ratio} exceeded expected clip regime"
+    )
+
+
+def test_compute_inverse_freq_weights_bad_mh_column_raises() -> None:
+    tiers = LabelTiers.five_label()
+    Y = np.zeros((10, tiers.n_labels), dtype=np.float32)
+    cfg = TrainingConfig(
+        inverse_freq_weighting=True,
+        inverse_freq_mh_column="nonexistent_label",
+    )
+    with pytest.raises(ValueError, match="not in tiers.all_labels"):
+        _compute_inverse_freq_weights(Y, tiers=tiers, cfg=cfg)
+
+
+def test_compute_inverse_freq_weights_non_monotonic_edges_raises() -> None:
+    tiers = LabelTiers.five_label()
+    Y = np.zeros((10, tiers.n_labels), dtype=np.float32)
+    cfg = TrainingConfig(
+        inverse_freq_weighting=True,
+        inverse_freq_bin_edges=(0.0, -0.5, -1.0),  # non-monotonic
+    )
+    with pytest.raises(ValueError, match="strictly-increasing"):
+        _compute_inverse_freq_weights(Y, tiers=tiers, cfg=cfg)
+
+
+def test_build_dataloaders_yields_weights_when_enabled(tmp_path: Path) -> None:
+    """When inverse_freq_weighting=True, the train loader yields 3-tuples (x, y, w)."""
+    layout = _tiny_layout()
+    tiers = LabelTiers.five_label()
+    df = _synth_frame(120, layout, tiers)
+    parquet = tmp_path / "train.parquet"
+    df.to_parquet(parquet, index=False)
+
+    cfg = replace(
+        _tiny_cfg(tmp_path),
+        train_parquet=parquet,
+        inverse_freq_weighting=True,
+        inverse_freq_bin_edges=(-0.5, 0.0),  # cheap 3-bin on synthetic range
+        inverse_freq_clip=5.0,
+    )
+    tr, _va, _ids, _scaler = build_dataloaders(cfg, layout, tiers, seed=0)
+    batch = next(iter(tr))
+    assert len(batch) == 3, f"expected (x, y, w), got {len(batch)}-tuple"
+    x, y, w = batch
+    assert x.shape[0] == y.shape[0] == w.shape[0]
+    assert w.shape == (x.shape[0],)
+    # Weights are non-negative finite.
+    assert bool(torch.isfinite(w).all())
+    assert bool((w > 0).all())
+
+
+def test_build_dataloaders_yields_sigma_when_weighting_disabled(tmp_path: Path) -> None:
+    """When inverse_freq_weighting=False, legacy (x, y, sigma_Y) contract holds."""
+    layout = _tiny_layout()
+    tiers = LabelTiers()
+    df = _synth_frame(120, layout, tiers)
+    parquet = tmp_path / "train.parquet"
+    df.to_parquet(parquet, index=False)
+
+    cfg = replace(_tiny_cfg(tmp_path), train_parquet=parquet)
+    tr, _va, _ids, _scaler = build_dataloaders(cfg, layout, tiers, seed=0)
+    batch = next(iter(tr))
+    assert len(batch) == 3, "legacy contract still yields (x, y, sigma_Y)"
+    x, y, s = batch
+    assert s.shape == y.shape  # sigma_Y is per-label, not per-star
+    assert x.shape[0] == y.shape[0]

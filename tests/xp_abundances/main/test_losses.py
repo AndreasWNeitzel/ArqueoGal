@@ -59,6 +59,17 @@ def test_supcon_projection_dim_mismatch_raises() -> None:
         supcon_soft_positive(za, y, zk, y, temperature=0.1)
 
 
+def test_supcon_nan_labels_masked_not_propagated() -> None:
+    za = _unit_proj(6, 8, seed=1)
+    zk = _unit_proj(6, 8, seed=2)
+    ya = torch.randn(6, 3)
+    yk = torch.randn(6, 3)
+    ya[1, 2] = float("nan")
+    yk[3, 0] = float("nan")
+    loss = supcon_soft_positive(za, ya, zk, yk, temperature=0.1)
+    assert torch.isfinite(loss), "NaN labels must not NaN-propagate into the loss"
+
+
 def _fake_cholesky_batch(
     B: int, n: int, block_sizes: tuple[int, ...], n_diagonal_only: int = 0,
     seed: int = 0,
@@ -168,3 +179,120 @@ def test_mahalanobis_residual_shape_and_zero_at_mean() -> None:
     mu = torch.randn(B, n)
     res = mahalanobis_residual(mu, L, mu)
     torch.testing.assert_close(res, torch.zeros(B, n), atol=1e-6, rtol=0)
+
+
+def test_beta_nll_uniform_weights_equal_unweighted() -> None:
+    """Weights of all ones must reproduce the unweighted reduction exactly."""
+    B, blocks, n_diag = 5, (2, 2), 2
+    n = sum(blocks) + n_diag
+    L = _fake_cholesky_batch(B, n, blocks, n_diag, seed=4)
+    mu = torch.randn(B, n)
+    y = torch.randn(B, n)
+
+    # No mask path.
+    plain = beta_nll_block_cholesky(mu, L, y, beta=0.5).item()
+    with_w = beta_nll_block_cholesky(
+        mu, L, y, beta=0.5, sample_weights=torch.ones(B),
+    ).item()
+    assert abs(plain - with_w) < 1e-5
+
+    # Mask path (all ones).
+    mask = torch.ones(B, n)
+    plain_m = beta_nll_block_cholesky(mu, L, y, beta=0.5, mask=mask).item()
+    with_w_m = beta_nll_block_cholesky(
+        mu, L, y, beta=0.5, mask=mask, sample_weights=torch.ones(B),
+    ).item()
+    assert abs(plain_m - with_w_m) < 1e-5
+
+
+def test_beta_nll_weighted_average_matches_manual() -> None:
+    """Weighted reduction must equal sum(w*nll)/sum(w)/n with no mask."""
+    B, blocks, n_diag = 6, (2, 2), 2
+    n = sum(blocks) + n_diag
+    L = _fake_cholesky_batch(B, n, blocks, n_diag, seed=9)
+    mu = torch.randn(B, n)
+    y = torch.randn(B, n)
+    w = torch.tensor([5.0, 1.0, 1.0, 1.0, 1.0, 1.0])  # up-weight star 0 5×.
+
+    # Manual per-star NLL (β=0 so no β weighting to untangle).
+    diff = (y - mu).unsqueeze(-1)
+    z = torch.linalg.solve_triangular(L, diff, upper=False).squeeze(-1)
+    mahal = z.pow(2).sum(dim=-1)
+    log_det = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
+    nll_per_star = 0.5 * (n * math.log(2 * math.pi) + log_det + mahal)
+    expected = (w * nll_per_star).sum() / w.sum() / n
+
+    got = beta_nll_block_cholesky(
+        mu, L, y, beta=0.0, sample_weights=w,
+    ).item()
+    assert abs(got - expected.item()) < 1e-5
+
+
+def test_beta_nll_weighted_mask_path_matches_manual() -> None:
+    """Weighted + mask path: sum(w*scale*nll)/sum(w*mask_sum_per_star)."""
+    B, blocks, n_diag = 4, (2, 2), 2
+    n = sum(blocks) + n_diag
+    L = _fake_cholesky_batch(B, n, blocks, n_diag, seed=11)
+    mu = torch.randn(B, n)
+    y = torch.randn(B, n)
+    mask = torch.tensor([
+        [1, 1, 1, 1, 1, 1],
+        [1, 1, 0, 0, 1, 1],
+        [1, 1, 1, 1, 0, 0],
+        [1, 0, 1, 0, 1, 0],
+    ], dtype=torch.float32)
+    w = torch.tensor([1.0, 3.0, 0.5, 2.0])
+
+    # Manual (β=0).
+    diff = (y - mu).unsqueeze(-1)
+    z = torch.linalg.solve_triangular(L, diff, upper=False).squeeze(-1)
+    mahal = z.pow(2).sum(dim=-1)
+    log_det = 2.0 * torch.log(torch.diagonal(L, dim1=-2, dim2=-1)).sum(dim=-1)
+    nll_per_star = 0.5 * (n * math.log(2 * math.pi) + log_det + mahal)
+    obs = mask.sum(dim=-1).clamp_min(1e-8)
+    scaled = nll_per_star * (obs / n) * w
+    expected = scaled.sum() / (mask * w.unsqueeze(-1)).sum()
+
+    got = beta_nll_block_cholesky(
+        mu, L, y, beta=0.0, mask=mask, sample_weights=w,
+    ).item()
+    assert abs(got - expected.item()) < 1e-5
+
+
+def test_beta_nll_sample_weights_shape_validation() -> None:
+    B, blocks, n_diag = 3, (2, 2), 2
+    n = sum(blocks) + n_diag
+    L = _fake_cholesky_batch(B, n, blocks, n_diag, seed=0)
+    mu = torch.zeros(B, n)
+    y = torch.zeros(B, n)
+    bad_w = torch.ones(B + 1)
+    with pytest.raises(ValueError, match="sample_weights shape"):
+        beta_nll_block_cholesky(mu, L, y, sample_weights=bad_w)
+
+
+def test_beta_nll_upweighting_shifts_gradient_toward_weighted_star() -> None:
+    """Heavy weight on star k must make the loss more sensitive to its mu_k."""
+    B, blocks, n_diag = 3, (2, 2), 2
+    n = sum(blocks) + n_diag
+    L = _fake_cholesky_batch(B, n, blocks, n_diag, seed=13)
+    y = torch.randn(B, n)
+
+    mu_uniform = torch.randn(B, n, requires_grad=True)
+    loss_uniform = beta_nll_block_cholesky(
+        mu_uniform, L, y, beta=0.5, sample_weights=torch.ones(B),
+    )
+    loss_uniform.backward()
+    g_uniform = mu_uniform.grad.clone()
+
+    mu_weighted = mu_uniform.detach().clone().requires_grad_(True)
+    w = torch.tensor([10.0, 0.1, 0.1])
+    loss_weighted = beta_nll_block_cholesky(
+        mu_weighted, L, y, beta=0.5, sample_weights=w,
+    )
+    loss_weighted.backward()
+    g_weighted = mu_weighted.grad
+
+    # Star 0's gradient norm should be larger under heavy weighting;
+    # other stars' gradient norms should be smaller.
+    assert g_weighted[0].norm() > g_uniform[0].norm()
+    assert g_weighted[1].norm() < g_uniform[1].norm()

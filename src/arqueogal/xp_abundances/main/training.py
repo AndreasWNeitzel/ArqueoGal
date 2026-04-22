@@ -54,6 +54,8 @@ from arqueogal.xp_abundances.main.data import (
     stratified_split_ids,
 )
 from arqueogal.xp_abundances.main.losses import (
+    ContrastiveQueue,
+    barlow_twins_loss,
     beta_nll_block_cholesky,
     supcon_soft_positive,
 )
@@ -63,6 +65,7 @@ from arqueogal.xp_abundances.main.model import (
     XpAbundanceModel,
     default_pipeline1_layout,
     five_label_block_layout,
+    two_label_block_layout,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -172,28 +175,47 @@ def build_dataloaders(
     # ``transform`` is NaN-preserving; rescaled uncertainties scale by 1/s too
     # (only σ_Y is also divided, so its meaning relative to the standardised
     # target is preserved for downstream calibration consumers).
+    # Compute inverse-frequency [M/H] weights on the train partition in raw
+    # units, BEFORE the label scaler transforms Y. See #198 — v1's uniform
+    # per-star NLL let [α/M] regress to the disc mean at [M/H]<-0.5.
+    if cfg.inverse_freq_weighting:
+        train_weights = _compute_inverse_freq_weights(
+            arrs["Y"][train_mask], tiers=tiers, cfg=cfg,
+        )
+    else:
+        train_weights = None
+
     arrs["Y"] = label_scaler.transform(arrs["Y"])
     if "sigma_Y" in arrs:
         arrs["sigma_Y"] = arrs["sigma_Y"] / label_scaler.scale.reshape(1, -1)
 
+    stage_gpu = cfg.stage_dataset_on_gpu and torch.cuda.is_available()
+    ds_device = "cuda" if stage_gpu else "cpu"
     train_ds = XpAbundanceDataset(
         X=arrs["X"][train_mask], Y=arrs["Y"][train_mask],
         sigma_Y=arrs["sigma_Y"][train_mask], source_id=arrs["source_id"][train_mask],
+        weights=train_weights, device=ds_device,
     )
     val_ds = XpAbundanceDataset(
         X=arrs["X"][val_mask], Y=arrs["Y"][val_mask],
         sigma_Y=arrs["sigma_Y"][val_mask], source_id=arrs["source_id"][val_mask],
+        device=ds_device,
     )
 
+    # When tensors already live on the GPU, DataLoader workers (fork) can't
+    # share CUDA tensors and pin_memory is meaningless — force num_workers=0
+    # and pin_memory=False in that regime.
+    loader_workers = 0 if stage_gpu else cfg.num_workers
+    loader_pin = (not stage_gpu) and torch.cuda.is_available()
     g = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(
         train_ds, batch_size=cfg.batch_size, shuffle=True,
-        num_workers=cfg.num_workers, pin_memory=torch.cuda.is_available(),
+        num_workers=loader_workers, pin_memory=loader_pin,
         generator=g, drop_last=True,
     )
     val_loader = DataLoader(
         val_ds, batch_size=cfg.batch_size, shuffle=False,
-        num_workers=cfg.num_workers, pin_memory=torch.cuda.is_available(),
+        num_workers=loader_workers, pin_memory=loader_pin,
     )
     return train_loader, val_loader, split_ids, label_scaler
 
@@ -206,6 +228,84 @@ def _strat_columns_available(parquet_path: Path | str) -> list[str]:
     present = set(schema.names)
     wanted = ["fe_h_apogee", "teff_apogee", "b_deg", "dec"]
     return [c for c in wanted if c in present]
+
+
+def _compute_inverse_freq_weights(
+    Y_train_raw: np.ndarray,  # noqa: N803 — matrix convention
+    *,
+    tiers: LabelTiers,
+    cfg: TrainingConfig,
+) -> np.ndarray:
+    """Per-star inverse-frequency weight from raw [M/H] bin counts.
+
+    Weight is ``1 / p(bin_i)`` clipped at ``cfg.inverse_freq_clip``, then
+    normalised so ``mean(w) = 1`` over the train partition. NaN-[M/H] stars
+    retain weight 1.0 (no adjustment); they count toward the mean-1
+    normalisation denominator via the full array.
+
+    Rank-invariant against vanilla unweighted training — when
+    ``cfg.inverse_freq_weighting`` is ``False``, the caller skips this and
+    leaves ``weights=None`` on the Dataset, which the loss interprets as
+    uniform (identical to v1 semantics). Enabling this knob is the v1.1
+    fix for the metal-poor [α/M] regression-to-mean reported at #198.
+    """
+    try:
+        mh_idx = tiers.all_labels.index(cfg.inverse_freq_mh_column)
+    except ValueError as e:
+        raise ValueError(
+            f"inverse_freq_mh_column={cfg.inverse_freq_mh_column!r} "
+            f"not in tiers.all_labels={tiers.all_labels}",
+        ) from e
+
+    mh_raw = Y_train_raw[:, mh_idx].astype(np.float64, copy=False)
+    finite = np.isfinite(mh_raw)
+
+    edges = np.asarray(cfg.inverse_freq_bin_edges, dtype=np.float64)
+    if edges.ndim != 1 or edges.size < 1 or not np.all(np.diff(edges) > 0):
+        raise ValueError(
+            f"inverse_freq_bin_edges must be a strictly-increasing 1-D tuple; "
+            f"got {cfg.inverse_freq_bin_edges}",
+        )
+
+    bin_idx = np.digitize(mh_raw, edges)  # 0..len(edges); 0 = below first edge
+    n_bins = edges.size + 1
+    counts = np.zeros(n_bins, dtype=np.int64)
+    for k in range(n_bins):
+        counts[k] = int(((bin_idx == k) & finite).sum())
+    n_finite = int(finite.sum())
+    if n_finite == 0:
+        raise RuntimeError(
+            "no finite [M/H] values in train partition — cannot compute "
+            "inverse-frequency weights",
+        )
+    probs = counts / float(n_finite)
+    inv_freq = np.where(counts > 0, 1.0 / np.maximum(probs, 1e-12), 1.0)
+    inv_freq = np.minimum(inv_freq, cfg.inverse_freq_clip)
+
+    w = np.ones_like(mh_raw, dtype=np.float32)
+    w[finite] = inv_freq[bin_idx[finite]].astype(np.float32)
+    # Normalise to mean=1 so the overall loss scale matches unweighted v1.
+    w *= float(len(w)) / float(w.sum())
+
+    # Per-bin diagnostics for the training log.
+    edge_repr = [f"(-inf, {edges[0]:.2f})"]
+    edge_repr.extend(
+        f"[{edges[i]:.2f}, {edges[i + 1]:.2f})" for i in range(len(edges) - 1)
+    )
+    edge_repr.append(f"[{edges[-1]:.2f}, +inf)")
+    for k in range(n_bins):
+        bin_mean_w = float(w[(bin_idx == k) & finite].mean()) if counts[k] > 0 else 1.0
+        _LOG.info(
+            "inverse-freq bin %d %s: n=%d (p=%.4f) → w_mean=%.3f",
+            k, edge_repr[k], counts[k], probs[k], bin_mean_w,
+        )
+    _LOG.info(
+        "inverse-freq weights: n_finite=%d, n_nan=%d, clip=%.1f, "
+        "w range [%.3f, %.3f], mean=%.4f",
+        n_finite, len(w) - n_finite, cfg.inverse_freq_clip,
+        float(w.min()), float(w.max()), float(w.mean()),
+    )
+    return w
 
 
 def _block_layout_for(tiers: LabelTiers) -> CovarianceBlockLayout:
@@ -223,6 +323,9 @@ def _block_layout_for(tiers: LabelTiers) -> CovarianceBlockLayout:
     five = five_label_block_layout()
     if five.label_order_human == tiers.all_labels:
         return five
+    two = two_label_block_layout()
+    if two.label_order_human == tiers.all_labels:
+        return two
     # Fallback: one dense block over every label in tier order.
     labels = tiers.all_labels
     return CovarianceBlockLayout(
@@ -307,7 +410,9 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
     y: torch.Tensor,
     cfg: TrainingConfig,
     adapter: XpFeatureAdapter,
-) -> tuple[torch.Tensor, dict[str, float]]:
+    weights: torch.Tensor | None = None,
+    queue: ContrastiveQueue | None = None,
+) -> tuple[torch.Tensor, dict[str, float], torch.Tensor, torch.Tensor]:
     """Forward pass + weighted SupCon + β-NLL loss.
 
     ``y`` arrives in human (tier) order from the loader; ``mu`` and ``L`` live
@@ -334,18 +439,29 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
 
     supcon_active = lw.supcon != 0.0
     nll_active = lw.beta_nll != 0.0
+    barlow_active = lw.barlow != 0.0
 
     # Forward: always call model (cheap relative to losses) so trunk grads flow
     # through either term — we don't gain by skipping it.
-    mu, L, _h, z = model(x_adapted)
+    mu, L, h, z = model(x_adapted)
 
     if supcon_active:
         y_for_supcon = (
             y[:, : lw.supcon_label_n_first]
             if lw.supcon_label_n_first is not None else y
         )
+        if queue is not None:
+            qz, qy = queue.get()
+            # Label dims must agree: queue was sized for the full y; slice to
+            # match supcon_label_n_first if in use.
+            if lw.supcon_label_n_first is not None:
+                qy = qy[:, : lw.supcon_label_n_first]
+            zk = torch.cat([z, qz], dim=0)
+            yk = torch.cat([y_for_supcon, qy], dim=0)
+        else:
+            zk, yk = z, y_for_supcon
         supcon = supcon_soft_positive(
-            z, y_for_supcon, z, y_for_supcon,
+            z, y_for_supcon, zk, yk,
             temperature=tau, sigma=lw.supcon_sigma,
         )
     else:
@@ -357,14 +473,21 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
         y_clean = torch.where(finite, y_block, mu.detach())
         nll = beta_nll_block_cholesky(
             mu, L, y_clean, beta=lw.beta, mask=finite.float(),
+            sample_weights=weights,
         )
     else:
         nll = torch.zeros((), device=x.device)
 
-    total = lw.supcon * supcon + lw.beta_nll * nll
+    if barlow_active:
+        bt = barlow_twins_loss(h, lam=lw.barlow_lam)
+    else:
+        bt = torch.zeros((), device=x.device)
+
+    total = lw.supcon * supcon + lw.beta_nll * nll + lw.barlow * bt
     parts = {"loss": float(total.detach()), "supcon": float(supcon.detach()),
-             "nll": float(nll.detach()), "tau": float(tau.detach())}
-    return total, parts
+             "nll": float(nll.detach()), "barlow": float(bt.detach()),
+             "tau": float(tau.detach())}
+    return total, parts, z.detach(), y.detach()
 
 
 def train_one_epoch(  # noqa: PLR0913 — one-epoch dispatch has many collaborators
@@ -377,6 +500,7 @@ def train_one_epoch(  # noqa: PLR0913 — one-epoch dispatch has many collaborat
     device: torch.device,
     scaler: torch.amp.GradScaler | None = None,
     adapter: XpFeatureAdapter | None = None,
+    queue: ContrastiveQueue | None = None,
 ) -> dict[str, float]:
     """One training epoch; returns mean per-batch metrics."""
     if adapter is None:
@@ -385,19 +509,28 @@ def train_one_epoch(  # noqa: PLR0913 — one-epoch dispatch has many collaborat
     amp_dtype = _AMP_DTYPES[cfg.amp_dtype]
     use_amp = amp_dtype is not None and device.type == "cuda"
 
-    sums: dict[str, float] = {"loss": 0.0, "supcon": 0.0, "nll": 0.0, "tau": 0.0}
+    sums: dict[str, float] = {
+        "loss": 0.0, "supcon": 0.0, "nll": 0.0, "barlow": 0.0, "tau": 0.0,
+    }
     n = 0
     grad_norm_max = 0.0
     grad_norm_sum = 0.0
 
     for batch in loader:
         x, y = batch[0].to(device, non_blocking=True), batch[1].to(device, non_blocking=True)
+        w = (
+            batch[2].to(device, non_blocking=True)
+            if cfg.inverse_freq_weighting and len(batch) > 2
+            else None
+        )
         optimizer.zero_grad(set_to_none=True)
 
         with torch.amp.autocast(
             device_type=device.type, dtype=amp_dtype, enabled=use_amp,
         ):
-            total, parts = _compute_losses(model, log_temp, x, y, cfg, adapter)
+            total, parts, z_det, y_det = _compute_losses(
+                model, log_temp, x, y, cfg, adapter, weights=w, queue=queue,
+            )
 
         if scaler is not None and scaler.is_enabled():
             scaler.scale(total).backward()
@@ -414,6 +547,9 @@ def train_one_epoch(  # noqa: PLR0913 — one-epoch dispatch has many collaborat
             )
             optimizer.step()
         scheduler.step()
+
+        if queue is not None:
+            queue.enqueue(z_det, y_det)
 
         g_val = float(g) if torch.isfinite(g) else float("inf")
         grad_norm_max = max(grad_norm_max, g_val)
@@ -452,13 +588,15 @@ def validate(
     if adapter is None:
         raise ValueError("adapter is required; build via _build_model_and_temperature")
     model.eval()
-    sums: dict[str, float] = {"loss": 0.0, "supcon": 0.0, "nll": 0.0, "tau": 0.0}
+    sums: dict[str, float] = {
+        "loss": 0.0, "supcon": 0.0, "nll": 0.0, "barlow": 0.0, "tau": 0.0,
+    }
     n = 0
     with torch.no_grad():
         for batch in loader:
             x = batch[0].to(device, non_blocking=True)
             y = batch[1].to(device, non_blocking=True)
-            _, parts = _compute_losses(model, log_temp, x, y, cfg, adapter)
+            _, parts, _, _ = _compute_losses(model, log_temp, x, y, cfg, adapter)
             for k, v in parts.items():
                 sums[k] += v
             n += 1
@@ -510,6 +648,20 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
     use_fp16 = cfg.amp_dtype == "float16" and device.type == "cuda"
     scaler = torch.amp.GradScaler(device="cuda") if use_fp16 else None
 
+    queue: ContrastiveQueue | None = None
+    if cfg.queue_size > 0:
+        queue = ContrastiveQueue(
+            latent_dim=cfg.latent_dim,
+            n_labels=tiers.n_labels,
+            size=cfg.queue_size,
+            device=device,
+            warm_start=cfg.queue_warm_start,
+        )
+        _LOG.info(
+            "momentum queue enabled: size=%d, D=%d, n_labels=%d, warm_start=%s",
+            cfg.queue_size, cfg.latent_dim, tiers.n_labels, cfg.queue_warm_start,
+        )
+
     history: list[dict[str, float]] = []
     best_vl = math.inf
     best_epoch = -1
@@ -521,7 +673,7 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
     for epoch in range(cfg.epochs):
         tr = train_one_epoch(
             model, log_temp, train_loader, optimizer, scheduler, cfg, device, scaler,
-            adapter=adapter,
+            adapter=adapter, queue=queue,
         )
         va = validate(model, log_temp, val_loader, cfg, device, adapter=adapter)
         row = {"epoch": epoch, **{f"train_{k}": v for k, v in tr.items()},
@@ -671,10 +823,14 @@ def _build_optimizer(
     """
     head_params = [*model.head.parameters(), log_temp]
     encoder_params = list(model.encoder.parameters())
+    # Fused AdamW fuses per-parameter updates into one CUDA kernel — for a
+    # ~100k-param model on a 6 GB 3060 this drops the optimizer step from
+    # ~8 ms to <0.5 ms (profiled 2026-04-22). Only supported on CUDA.
+    fused = torch.cuda.is_available()
     if cfg.encoder_lr_ratio == 1.0:
         return torch.optim.AdamW(
             [*encoder_params, *head_params],
-            lr=cfg.max_lr, weight_decay=cfg.weight_decay,
+            lr=cfg.max_lr, weight_decay=cfg.weight_decay, fused=fused,
         )
     return torch.optim.AdamW(
         [
@@ -682,7 +838,7 @@ def _build_optimizer(
              "name": "encoder"},
             {"params": head_params, "lr": cfg.max_lr, "name": "head"},
         ],
-        weight_decay=cfg.weight_decay,
+        weight_decay=cfg.weight_decay, fused=fused,
     )
 
 

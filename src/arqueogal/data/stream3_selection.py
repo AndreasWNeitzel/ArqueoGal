@@ -1,23 +1,20 @@
-"""Stream 3 stratified sub-sampling — §5.3 of data_acquisition.md.
+"""Stream 3 sub-sampling — §5.3 of data_acquisition.md.
 
-Draws a (Teff, logg, [M/H], G)-stratified 1.5 M-star subset from the
-Andrae+2023 vetted RGB catalogue (Zenodo 7945154). The stratification is
-essential for Pipeline 2 diagnostics — an unstratified Gaia draw is
-dominated by disc stars at solar metallicity and under-samples the halo
-and metal-poor tails where interesting population structure lives (§5.3).
+Two sampler flavours live here, both operating on an already-loaded DataFrame
+(the Andrae+2023 Zenodo downloader lives elsewhere):
 
-The downloader (Andrae+2023 Zenodo) lives elsewhere; this module operates
-on an already-loaded DataFrame.
+- :func:`stratified_subsample` — (Teff, log g, [M/H], G)-stratified draw used
+  by the Pipeline-1 audit set. Essential to avoid the Gaia solar-disc bias
+  that would under-sample the halo and metal-poor tails where interesting
+  population structure lives.
+- :func:`volume_limited_subsample` — natural-density uniform random draw from
+  stars with ``distance < distance_cut_kpc``. Used for downstream
+  density-based clustering (Starfold, separate repo), which requires the
+  natural density profile that stratification deliberately breaks.
 
-Algorithm:
-
-1. Assign each star to a 4D bin using ``np.digitize`` on the four axes.
-2. For each non-empty bin, take all stars if the bin has ≤ ``per_cell``,
-   else draw a uniform random subsample of ``per_cell`` stars.
-3. Concatenate and shuffle (reproducibly via ``rng_seed``).
-
-Both the stratification parameters and the seed are part of the returned
-:class:`StratificationResult` for provenance logging.
+Both samplers are seeded (reproducible) and preserve the caller's schema.
+Provenance metadata is returned so ingestion scripts can write the standard
+``*.provenance.json`` sidecar.
 """
 
 from __future__ import annotations
@@ -252,12 +249,178 @@ def _empty_result(  # noqa: PLR0913 — internal helper, matches StratificationR
     )
 
 
+# -----------------------------------------------------------------------------
+# Volume-limited sampler — natural-density draw for downstream clustering
+# (Option C)
+# -----------------------------------------------------------------------------
+#
+# Rationale. Density-based clustering (now performed downstream in the
+# separate Starfold repository, not in this repo) learns cluster structure in
+# natural density space, so stratification — which deliberately flattens the
+# density distribution — is the wrong sampling scheme for that use case.
+# Instead we take a volume-limited cut: keep every star with distance < d_cut,
+# then (if the below-cut pool is still too large) draw a uniform random
+# subsample from it.
+#
+# Distance cut default: 2.5 kpc. Rationale:
+#   - data_acquisition.md §8.2 / §8.4 primary-Av strategy treats d < 1.25 kpc
+#     (Edenhofer+2024) and 1.25–3 kpc (Lallement+2022 cross-check + neighborhood
+#     median) as the two reliable regimes; beyond 3 kpc, Av relies on SFD +
+#     GSP-Phot median only.
+#   - 2.5 kpc sits inside the Lallement+2022 coverage, keeps Av uncertainty
+#     dominated by line-of-sight maps rather than SFD saturation, and is a
+#     common volume-limited cut for RGB+RC in the population-classification
+#     literature (comparable to Dodd+2023's local sample).
+#   - Neitzel+2025 used ~2 kpc on the TESS-CVZ side; 2.5 kpc extends that
+#     radius without entering the regime where distance uncertainties blow
+#     up the action-space scatter.
+# The caller can override via the ``distance_cut_kpc`` argument; the value is
+# returned in :class:`VolumeLimitedResult.to_provenance` for the sidecar.
+
+
+DEFAULT_DISTANCE_CUT_KPC: Final[float] = 2.5
+"""Default volume-limit in kiloparsecs for :func:`volume_limited_subsample`.
+See module docstring for the rationale (data_acquisition.md §8.2 + §8.4)."""
+
+
+@dataclass(frozen=True, slots=True)
+class VolumeLimitedResult:
+    """Output of :func:`volume_limited_subsample`.
+
+    ``sample`` is the selected subset DataFrame. ``n_below_cut`` counts the
+    pool size before the optional uniform downsample to ``n_target``.
+    """
+
+    sample: pd.DataFrame
+    distance_col: str
+    distance_cut_kpc: float
+    n_target: int
+    n_input: int
+    n_below_cut: int
+    n_selected: int
+    rng_seed: int
+
+    def to_provenance(self) -> dict:
+        """Serialisable summary for the Parquet sidecar."""
+        return {
+            "method": "stream3_volume_limited_subsample",
+            "distance_col": self.distance_col,
+            "distance_cut_kpc": self.distance_cut_kpc,
+            "n_target": self.n_target,
+            "n_input": self.n_input,
+            "n_below_cut": self.n_below_cut,
+            "n_selected": self.n_selected,
+            "rng_seed": self.rng_seed,
+        }
+
+
+def volume_limited_subsample(
+    catalogue: pd.DataFrame,
+    *,
+    distance_col: str,
+    distance_cut_kpc: float = DEFAULT_DISTANCE_CUT_KPC,
+    n_target: int,
+    seed: int = 0,
+) -> VolumeLimitedResult:
+    """Draw a volume-limited subsample for downstream density-based clustering.
+
+    Selects stars with ``distance < distance_cut_kpc``. If the below-cut pool
+    exceeds ``n_target``, a uniform random subsample of size ``n_target`` is
+    taken from it — preserving natural density, which density-based
+    clustering (e.g. HDBSCAN in Starfold) needs. If the pool is smaller than
+    ``n_target``, the full pool is returned with a logged warning.
+
+    Parameters
+    ----------
+    catalogue
+        Input star catalogue. Must carry a distance column whose values are
+        in **kiloparsecs**. Per data_acquisition.md §7.3, this is typically
+        ``r_med_photogeo / 1000`` (Bailer-Jones+2021 ``r_med_photogeo`` is in
+        parsecs). The caller is responsible for attaching and unit-converting
+        the distance column — this function does not re-fetch distances.
+    distance_col
+        Column name holding the distance in kpc. Required — forcing the
+        caller to name it makes pc-vs-kpc unit confusion a visible choice.
+    distance_cut_kpc
+        Keep stars with ``distance < distance_cut_kpc``. Default
+        :data:`DEFAULT_DISTANCE_CUT_KPC` (2.5 kpc).
+    n_target
+        Target number of stars in the output. The realised size is
+        ``min(n_target, n_below_cut)``.
+    seed
+        Random seed for the uniform downsample. Fixed for reproducibility.
+
+    Returns
+    -------
+    VolumeLimitedResult
+        Subsampled DataFrame (same schema as input) + accounting metadata.
+
+    Notes
+    -----
+    Rows with NaN in ``distance_col`` are treated as above-cut and excluded.
+    This is intentional: without a distance we cannot place the star in the
+    volume, and density-based clustering on unknown-distance stars would
+    smear the density estimate.
+    """
+    if distance_col not in catalogue.columns:
+        raise KeyError(
+            f"volume_limited_subsample requires column {distance_col!r}; "
+            f"available: {sorted(catalogue.columns)}"
+        )
+    if distance_cut_kpc <= 0:
+        raise ValueError(f"distance_cut_kpc must be positive, got {distance_cut_kpc}")
+    if n_target <= 0:
+        raise ValueError(f"n_target must be positive, got {n_target}")
+
+    distances = catalogue[distance_col].to_numpy(dtype=float)
+    n_input = len(catalogue)
+    # np.less with NaN returns False → NaN rows are dropped from the mask.
+    below_cut = np.less(distances, distance_cut_kpc)
+    n_below_cut = int(below_cut.sum())
+
+    below_pool = catalogue.loc[below_cut]
+
+    if n_below_cut <= n_target:
+        if n_below_cut < n_target:
+            logger.warning(
+                "volume_limited_subsample: below-cut pool (%d) smaller than "
+                "n_target (%d); returning full pool",
+                n_below_cut, n_target,
+            )
+        sample = below_pool.reset_index(drop=True)
+    else:
+        rng = np.random.default_rng(seed)
+        picks = rng.choice(n_below_cut, size=n_target, replace=False)
+        picks.sort()
+        sample = below_pool.iloc[picks].reset_index(drop=True)
+
+    logger.info(
+        "volume_limited_subsample: d < %.3f kpc on column %r: "
+        "%d/%d below cut, %d selected (seed=%d)",
+        distance_cut_kpc, distance_col, n_below_cut, n_input, len(sample), seed,
+    )
+
+    return VolumeLimitedResult(
+        sample=sample,
+        distance_col=distance_col,
+        distance_cut_kpc=float(distance_cut_kpc),
+        n_target=int(n_target),
+        n_input=int(n_input),
+        n_below_cut=n_below_cut,
+        n_selected=int(len(sample)),
+        rng_seed=int(seed),
+    )
+
+
 __all__ = [
     "DEFAULT_BINS_G",
     "DEFAULT_BINS_LOGG",
     "DEFAULT_BINS_MH",
     "DEFAULT_BINS_TEFF",
+    "DEFAULT_DISTANCE_CUT_KPC",
     "DEFAULT_PER_CELL",
     "StratificationResult",
+    "VolumeLimitedResult",
     "stratified_subsample",
+    "volume_limited_subsample",
 ]

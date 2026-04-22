@@ -112,11 +112,15 @@ def save_halfway_plots(
         "teff_apogee": "plasma",
         "mh_apogee": "viridis",
         "logg_apogee": "cividis",
+        "alpha_m_apogee": "coolwarm",
+        "mg_h_apogee": "coolwarm",
     }
     label_texts = {
         "teff_apogee": r"$T_\mathrm{eff}$ / K (APOGEE)",
         "mh_apogee": "[M/H] (APOGEE)",
         "logg_apogee": r"$\log g$ (APOGEE)",
+        "alpha_m_apogee": r"[$\alpha$/M] (APOGEE)",
+        "mg_h_apogee": "[Mg/H] (APOGEE)",
     }
     for col, values in he.labels.items():
         fig, ax = plt.subplots(figsize=(7, 6), dpi=150)

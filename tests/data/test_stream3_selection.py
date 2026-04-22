@@ -15,9 +15,12 @@ from arqueogal.data.stream3_selection import (
     DEFAULT_BINS_LOGG,
     DEFAULT_BINS_MH,
     DEFAULT_BINS_TEFF,
+    DEFAULT_DISTANCE_CUT_KPC,
     DEFAULT_PER_CELL,
     StratificationResult,
+    VolumeLimitedResult,
     stratified_subsample,
+    volume_limited_subsample,
 )
 
 # ---- helpers -----------------------------------------------------------------
@@ -235,6 +238,190 @@ def test_to_provenance_is_serialisable_and_complete() -> None:
     # Must be JSON-safe (no ndarrays, no non-primitives).
     import json
     json.dumps(prov)
+
+
+# ---- volume-limited sampler --------------------------------------------------
+
+
+def _volume_synthetic(
+    n: int,
+    *,
+    d_min: float = 0.05,
+    d_max: float = 5.0,
+    rng_seed: int = 0,
+    distance_col: str = "d_photogeo_kpc",
+) -> pd.DataFrame:
+    """Synthetic catalogue uniformly distributed in distance over [d_min, d_max] kpc."""
+    rng = np.random.default_rng(rng_seed)
+    return pd.DataFrame(
+        {
+            "source_id": np.arange(n, dtype=np.int64),
+            distance_col: rng.uniform(d_min, d_max, n),
+            "teff": rng.uniform(4000.0, 5500.0, n),
+        }
+    )
+
+
+def test_volume_limited_default_cut_is_2_5_kpc() -> None:
+    assert DEFAULT_DISTANCE_CUT_KPC == 2.5
+
+
+def test_volume_limited_no_selected_star_above_cut() -> None:
+    df = _volume_synthetic(2_000, rng_seed=0)
+    result = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=500, seed=7,
+    )
+    assert (result.sample["d_photogeo_kpc"] < 2.5).all()
+
+
+def test_volume_limited_deterministic_with_seed() -> None:
+    df = _volume_synthetic(3_000, rng_seed=99)
+    r1 = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=400, seed=42,
+    )
+    r2 = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=400, seed=42,
+    )
+    pd.testing.assert_frame_equal(r1.sample, r2.sample)
+
+
+def test_volume_limited_different_seeds_give_different_picks() -> None:
+    df = _volume_synthetic(5_000, rng_seed=1)
+    r1 = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=400, seed=1,
+    )
+    r2 = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=400, seed=2,
+    )
+    s1 = set(r1.sample["source_id"])
+    s2 = set(r2.sample["source_id"])
+    assert s1 != s2
+
+
+def test_volume_limited_selection_size_matches_min_rule() -> None:
+    df = _volume_synthetic(4_000, d_min=0.1, d_max=4.0, rng_seed=3)
+    n_below_expected = int((df["d_photogeo_kpc"] < 2.5).sum())
+    # Pool > n_target.
+    r_cap = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=100, seed=0,
+    )
+    assert len(r_cap.sample) == 100
+    assert r_cap.n_below_cut == n_below_expected
+    assert r_cap.n_selected == 100
+    # Pool <= n_target.
+    r_full = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=10 * n_below_expected, seed=0,
+    )
+    assert len(r_full.sample) == n_below_expected
+    assert r_full.n_selected == n_below_expected
+
+
+def test_volume_limited_preserves_input_schema() -> None:
+    df = _volume_synthetic(500, rng_seed=0)
+    df["extra_col"] = "foo"
+    result = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=50, seed=0,
+    )
+    assert list(result.sample.columns) == list(df.columns)
+    assert (result.sample["extra_col"] == "foo").all()
+
+
+def test_volume_limited_returns_full_pool_when_below_n_target() -> None:
+    # Only 3 stars below cut, n_target=100 → returns 3.
+    df = pd.DataFrame(
+        {
+            "source_id": np.arange(10),
+            "d_photogeo_kpc": np.concatenate(
+                [np.array([0.1, 0.5, 1.0]), np.full(7, 5.0)]
+            ),
+        }
+    )
+    result = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=100, seed=0,
+    )
+    assert len(result.sample) == 3
+    assert result.n_below_cut == 3
+
+
+def test_volume_limited_nan_distance_excluded() -> None:
+    df = pd.DataFrame(
+        {
+            "source_id": np.arange(5),
+            "d_photogeo_kpc": [0.5, np.nan, 1.0, np.nan, 2.0],
+        }
+    )
+    result = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=100, seed=0,
+    )
+    # Only the 3 finite, below-cut stars should be kept.
+    assert len(result.sample) == 3
+    assert result.sample["d_photogeo_kpc"].notna().all()
+
+
+def test_volume_limited_returns_result_type() -> None:
+    df = _volume_synthetic(200, rng_seed=0)
+    result = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=50, seed=11,
+    )
+    assert isinstance(result, VolumeLimitedResult)
+    assert result.distance_col == "d_photogeo_kpc"
+    assert result.distance_cut_kpc == 2.5
+    assert result.n_target == 50
+    assert result.rng_seed == 11
+
+
+def test_volume_limited_to_provenance_is_serialisable() -> None:
+    import json
+    df = _volume_synthetic(200, rng_seed=0)
+    result = volume_limited_subsample(
+        df, distance_col="d_photogeo_kpc",
+        distance_cut_kpc=2.5, n_target=50, seed=11,
+    )
+    prov = result.to_provenance()
+    for key in (
+        "method", "distance_col", "distance_cut_kpc", "n_target",
+        "n_input", "n_below_cut", "n_selected", "rng_seed",
+    ):
+        assert key in prov
+    json.dumps(prov)  # must be JSON-safe
+
+
+def test_volume_limited_missing_column_raises() -> None:
+    df = pd.DataFrame({"source_id": [1, 2]})
+    with pytest.raises(KeyError, match="volume_limited_subsample requires column"):
+        volume_limited_subsample(
+            df, distance_col="d_photogeo_kpc",
+            distance_cut_kpc=2.5, n_target=10,
+        )
+
+
+def test_volume_limited_nonpositive_cut_raises() -> None:
+    df = _volume_synthetic(100, rng_seed=0)
+    with pytest.raises(ValueError, match="distance_cut_kpc"):
+        volume_limited_subsample(
+            df, distance_col="d_photogeo_kpc",
+            distance_cut_kpc=0.0, n_target=10,
+        )
+
+
+def test_volume_limited_nonpositive_ntarget_raises() -> None:
+    df = _volume_synthetic(100, rng_seed=0)
+    with pytest.raises(ValueError, match="n_target"):
+        volume_limited_subsample(
+            df, distance_col="d_photogeo_kpc",
+            distance_cut_kpc=2.5, n_target=0,
+        )
 
 
 # ---- stratification effect ---------------------------------------------------
