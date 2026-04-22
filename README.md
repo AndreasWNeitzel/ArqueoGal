@@ -10,16 +10,17 @@ This repository is Andreas Neitzel's (Co-I, PhD student) personal development wo
 
 ## What this workspace produces
 
-| Deliverable | Due | What it is |
+| Deliverable | Due | Role of this repo |
 |---|---|---|
-| **D-Cat-b** (supporting contribution) | Aug 2026 (Month 6) | XP-based chemical abundance catalogue for stars without APOGEE DR19 spectroscopy |
-| **D5.1** | Dec 2026 (Month 10) | Open-source ML tool for automated stellar population classification |
-| **D-Cat-d** | Feb 2027 (Month 12) | Stellar-population membership probabilities for the all-sky ArqueoGal catalogue |
+| **D-Cat-b** (supporting contribution) | Aug 2026 (Month 6) | XP-based chemical abundance catalogue for stars without APOGEE DR19 spectroscopy — **produced here** by Pipeline 1 |
+| **D5.1** | Dec 2026 (Month 10) | Open-source ML tool for stellar-population classification — **produced by Starfold** (separate repo); this repo provides the upstream abundance predictions |
+| **D-Cat-d** | Feb 2027 (Month 12) | Stellar-population membership probabilities for the all-sky ArqueoGal catalogue — produced by running Starfold on this repo's Pipeline 1 predictions |
 
-These are built by two pipelines operating on three data streams:
+The scope of this repository is **Pipeline 1** — Gaia DR3 XP coefficients → APOGEE-DR19-calibrated abundances:
 
-- **Pipeline 1 — `xp_abundances`:** semi-supervised multi-task regression, Gaia DR3 XP coefficients → APOGEE-DR19-calibrated abundances, with calibrated covariant uncertainties.
-- **Pipeline 2 — `population_classifier`:** unsupervised Parametric UMAP + HDBSCAN on the 10–11D chrono-chemo-kinematic vector, with DBCV-optimised hyperparameters and MC-propagated uncertainties.
+- **`xp_abundances`:** semi-supervised multi-task regression with contrastive pretraining + joint-loss fine-tuning. Outputs per-star {[M/H], [α/M], [Fe/H], [Mg/H], Teff, log g} predictions with block-Cholesky covariant uncertainties, plus OOD / support / release-tier quality flags.
+
+Population classification (formerly Pipeline 2 inside this repo) was spun out to **Starfold** on 2026-04-22 — the code now lives at <https://github.com/AndreasWNeitzel/Starfold>; see [`docs/plan/04_pipeline2_main.md`](docs/plan/04_pipeline2_main.md) for the integration contract.
 
 ---
 
@@ -44,7 +45,6 @@ ArqueoGal/
 ├── src/arqueogal/
 │   ├── data/                    ← ingestion, cross-matching, feature engineering
 │   ├── xp_abundances/           ← Pipeline 1 (main/ + experimental/)
-│   ├── population_classifier/   ← Pipeline 2 (main/ + experimental/)
 │   └── utils/                   ← shared coordinates, plotting, I/O, GPU helpers
 ├── scripts/         ← CLI entry points (ingestion, corrections, feature emission, plotting)
 ├── notebooks/       ← exploration and visualisation
@@ -108,7 +108,7 @@ Without a working token, every Gaia-backed ingestion script (`scripts/fetch_gaia
 ## References
 
 - **Pipeline 1 groundwork:** Ye+2024 (arXiv:[2411.19105](https://arxiv.org/abs/2411.19105)), Andrae+2023, Mészáros+2025 (arXiv:[2506.07845](https://arxiv.org/abs/2506.07845)), Lindegren+2021, Riello+2021 A&A 649 A3 Appendix A.
-- **Pipeline 2 groundwork:** Neitzel+2025 A&A 695 A243 (arXiv:[2501.16294](https://arxiv.org/abs/2501.16294)) — the UMAP+HDBSCAN methodology this pipeline builds on.
+- **Downstream classifier (Starfold):** Neitzel+2025 A&A 695 A243 (arXiv:[2501.16294](https://arxiv.org/abs/2501.16294)) — UMAP+HDBSCAN stellar-population methodology, implemented in the separate Starfold repository at <https://github.com/AndreasWNeitzel/Starfold>.
 - **Data maps:** Edenhofer+2024, Lallement+2022, Schlegel-Finkbeiner-Davis 1998, Bailer-Jones+2021 (GAVO `gedr3dist.main`), Queiroz+2023 StarHorse2 v2 (AIP `gaiadr3_contrib.aqueiroz2023_*_v2`).
 
 ---

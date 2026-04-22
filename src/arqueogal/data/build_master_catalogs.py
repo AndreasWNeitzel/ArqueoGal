@@ -17,11 +17,11 @@ preprocessing). The master-catalog step is just the *contract boundary*
 between data ingestion and modelling — schema-validate, write, record
 row-count losses from the inner join.
 
-``pipeline2_features.parquet`` (§10.3) is intentionally **not built
-here**: it requires Pipeline 1 model predictions (Tier-1/Tier-2
-abundances, evolutionary-stage probability) that don't exist until the
-trained model ships. That builder lives in
-:mod:`arqueogal.population_classifier.main.features`.
+The downstream chrono-chemo-kinematic feature matrix (formerly §10.3
+``pipeline2_features.parquet``) is no longer built in this repository.
+Population classification moved to the separate **Starfold** repo on
+2026-04-22; Starfold is responsible for its own feature-matrix assembly
+on top of this repo's Pipeline 1 prediction parquets.
 """
 
 from __future__ import annotations

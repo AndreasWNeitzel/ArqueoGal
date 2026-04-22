@@ -10,10 +10,11 @@
 
 ## 0. Executive summary
 
-This document defines the scientific rationale, the state of the art, and the methodological programme for two machine-learning pipelines that Andreas Neitzel will lead or co-lead within the ArqueoGal project:
+This document defines the scientific rationale, the state of the art, and the methodological programme for the machine-learning pipeline that Andreas Neitzel leads within the ArqueoGal project in this repository:
 
 1. **Pipeline 1 — `xp_abundances`**: a semi-supervised regression from Gaia DR3 XP (BP/RP) Hermite coefficients to APOGEE DR19 chemical abundances, covering red giants within the XP-native magnitude regime (G ≲ 17.65). The focus is *depth of treatment within this regime* — rigorous uncertainty calibration, extension to additional elements with APOGEE-DR19-backed statistical validation, and honest separation of spectrum-driven from prior-driven predictions — rather than pushing to fainter magnitudes.
-2. **Pipeline 2 — `population_classifier`**: a fully unsupervised manifold-learning tool (UMAP + HDBSCAN) that classifies stellar populations in the ArqueoGal all-sky red-giant catalogue. This is D5.1, the open-source deliverable due December 2026, and directly generates D-Cat-d.
+
+Population classification — the UMAP+HDBSCAN tool originally scoped as "Pipeline 2" — has been spun out as the separate **Starfold** repository (2026-04-22). D5.1 and D-Cat-d are delivered by Starfold, which consumes this repository's Pipeline 1 predictions via the parquet contract described in `docs/plan/04_pipeline2_main.md`. Sections of this document that still discuss population-classification methodology are retained as historical rationale and to document the D-Cat-b/D-Cat-d interface requirements; the active methodological reference for Starfold lives in that repo.
 
 The project operates on **real observational data**. FIRE-2 Ananke synthetic surveys are used *only* for the method-validation hare-and-hounds exercise in Subtask 5.1; all downstream science is conducted on real Gaia DR3 × APOGEE DR19 × TESS data. The concrete data acquisition and preprocessing plan — three streams (APOGEE DR19 × Gaia, TESS Hon+2021 × Gaia, Gaia RGB+RC application sample), 5 GB disk budget, pyvo-over-astroquery ingestion, Edenhofer+2024 + GSP-Phot neighborhood-median dust handling, StarHorse2 distances, galpy orbits — is specified in the companion `data_acquisition.md`. This document distinguishes sharply between what can be validated with ground truth (training-set hold-out, FIRE-2) and what must be validated without it (the real catalogue).
 
@@ -25,7 +26,7 @@ The differentiator this project stakes out, relative to the saturated field of X
 
 ### 1.1 ArqueoGal in one paragraph
 
-ArqueoGal will produce the first all-sky, kiloparsec-scale chrono-chemo-kinematic map of the Milky Way disc by combining TESS asteroseismic ages, Gaia DR3 astrometry and kinematics, and APOGEE spectroscopy on red giants. Three Research Objectives motivate everything: RO1 (origin of the chemically bimodal disc — two-infall vs shock-heating vs merger-driven), RO2 (dynamical agents of disc flaring), RO3 (efficiency and timescales of radial migration). The catalogue will contain ~10⁵ stars. The bottleneck that limits all three ROs is not data volume but *per-star parameter dimensionality*: for most red giants in the target sample we will have ages (seismic, 10–20% precision), kinematics (Gaia, excellent), but chemistry only for the APOGEE footprint (~30–40% of the sample). Pipeline 1 closes this gap. Pipeline 2 turns the completed chrono-chemo-kinematic vector into membership probabilities for the disc sub-populations (α-rich, α-poor) and for accreted/in-situ halo components that the sample will inevitably contain at low-latitude and metal-poor tails.
+ArqueoGal will produce the first all-sky, kiloparsec-scale chrono-chemo-kinematic map of the Milky Way disc by combining TESS asteroseismic ages, Gaia DR3 astrometry and kinematics, and APOGEE spectroscopy on red giants. Three Research Objectives motivate everything: RO1 (origin of the chemically bimodal disc — two-infall vs shock-heating vs merger-driven), RO2 (dynamical agents of disc flaring), RO3 (efficiency and timescales of radial migration). The catalogue will contain ~10⁵ stars. The bottleneck that limits all three ROs is not data volume but *per-star parameter dimensionality*: for most red giants in the target sample we will have ages (seismic, 10–20% precision), kinematics (Gaia, excellent), but chemistry only for the APOGEE footprint (~30–40% of the sample). Pipeline 1 (this repo) closes the chemistry gap. Starfold (separate repo) then turns the completed chrono-chemo-kinematic vector into membership probabilities for the disc sub-populations (α-rich, α-poor) and for accreted/in-situ halo components that the sample will inevitably contain at low-latitude and metal-poor tails.
 
 ### 1.2 Andreas Neitzel's role
 
@@ -36,9 +37,9 @@ ArqueoGal will produce the first all-sky, kiloparsec-scale chrono-chemo-kinemati
 | Task 6 — Galactic Modeling | Participant (leads: Campante, Miglio) | 6 | Dec 2026–May 2027 |
 
 The workspace targets:
-- **D5.1** (Month 10 / Dec 2026): open-source GitHub release of `population_classifier`. Builds on Neitzel et al. 2025 (A&A 695, A243; arXiv:2501.16294).
-- **D-Cat-d** (Month 12 / Feb 2027): stellar population membership probabilities appended to the all-sky catalogue.
-- **Supporting contribution to D-Cat-b** (Month 6 / Aug 2026): chemical abundances from Gaia XP for stars without APOGEE spectroscopy — Pipeline 1 delivers here.
+- **Supporting contribution to D-Cat-b** (Month 6 / Aug 2026): chemical abundances from Gaia XP for stars without APOGEE spectroscopy — Pipeline 1 in this repo delivers here.
+- **D5.1** (Month 10 / Dec 2026): open-source GitHub release of the population-classifier tool — delivered by Starfold (separate repo), which builds on Neitzel et al. 2025 (A&A 695, A243; arXiv:2501.16294) and consumes Pipeline 1 predictions produced here.
+- **D-Cat-d** (Month 12 / Feb 2027): stellar population membership probabilities appended to the all-sky catalogue — produced by Starfold from this repo's Pipeline 1 output.
 
 ---
 
@@ -150,6 +151,18 @@ A *statistical method* is required for promoting new elements from Tier 3 to Tie
 
 This is a rigorous, pre-registered protocol. It is applied before any element appears in the D-Cat-b release.
 
+#### 3.3.1 Three-question diagnostic — failure-mode protocol for the shuffled-spectrum null
+
+Codified 2026-04-19 after the Pipeline 1 v1 audit (see `reports/pipeline1/audit/SUMMARY.md`). When the §9.2 Test 4 shuffled-spectrum null test fails for a label — operationalised as null skill_ratio > 0.20, i.e. the model retains more than 20% of its real-data skill on the shuffled XP block — the response is **not** automatic Tier demotion. The literal null-skill-ratio gate is sensitive to aux-only labels carrying an extinction/distance-correlated signal that the model can partially reconstruct under shuffled XP; this does not imply XP is uninformative. The response is the three-question diagnostic:
+
+1. **PCA-CMI with richer summary.** Recompute the §9.2 Test 5 conditional MI estimate with a PCA summary of the XP block that retains ≥ 95% variance (typically 5–10 components for Gaia XP), holding the conditioning set, KSG k, and subsample cap fixed. The 2-D summary used by the production audit can inflate or collapse the CMI estimate — see §9.2.1 below. The PCA estimate is primary; the 2-D estimate is supplementary.
+2. **Per-feature permutation importance with XP-vs-aux grouping.** Emit the full per-feature permutation ΔRMSE ranking (not just family aggregates). Tag each feature by group (XP shape + c0 vs auxiliary) and report the top-10 composition plus group Σ(ΔRMSE). This disentangles "the aux features are individually strong" from "XP is globally uninformative".
+3. **Auxiliary-only baseline MLP.** Retrain a head-matched aux-only MLP (no XP shape, no c0 scalars) on the same train/val split and report the per-label RMSE ratio aux_only / full_model. Thresholds: ratio ≈ 1.00 (within ~5%) → XP contribution is noise; ratio > 1.10 → XP contributes meaningfully; intermediate → judgment call.
+
+**Tier assignment follows the combined evidence of these diagnostics.** A label that fails the literal Test 4 gate but passes at least two of (aux-ratio > 1.10, PCA-CMI > 0.02 nats, ≥ 3 XP features in top-10 permutation) is Tier 1 with an explicit prior-augmented release caveat documenting the XP-vs-aux relative contribution. A label that fails Test 4 and fails all three diagnostics is demoted: Tier 2 with population-level-only recommendation. A label that passes Test 4 but has a suspiciously low 2-D-summary CMI should still have its PCA-summary CMI reported for methodology consistency; the load-bearing evidence for such labels is the shuffled-spectrum null and the XP joint shuffle ΔRMSE/σ, not the 2-D CMI.
+
+The driver scripts for this protocol are `scripts/run_three_question_diagnostic.py` (Q1–Q3 for a target label subset) and `scripts/run_pca_cmi_all_labels.py` (Q1 cross-label consistency pass). The Pipeline 1 v1 application directed the ratified Option 2 tier decisions (Teff → Tier 1 clean; log g → Tier 1 with explicit prior-augmented caveat).
+
 ---
 
 ## 4. APOGEE DR19 as label source
@@ -239,7 +252,7 @@ Surface C, N, Li, 12C/13C, and subtler trends are not preserved from birth:
 - **[α/Fe]** — Type II vs Ia SN timescale; separates α-rich and α-poor discs.
 - **Individual [Mg/Fe], [Ca/Fe], [Si/Fe], [Ti/Fe]** — different nucleosynthetic channels.
 - **[Mn/Fe], [Ni/Fe]** — iron-peak, Ia-sensitive.
-- **[Al/Fe]** — separates in-situ from accreted halo cleanly (Hawkins+2015; Das+2020; Belokurov & Kravtsov 2022). Key discriminator for Pipeline 2.
+- **[Al/Fe]** — separates in-situ from accreted halo cleanly (Hawkins+2015; Das+2020; Belokurov & Kravtsov 2022). Key discriminator for downstream population classification (Starfold).
 - **[Eu/Fe], [Ba/Fe]** — r/s-process indicators.
 
 ### 6.3 Stellar clocks (evolutionary-stage-dependent)
@@ -254,7 +267,7 @@ Surface C, N, Li, 12C/13C, and subtler trends are not preserved from birth:
 1. **Evolutionary-stage classification head** — RGB / RC / subgiant / MS-turnoff / AGB classifier trained jointly with the regression heads.
 2. **Cool-giant cut** — train on Teff > 4000 K, flag extrapolation below 4200 K (APOGEE DR19 [N/Fe] systematics).
 3. **[C/N] age calibration** applied only to RGB, [Fe/H] > −0.8, Teff 4200–5100 K. Flag elsewhere.
-4. **Tier 2 labels carry evolutionary-stage tags** — downstream users (Pipeline 2 included) must respect them.
+4. **Tier 2 labels carry evolutionary-stage tags** — downstream users (Starfold included) must respect them.
 
 ---
 
@@ -421,8 +434,16 @@ Six tests per released label:
 2. **Permutation feature importance.** Permute one feature across the test set, measure R² drop per label. Heatmap: label × feature.
 3. **SHAP values** on N=10k subsample. Per-star feature attributions for outlier inspection.
 4. **Shuffled-spectrum null.** Within each Teff–log g cell, randomly permute XP coefficients across stars. Retrain or evaluate. Labels retaining skill are 100% prior-driven — flag in catalogue.
-5. **Mutual information** MI(XP; [X/Fe] | Teff, log g, [Fe/H]). Residual MI bootstrap confidence interval above zero is required for Tier 2 promotion.
+5. **Mutual information** MI(XP; [X/Fe] | Teff, log g, [Fe/H]). Residual MI bootstrap confidence interval above zero is required for Tier 2 promotion. **Primary estimator (v1.1): PCA-summary KSG CMI.** The XP block (BP + RP normalised Hermite coefficients; 108 features on the Pipeline 1 v1 layout) is projected onto a PCA summary retaining ≥ 95% of its variance (default 7 components for Gaia XP; 15 components ≈ 99% when aux-absorption diagnosis is needed — see §9.2.1 and the [α/M] triage finding below). The 2-D summary used by v1 is deprecated (§9.2.1); reproducibility of historical report cards is preserved via a `legacy_2d` flag in `src/arqueogal/xp_abundances/main/audit.py`.
 6. **Decorrelated sub-sample test.** Stratified sample in which [X/Fe] is decorrelated from [Fe/H] (match α-rich and α-poor at similar [Fe/H], Teff, log g, Av, position). Retrain. If prediction survives decorrelation, spectrum-driven; if collapses, prior-driven.
+
+#### 9.2.1 KSG on low-dimensional XP summaries — 2-D deprecated, PCA primary (audit protocol v1.1)
+
+Added 2026-04-19 after the Pipeline 1 v1 audit; audit protocol bumped **v1 → v1.1** at the same time. KSG-based CMI estimates on 2-D summaries of high-dimensional spectral signals (e.g. ``(|BP|-sum, |RP|-sum)``) are prone to upward bias when the spectral signal is carried by low-order Hermite structure that correlates with the summary, and to downward collapse when the signal is carried by higher-order structure that the 2-D summary discards. **In the Pipeline 1 v1 audit, three of five labels showed substantial 2-D bias** — Teff 4.6× upward inflation (0.1352 nats 2-D vs 0.0296 PCA), [M/H] 4× underestimation (0.0088 vs 0.0357; 2-D collapsed below the release-gate floor), [Mg/H] pathological collapse (0 vs 0.0357). Only log g showed mild bias (0.0401 vs 0.0311, 1.3× inflation). The 2-D estimator is therefore no longer fit-for-purpose as the primary Test-5 methodology.
+
+**Protocol (v1.1): audits must use PCA summaries with ≥ 95% variance explained as the primary CMI estimate. The default is 7 components for Gaia XP, which retained 95.8% of the BP + RP normalised-shape variance on the Pipeline 1 v1 val split.** The 2-D estimator is retained behind a `legacy_2d` flag in `src/arqueogal/xp_abundances/main/audit.py` for reproducibility of historical report cards only; calling it emits a `DeprecationWarning`. The KSG k, conditioning set, and subsample cap should match across PCA (and any legacy 2-D) estimates so only the summary dimensionality changes.
+
+**Escape hatch for high-order or aux-absorbing signals.** When the 7-component default returns CMI near zero for a label that is otherwise information-rich (passing shuffle-null and joint-XP-shuffle), the `scripts/triage_alpha_m_cmi.py` three-test sequential protocol disambiguates three candidate causes: H1 high-order Hermite structure (push the PCA to 15 components, ~99% variance), H3 KSG clamp artefact (rerun with the clip off), H2 aux absorption (reduce conditioning to parallax alone). The Pipeline 1 v1 [α/M] case — where 7-PC PCA-CMI was 0.0000 — was adjudicated by this triage: H2 confirmed, with parallax-only 15-PC CMI = 0.1125 nats (~56× the 0.02 floor) vs full-aux 15-PC CMI = 0.0000. See `reports/pipeline1/audit/alpha_m_triage.md` for the decision record. When triage is needed, the tier decision remains adjudicated by the shuffle-null and the three-question diagnostic (§3.3.1); CMI is a methodological cross-check, not a release-blocking quantity for labels flagged H2.
 
 ### 9.3 Interpretability audit — the per-label report card
 
@@ -434,174 +455,52 @@ Compare against AspGap, Guiglion+2024, SHBoost, Andrae+2023, Ye+2024, Buck & Sch
 
 ---
 
-## 10. Pipeline 2 — `population_classifier` (main)
+## 10. Population classification — moved to Starfold (2026-04-22)
 
-### 10.1 Architecture, staying fully unsupervised
+The UMAP+HDBSCAN population classifier originally scoped as "Pipeline 2" has been spun out into the separate **Starfold** repository. The methodological detail previously in §§10–11 (architecture, feature-space redesign, soft memberships, DBCV hyperparameter selection, §10.5 unsupervised diagnostic stack, FIRE-2 hare-and-hounds, experimental-arm candidates, collaborator HPC-sweep assessment) now lives there; Starfold is the authoritative reference for that work.
 
-The main pipeline is, and remains, **UMAP + HDBSCAN**. This is the Neitzel et al. 2025 (A&A 695, A243) methodology that defines the project's scientific identity and the D5.1 deliverable. Improvements stay strictly unsupervised.
+What stays in this document is the **interface contract** between the two repositories:
 
-**Inputs** (feature vector per star, from the ArqueoGal catalogue):
-- **Ages** from TESS seismology (Task 4, led by others): τ in Gyr, σ ~ 15–25% typical, ~30% low-S/N. Pre-staged in `data_acquisition.md` §4 (Hon+2021 ν_max + TASOC parameters).
-- **Chemistry** from APOGEE DR19 where available, else from Pipeline 1 Tier 1/Tier 2: [Fe/H], [α/Fe], **[Mg/Fe] separately** (§10.2), **[Al/Fe] where Tier 1/2 support it**, [C/N] for RGB within validity domain.
-- **Kinematics** from Gaia DR3 + APOGEE RVs via `galpy` (Task 3): **actions J_R, J_z, L_z**, eccentricity ε, r_peri, r_apo, total energy E. See `data_acquisition.md` §9 for orbit-integration recipe.
-- **Evolutionary-stage** probability from Pipeline 1 — gate [C/N].
+- This repo ships Pipeline 1 predictions (5-label μ + full 5×5 Σ, OOD flags, Regime-B flag, `selection_prob`, `aux_missingness_*`, `release_tier`) on the Stream 3 inference parquets.
+- Starfold consumes Tier 1 (and optionally Tier 2) rows from those parquets, applies its own feature assembly (age, kinematics, [C/N], etc.), and produces the D-Cat-d soft memberships.
+- The kinematics module (`src/arqueogal/data/kinematics.py`) may be exposed as an importable utility or duplicated inside Starfold — choice deferred to Starfold's own architecture review.
+- FIRE-2 method validation (Subtask 5.1) follows Starfold, not this repo; the real-data-only policy in `data_acquisition.md` §0 still applies to everything that feeds Pipeline 1.
 
-Retain (V_φ, √(U²+W²)) as backward-compatibility baseline for Neitzel+2025 reproduction runs.
-
-**Pre-processing:**
-- Feature standardisation via `StandardScaler` fit on representative training subset.
-- Missing-value handling: Pipeline-1-based k-NN imputation where confident; otherwise exclude and re-include at end with posterior-probability dilution.
-- **Feature-uncertainty propagation via MC**: N = 50 catalogue realisations, each with features drawn from per-star posteriors (including the calibrated σ from Pipeline 1), run full pipeline on each, aggregate into soft memberships (§10.3). Key methodological upgrade over Neitzel+2025 — and the place where Pipeline 1's *calibrated* uncertainties matter downstream.
-
-**UMAP — main configuration (Parametric UMAP):**
-- **Parametric UMAP** (Sainburg, McInnes & Gentner 2021, arXiv:2009.12981) — neural-net embedding: out-of-sample transformation, differentiability, 2–10× speed. Trained on representative sub-sample, applied to full catalogue.
-- Hyperparameters `n_neighbors`, `min_dist`, output dimension selected by **DBCV maximisation** (§10.4). No visual selection.
-- Metric: Euclidean on scaled features.
-
-**HDBSCAN:**
-- cuML GPU-accelerated where available (RAPIDS 25.10), `hdbscan` CPU fallback.
-- Hyperparameters `min_cluster_size`, `min_samples`, `cluster_selection_epsilon`, `cluster_selection_method` selected by DBCV (§10.4).
-- **Soft memberships** via `all_points_membership_vectors` — essential for D-Cat-d.
-- **GLOSH outlier scores** — per-star outlier probability.
-
-### 10.2 Feature-space redesign — why Neitzel+2025 hit a ceiling
-
-The Neitzel+2025 ceiling diagnosis (disc-dominated sample, high age uncertainty, missing orthogonal features, possibly method limits) resolves as:
-
-- **Primary cause: feature-space limitation.**
-  - (V_φ, √(U²+W²)) is LSR-referred and compresses retrograde-halo structure. GSE, Sequoia, Thamnos separate much more cleanly in (L_z, E) or action space (Myeong+2019, Koppelman+2019, Belokurov+2018, Dodd+2023).
-  - [α/Fe] lumps Mg, Si, Ca, Ti and loses discrimination. [Mg/Fe] alone is the single-best α-tracer of Type II vs Ia SN timescale. [Al/Fe] cleanly separates in-situ from accreted halo — the single most informative individual abundance for halo archaeology.
-- **Secondary cause: 30% age uncertainty** is large but less limiting than feared. For α-bimodality, chemistry dominates. For accreted-vs-in-situ, action space dominates. Age uncertainty primarily limits *chronological resolution within chemically homogeneous populations*, not population detection.
-- **Not a method cause**: UMAP+HDBSCAN is SOTA for this problem, but needs (a) expanded features, (b) DBCV hyperparameter selection, (c) soft memberships. The method is not the bottleneck.
-
-**Concrete feature-set change** vs Neitzel+2025: replace (age, [Fe/H], [α/Fe], V_φ, √(U²+W²)) with (age, [Fe/H], [Mg/Fe], [Al/Fe] where available, [C/N] for RGB, J_R, J_z, L_z, ecc, E). 10–11 dimensional space vs original 5. Run both side by side in the release note for comparison.
-
-### 10.3 Soft membership probabilities — the D-Cat-d product
-
-The D-Cat-d deliverable is specifically *population membership probabilities*. Hard HDBSCAN labels are insufficient; boundary stars need continuous probabilities.
-
-Mechanism:
-1. `hdbscan.all_points_membership_vectors()` soft probabilities for central run.
-2. MC ensemble over feature uncertainty (N = 50) → distribution of soft memberships.
-3. Per-star output: mean and standard deviation of MC soft-membership distribution, plus GLOSH outlier score.
-4. Boundary-star flags when max(membership) < 0.7 or std(membership) > 0.15.
-
-More honest than any prior Gaia-population catalogue.
-
-### 10.4 Objective hyperparameter selection — DBCV
-
-Density-Based Clustering Validation (Moulavi+2014; `hdbscan.validity.validity_index`) is density-aware and designed for arbitrary cluster shapes. **DBCV is the correct global objective** — not persistence alone (see §10.7 on why persistence maximisation is problematic).
-
-Grid:
-- `n_neighbors ∈ {15, 30, 50, 100, 200}`
-- `min_dist ∈ {0.0, 0.05, 0.1}`
-- UMAP output dimension ∈ {2, 3, 5}
-- `min_cluster_size ∈ {50, 100, 200, 500}`
-- `min_samples ∈ {5, 10, 20}`
-- `cluster_selection_epsilon ∈ {0.0, 0.1, 0.2}`
-- `cluster_selection_method ∈ {eom, leaf}`
-
-Maximise DBCV on the full catalogue (or large representative subset). Release grid-search log as part of D5.1.
-
-### 10.5 Objective unsupervised diagnostics — solving the interpretation pain point
-
-A key outstanding concern — *"we lack an objective, unsupervised way to interpret our results. We are trusting based on visual inspection"* — is tractable. Six diagnostics, in priority order:
-
-1. **Bootstrap cluster stability** (Hennig 2007). Resample with replacement N = 500 times, refit, pairwise ARI between runs. **Clusters with median ARI > 0.75 stable; < 0.5 are artefacts.** Alone would have told us which Neitzel+2025 sub-clusters were real.
-2. **DBCV** (§10.4) — both for hyperparameter selection and as final per-cluster validity report.
-3. **Permutation-feature causal attribution.** Shuffle one feature across the catalogue, refit, measure cluster dissolution via ARI to original. Chemistry-driven clusters vanish under [Fe/H] shuffle; kinematics-driven vanish under J_z shuffle; clusters robust to all shuffles are density artefacts. Causal decomposition visual inspection cannot provide.
-4. **Null-model comparison.** Fit multivariate Gaussian with catalogue mean/covariance and a Gaussian-copula null (marginals preserved, cross-feature correlations destroyed). Generate N = 100 null samples, apply pipeline. Real clusters appear at rates far above null.
-5. **Held-out feature consistency.** Cluster using 4 of 5 (or 9 of 10) features; check held-out feature distributions are cleanly separated per cluster. Unsupervised cross-validation analogue.
-6. **Literature-known-population cross-reference.** GSE, Sequoia, Thamnos, Helmi stream, in-situ halo, low-α/high-α discs, Splash (Belokurov+2020). Cross-reference our clusters against Dodd+2023, Myeong+2019, Horta+2021, Ceccarelli+2024 labels. Disagreements scientifically interesting; agreement supports validity.
-
-**On FIRE-2 for method validation only.** Subtask 5.1 provides ARI, AMI, Youden J/informedness, MCC against ground truth — characterises method ceiling under idealised conditions with realistic Gaia DR3 / APOGEE DR17 uncertainties. Does **not** characterise performance on real catalogue — real MW may differ from any single FIRE-2 galaxy. Subtask 5.1 answers "does the method work at all?"; diagnostics 1–6 answer "does the method work on *our* data?"
-
-### 10.6 FIRE-2 availability for the hare-and-hounds
-
-The Latte trio (m12i, m12f, m12m) are non-bimodal or weakly bimodal in [α/Fe]. Barry+2026 (arXiv:2601.02520): strong α-bimodality in 4/16 FIRE-2 MW-mass galaxies. Parul+2025 (MNRAS 537, 1571): 8/11 ELVIS galaxies bimodal.
-
-Ananke Gaia DR3-like surveys (Sanderson+2020, Nguyen+2024) as of April 2026: Latte m12i, m12f, m12m; ELVIS Louise/Remus/Romulus. For hare-and-hounds: **Remus or Romulus** closer to MW α-bimodality; fall back to m12f for backward compatibility with Neitzel+2025. If Ananke surveys unavailable for bimodal galaxies, generate our own synthetic Gaia-like survey from FIRE-2 DR (Wetzel+2023, ApJS 265, 44) particle snapshots — few person-weeks of work. **Note: FIRE-2 ingestion is intentionally outside the `data_acquisition.md` scope** — see that document's §0 for the real-data-only policy.
-
-### 10.7 The collaborator's HPC hyperparameter sweep — value and caveats
-
-A collaborator is running a large-scale Optuna HPC sweep of UMAP+HDBSCAN hyperparameters (`min_dist`, `n_neighbors`, `local_connectivity`, and others) on FIRE-2 data, with Optuna optimising HDBSCAN persistence score and recording cluster labels, persistence scores, trustworthiness scores, and other parameters across thousands of embeddings. An honest value assessment follows.
-
-**Genuine value the work can deliver:**
-- Empirical map of the UMAP+HDBSCAN performance landscape on a realistic synthetic test case.
-- Identification of pathological hyperparameter regions to avoid.
-- Quantification of *sensitivity* — how much does clustering depend on hyperparameter choice? If highly sensitive, that itself is a methodological finding worth publishing.
-- A concrete, defensible hyperparameter-selection procedure that can be transferred as a prior to the real-data Subtask 5.2 pipeline.
-
-**Three significant methodological concerns:**
-
-1. **Persistence score is the wrong primary objective.** HDBSCAN persistence (`cluster_persistence_`) measures within-cluster density-level stability: how long does a cluster persist as you vary the density threshold? It is a *local* within-cluster metric. Optuna-maximising persistence tends to favour tight, dense, small clusters — which in FIRE-2 data often means the trivial dense disc core rather than the physically interesting accreted substructure or α-bimodality. **DBCV (Moulavi+2014) is the correct global density-aware objective** for this problem; it handles arbitrarily shaped clusters and works without ground truth. If persistence is retained, it should be a secondary diagnostic, not Optuna's target.
-
-2. **Trustworthiness is not a clustering metric.** It measures UMAP embedding-level preservation of local neighborhoods (Venna & Kaski 2001). Values > 0.9 are routine and uninformative — Neitzel+2025 consistently reported T > 0.97 across the entire hyperparameter region that was scientifically plausible. Trustworthiness does not discriminate good from bad *clusterings*; it only tells you the embedding did not shred local structure.
-
-3. **FIRE-2 has ground truth — it is negligent not to use it.** The correct primary metrics on FIRE-2 are **ARI, AMI, Youden J/informedness, MCC** against the simulation's known labels: `dform` for in-situ vs accreted decomposition; high-α/low-α chemical dichotomy where bimodality exists. Without ground-truth-referred metrics, the sweep characterises the *method's* sensitivity (useful) but does not answer "which hyperparameters produce scientifically correct clusters" (the real question). The ground truth is present in FIRE-2; using it converts the sweep from method characterisation to methodology paper.
-
-**Constructive recommendations to relay, if the collaborator is open:**
-
-1. **Add DBCV to the sweep output** (via `hdbscan.validity.validity_index`). Compare the Optuna-selected "optimal" hyperparameter set under persistence vs under DBCV — they will often disagree, and the disagreement is informative.
-2. **Add ground-truth metrics** (ARI, AMI, informedness, MCC) against FIRE-2 labels. Report per-configuration.
-3. **Test across multiple FIRE-2 galaxies** — Latte trio + Remus/Romulus at minimum — to establish transferability of any "optimal" hyperparameter set.
-4. **Add bootstrap stability** within each hyperparameter configuration (Hennig 2007; ≥ 100 bootstrap resamples). A high-persistence high-DBCV cluster that is unstable under bootstrap is still an artefact.
-5. **Acknowledge that the sweep varies hyperparameters, not features.** The Neitzel+2025 ceiling on discovery is dominated by feature-space limitations (§10.2), not hyperparameter choice. No amount of Optuna on 5D (V_φ, √(U²+W²), …) recovers what 10D (actions + individual abundances) can. The sweep should ideally be repeated on the expanded feature set proposed in §10.2.
-6. **FIRE-2-optimal ≠ real-data-optimal.** Transfer of "optimal" hyperparameters to the real MW catalogue requires validation via the §10.5 real-data diagnostic stack. The sweep produces a prior, not an answer.
-
-**Bottom line.** If the sweep delivers on recommendations 1–4, its output becomes a genuinely valuable prior for our main-pipeline DBCV grid search, and a publishable methodology result. Without those additions, the work characterises UMAP+HDBSCAN's hyperparameter sensitivity (still useful, but modest as a standalone contribution) and does not replace our own DBCV-based selection protocol on the real catalogue. We should not wait for this sweep's output before running our own §10.4 grid search — the two are complementary.
-
----
-
-## 11. Pipeline 2 — experimental arm
-
-Strictly segregated, in `src/arqueogal/population_classifier/experimental/`.
-
-### 11.1 Candidates
-
-1. **Mahalanobis-metric UMAP** — per-star feature covariance in distance metric. Natural uncertainty propagation. Computationally expensive.
-2. **Aligned UMAP** (McInnes 2020) — shared embedding across multiple FIRE-2 galaxies or survey partitions (north/south).
-3. **Deep clustering** — DEC (Xie+2016), IDEC (Guo+2017), VaDE (Jiang+2017). End-to-end embedding + clustering. Less transparent.
-4. **Topological Data Analysis** — ToMATo (Chazal+2013), persistent homology via `giotto-tda`, SigMA (Ratzenböck+2023). Persistence measures complementary to HDBSCAN stability.
-5. **Diffusion maps** — Coifman & Lafon 2006; spectral alternative to UMAP.
-6. **Self-organising maps** — older unsupervised visualisation, comparison benchmark.
-7. **Bayesian nonparametric mixture models** — Dirichlet-process GMMs (Rasmussen 2000). Adaptive component count.
-8. **Contrastive feature-vector representations** — self-supervised embeddings as alternative to UMAP's manifold learning.
-9. **Hierarchical clustering on the UMAP embedding** — separate from HDBSCAN's internal hierarchy; complementary approach for nested structure (disc → α-rich/α-poor → finer chemo-dynamical sub-structure).
-
-**Promotion rule:** identical to Pipeline 1 — match or exceed main on DBCV, bootstrap stability, FIRE-2 informedness (hare-and-hounds), held-out-feature consistency.
+See `docs/plan/04_pipeline2_main.md` for the integration contract in full.
 
 ---
 
 ## 12. Real data vs FIRE-2 — a sharp methodological boundary
 
-| | Pipeline 1 (`xp_abundances`) | Pipeline 2 main (Subtask 5.1, hare-and-hounds) | Pipeline 2 main (Subtask 5.2, D-Cat-d) |
-|---|---|---|---|
-| Training data | Real: APOGEE DR19 × Gaia XP | Unsupervised — no training needed | Unsupervised — no training needed |
-| Validation data | Real: APOGEE hold-out, open clusters, Gaia FGK benchmarks | **FIRE-2** Ananke (method-validation only) | Real: D-Cat catalogue with §10.5 diagnostics |
-| Ground truth available | Yes (APOGEE labels) | Yes (FIRE-2 meta-parameters) | **No** |
-| Quantitative metrics | RMSE, bias, reliability diagrams, coverage, §9.2 audit | ARI, AMI, Youden J, MCC | Bootstrap ARI, DBCV, permutation-causal, null-model, held-out-feature, literature cross-ref |
-| Role of FIRE-2 | None | Method ceiling under idealised conditions | None |
-| Data acquisition scope | `data_acquisition.md` streams 1, 2, 3 | Outside `data_acquisition.md` scope | `data_acquisition.md` stream 3 + kinematics |
+For Pipeline 1 in this repo:
 
-**Critical inferential gap:** FIRE-2 results characterise the method's behaviour on a synthetic universe; they do not guarantee behaviour on the real MW because (i) no single FIRE-2 galaxy is a faithful MW analogue, (ii) Ananke uncertainties are Gaia DR3 only, not APOGEE-DR19-specific, (iii) FIRE-2 lacks full real-selection-function complexity. Pipeline 2's main D-Cat-d release must stand on its own via §10.5 diagnostics. Subtask 5.1 is the hare-and-hounds; Subtask 5.2 is the tournament.
+| | Pipeline 1 (`xp_abundances`) |
+|---|---|
+| Training data | Real: APOGEE DR19 × Gaia XP |
+| Validation data | Real: APOGEE hold-out, open clusters, Gaia FGK benchmarks |
+| Ground truth available | Yes (APOGEE labels) |
+| Quantitative metrics | RMSE, bias, reliability diagrams, coverage, §9.2 audit |
+| Role of FIRE-2 | None |
+| Data acquisition scope | `data_acquisition.md` streams 1, 2, 3 |
+
+The FIRE-2 hare-and-hounds (Subtask 5.1) and the real-data D-Cat-d validation (Subtask 5.2) are Starfold concerns. The corresponding methodological boundary — FIRE-2 as method-validation only, real-data diagnostics for D-Cat-d — is enforced there.
 
 ---
 
 ## 13. What this programme transcends
 
-| Reference | How Pipeline 1 / 2 transcends |
+| Reference | How Pipeline 1 transcends |
 |---|---|
 | **Buck & Schwarz 2024** | Production catalogue vs their proof-of-concept; calibrated heteroscedastic covariant uncertainties with reliability diagrams and coverage tests (they report R² only); information-content audit; APOGEE DR19 vs DR17; extension to individual elements beyond [α/M]; their multimodal CL becomes our experimental benchmark (§8.5). |
 | **Guiglion+2024** | XP-only drops RVS G<14 ceiling; DR19 labels; neighborhood-median Av prior; Tier 1/2/3 tagging; calibrated uncertainties. |
 | **AspGap (Li+2024)** | Joint distance-Av fit; broader Teff-log g window; evolutionary-stage head; heteroscedastic covariance; per-label audit. |
 | **Fallows & Sanders 2024** | Ensemble/uncertainty philosophy + §9.2 audit converts their caveat ("training priors may drive bimodality") into measured, per-label released quantity. |
 | **Ye+2024** | Adopt their flux-correction; extend to α and [C/N] they do not attempt. |
-| **Neitzel+2025** | Parametric UMAP with uncertainty propagation; feature space expanded to actions + individual abundances; soft memberships; DBCV-selected hyperparameters; §10.5 diagnostic stack; MC ensemble over calibrated Pipeline-1 uncertainties → uncertainty-aware D-Cat-d. |
 | **All current XP-abundance catalogues** | The information-content audit and Tier 1/2/3 honesty. No one else does this. |
-| **All current Gaia-population catalogues** | Objective unsupervised diagnostic stack (§10.5), per-cluster stability, soft memberships. No one else does this rigorously. |
 
-The transcendence is not "more stars" or "more elements" or "fainter magnitudes" — all three races are saturated. It is **honesty under uncertainty**: every prediction carrying its information-content report card, every uncertainty calibrated and coverage-tested, every cluster carrying its stability probability, and a clean separation between method-validation (FIRE-2) and science-validation (real data + §9, §10.5). Defensible as PhD contribution.
+(Transcendence claims over population-classification prior art — Neitzel+2025 and the Gaia-population catalogues — are documented in Starfold.)
+
+The transcendence is not "more stars" or "more elements" or "fainter magnitudes" — all three races are saturated. It is **honesty under uncertainty**: every prediction carrying its information-content report card, every uncertainty calibrated and coverage-tested, and a clean separation between method-validation and science-validation (real data + §9). Defensible as PhD contribution.
 
 ---
 
@@ -611,10 +510,10 @@ The transcendence is not "more stars" or "more elements" or "fainter magnitudes"
 2. **Ye+2024 flux correction**: not yet peer-reviewed in final form. Freeze the version we use; log version.
 3. **Extinction beyond 1.25 kpc**: Edenhofer+2024 limit. Beyond, rely on GSP-Phot neighborhood-median (5 GB budget forces this choice over Bayestar19; acceptable substitute with documented caveats in `data_acquisition.md` §8). Far-disc Av uncertainty is a known limitation.
 4. **Red-clump contamination** in the "RGB" evolutionary-stage class propagates into [C/N]-age errors if > 5%. Seismic evolutionary-stage classification from Task 2 ground-truths a subsample.
-5. **FIRE-2 non-representativity**: even bimodal Ananke galaxies may not match MW α-bimodality precisely. Subtask 5.1 carries explicit caveat.
-6. **[Al/Fe] availability from XP**: Tier 3 at R = 50. Rely on APOGEE [Al/Fe] for APOGEE-observed subsample; ~60% of catalogue will lack [Al/Fe], limiting halo discrimination. Honest gap in D-Cat-d.
-7. **Computational cost**: full MC ensemble (N = 50) × DBCV grid × bootstrap (N = 500) on 10⁵ stars ≈ 2–3 days on RTX 3060. Portable to IA HPC. cuML 25.10 helps substantially.
-8. **Age uncertainty**: 15–30% seismic precision is fundamental chronological-resolution floor. If Task 4 delivers > 25% median, expect fewer populations resolvable in age dimension.
+5. **FIRE-2 non-representativity**: even bimodal Ananke galaxies may not match MW α-bimodality precisely. Handled in Starfold's Subtask 5.1.
+6. **[Al/Fe] availability from XP**: Tier 3 at R = 50. Rely on APOGEE [Al/Fe] for APOGEE-observed subsample; ~60% of catalogue will lack [Al/Fe], limiting halo discrimination downstream. Honest gap in D-Cat-d (Starfold).
+7. **Downstream compute budget** for Starfold's MC × DBCV × bootstrap grid is Starfold's concern; this repo's Pipeline 1 inference cost is separately tracked in `docs/plan/03_stream3_inference.md`.
+8. **Age uncertainty**: 15–30% seismic precision is a fundamental chronological-resolution floor for any downstream population analysis. If Task 4 delivers > 25% median, expect fewer populations resolvable in age dimension.
 9. **Buck & Schwarz 2024 is a workshop paper** (NeurIPS ML4PS 2024): contribution established but not peer-reviewed to journal standard. Cite appropriately in our publications.
 10. **Data-acquisition fragility**: `data_acquisition.md` relies on AIP TAP availability, SDSS DR19 server uptime, VizieR cross-match stability. Script-level retries, sidecar provenance, and batch checkpointing mitigate but do not eliminate. Budget ~1 week for an unattended full-sample acquisition.
 11. **Low-latitude, high-extinction incompleteness of the D-Cat-b release.** Pipeline 1 Tier 1/2 outputs exclude stars with `xp_fit_flag_residual_high` set. On Stream 1 (2026-04 materialisation) these Hermite-catastrophic rows concentrate on A_V_SFD ≈ 23 and low galactic latitude (|b| < 10°), with median G ≈ 14.6 and median Teff ≈ 4900 K — Galactic-plane disc territory where Ye+2024's NN extrapolates against saturated SFD columns and near-zero blue flux. Flag rate in Stream 1: 2 521 / 315 616 ≈ 0.80%. This is a structural selection effect, not a bug: the true line-of-sight extinction is unknowable from SFD alone at those columns, so neither we nor any downstream user can recover those stars without a better 3D dust prior. The D-Cat-b release therefore carries documented low-latitude high-extinction incompleteness. The scientifically sensitive halo-structural population is less affected than expected — the catastrophic group sits firmly in the disc, not the halo — so the cost of the exclusion is modest.

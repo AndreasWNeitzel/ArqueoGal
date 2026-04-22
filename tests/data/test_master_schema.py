@@ -1,4 +1,11 @@
-"""Offline tests for arqueogal.data.master_schema — §10 contract checks."""
+"""Offline tests for arqueogal.data.master_schema — §10 contract checks.
+
+``PIPELINE2_FEATURES_SCHEMA`` is a legacy schema retained in this repo for
+historical compatibility; the active chrono-chemo-kinematic feature
+contract now lives in Starfold (separate repo). The tests below continue
+to exercise the in-repo schema to prevent accidental breakage of the
+historical definition.
+"""
 
 from __future__ import annotations
 

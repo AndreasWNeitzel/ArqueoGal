@@ -33,11 +33,13 @@ arqueogal.data
 │                           SFD composition + GSP-Phot neighborhood-median Av via cKDTree.
 ├── distances.py          — Bailer-Jones+2021 (GAVO TAP) + StarHorse2 v2 (AIP TAP).
 ├── kinematics.py         — galpy orbits (McMillan17, Staeckel fudge, δ=0.45); central-value
-│                           for bulk, full MC for Pipeline-2 boundary stars only.
+│                           for bulk, full MC driven by downstream consumers (Starfold,
+│                           separate repo) for boundary-star subsamples only.
 ├── crossmatch.py         — DR2↔DR3 via gaiadr3.dr2_neighbourhood; TIC v8.2↔Gaia DR3.
 │                           Many-to-many handling; brightest-tie-break.
-└── fire2_ananke.py       — Subtask 5.1 hare-and-hounds ONLY. Strictly segregated from
-                            real-data science. See `docs/research_brief.md` §12.
+└── fire2_ananke.py       — Subtask 5.1 hare-and-hounds. Follows Starfold (separate repo);
+                            retained here only if still imported for method-validation
+                            harness and strictly segregated from real-data science.
 ```
 
 ## Hard rules

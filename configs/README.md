@@ -7,12 +7,13 @@ YAML configs for reproducible experiments. One file per model variant or trainin
 ```
 configs/
 ├── main/            # configs for main-pipeline deliverables (frozen during sprints)
-│   ├── xp_abundances_baseline.yaml
-│   ├── population_classifier_fire2.yaml   # Subtask 5.1 hare-and-hounds
-│   └── population_classifier_real.yaml    # Subtask 5.2 D-Cat-d
+│   └── xp_abundances_baseline.yaml
 └── experimental/    # configs for experimental-arm exploration (pre-promotion)
     └── xp_abundances_extended_labels.yaml
 ```
+
+Population-classifier configs (formerly `population_classifier_*.yaml`) live in the
+separate **Starfold** repository.
 
 Main/experimental separation mirrors `src/arqueogal/*/main|experimental/`. Cross-config
 references (a main config `includes:` an experimental one) are not allowed.

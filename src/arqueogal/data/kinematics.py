@@ -5,13 +5,17 @@ r_apo, z_max), energy E, and Galactocentric cylindrical velocities
 (v_R, v_T, v_z) in the McMillan+2017 Milky Way potential using the
 Staeckel fudge method (Binney 2012) with ``delta=0.45`` (Mackereth+2019).
 
-This module is the entry point for Pipeline 2's kinematic features and for
-the D-Cat-d soft-membership outputs. MC uncertainty propagation is split
+This module is the entry point for Stream 3 kinematic features. Downstream
+population classification has moved to the separate **Starfold** repository
+(2026-04-22); the kinematics utility here may be exposed to Starfold as an
+importable dependency or duplicated there — choice deferred per
+``docs/plan/04_pipeline2_main.md``. MC uncertainty propagation is split
 into two tiers per §9.5:
 
 - :func:`compute_actions` — central-value only (Stream 3 bulk, 1.5 M stars).
 - :func:`compute_actions_mc` — N-MC draws from the Gaia astrometric
-  covariance for the D-Cat-d boundary-cluster subsample.
+  covariance for the boundary-star subsample (driven by downstream
+  consumers, e.g. Starfold).
 
 The McMillan+2017 potential ships with ``ro=8.21 kpc, vo=233.1 km/s``.
 data_acquisition.md §9.2 prefers ``R_0=8.122 kpc`` (GRAVITY 2018) — the

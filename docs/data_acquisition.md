@@ -15,7 +15,7 @@
 |---|---|---|---|
 | **1. APOGEE DR19 × Gaia DR3** | Training labels for Pipeline 1 (`xp_abundances`) | ~700 k | ~1.0 GB |
 | **2. TESS Hon+2021 + TASOC × Gaia DR3** | Pre-staging for future asteroseismic ages (Task 4) | ~160 k | ~250 MB |
-| **3. Gaia RGB+RC application sample** | Pipeline 1 inference set + Pipeline 2 feature basis | 1–2 M | ~2.0 GB |
+| **3. Gaia RGB+RC application sample** | Pipeline 1 inference set (predictions downstream-consumed by Starfold) | 1–2 M | ~2.0 GB |
 | **Shared**: dust maps, distances, orbits, master catalog | | | ~1.0 GB |
 | **Headroom** | | | ~750 MB |
 
@@ -94,8 +94,10 @@ data/
 │   └── stream3_gaia_rgbrc.parquet
 ├── processed/                              # analysis-ready feature matrices
 │   ├── pipeline1_training.parquet          # APOGEE × Gaia with XP + labels
-│   ├── pipeline1_inference.parquet         # Gaia RGB+RC with XP, no labels
-│   └── pipeline2_features.parquet          # chrono-chemo-kinematic
+│   └── pipeline1_inference.parquet         # Gaia RGB+RC with XP, no labels
+│                                           # (Starfold downstream consumes Pipeline 1 prediction parquets
+│                                           #  produced from this matrix; kinematics may be exposed as a utility
+│                                           #  or duplicated in Starfold — choice deferred.)
 ├── external/                               # third-party shared catalogues
 │   └── hot_stuff/                          # anything else if needed
 └── provenance/                             # JSON provenance files (one per Parquet)
@@ -270,7 +272,7 @@ Output: `data/interim/stream2_tess_gaia.parquet`. ~120 k rows × ~40 columns ≈
 
 ## 5. Stream 3 — 1–2 M Gaia RGB+RC application sample
 
-This is the inference set for Pipeline 1 (`xp_abundances`) and the feature basis for Pipeline 2. **Selection criterion matters most here** — an honest, defensible, reproducible cut is essential for the D-Cat-b/D-Cat-d releases.
+This is the inference set for Pipeline 1 (`xp_abundances`); the Pipeline 1 prediction parquets produced from it are the input Starfold (downstream; separate repo) consumes to build its own feature matrix. **Selection criterion matters most here** — an honest, defensible, reproducible cut is essential for the D-Cat-b/D-Cat-d releases.
 
 ### 5.1 Three candidate selection strategies
 
@@ -309,7 +311,7 @@ bins_g     = np.linspace(7, 16, 10)
 # Cells with < 600 stars: take all; cells with more: random.
 ```
 
-This stratification is essential for Pipeline 2 diagnostics — an unstratified sample dominated by disc stars at solar metallicity would under-sample the halo and metal-poor tails where interesting population structure lives.
+This stratification is essential for downstream diagnostics (§9.2 test 6 here, and population-discovery work in Starfold) — an unstratified sample dominated by disc stars at solar metallicity would under-sample the halo and metal-poor tails where interesting population structure lives.
 
 Log the exact stratification parameters and random seed to provenance.
 
@@ -321,6 +323,23 @@ Same query template as §3.6. **With XP coefficients this time** — the full pu
 
 - `data/interim/stream3_gaia_rgbrc.parquet`: 1.5 M rows × ~80 Gaia columns ≈ **~950 MB uncompressed, ~320 MB Parquet** (without XP).
 - With XP coefficients attached (§6): **~1.8 GB Parquet**. This is the single largest disk consumer in the workspace.
+
+### 5.6 IR photometry cross-match (2MASS PSC + AllWISE)
+
+Pipeline 1 inference consumes 2MASS J/H/K and AllWISE W1/W2 as auxiliary features alongside the XP coefficients. Zero-imputation diagnostics on Stream 3 show all five v1 labels degrade 28–130% RMSE without IR; NaN-imputation crashes the adapter. Per-star IR is non-negotiable.
+
+- Module: `src/arqueogal/data/ir_photometry.py`. Driver: `scripts/fetch_ir_photometry.py`.
+- Primary TAP: **AIP** (`https://gaia.aip.de/tap`, `GAIA_AIP_TOKEN` bearer auth). ESA Gaia Archive is a secondary fallback but its shared anonymous `TAP_UPLOAD` queue routinely runs up against a 20 GB filesystem quota under concurrent external load — a single 10 k-id chunk can land with `Filesystem quota exceeded for user anonymous`. Prefer AIP.
+- Cross-match uses the Marrese+2019 Gaia×external best-neighbour tables:
+  - 2MASS: `gaiadr3.tmass_psc_xsc_best_neighbour` ⨝ `catalogs.tmass` (AIP) / `gaiadr1.tmass_original_valid` (ESA).
+  - AllWISE: `gaiadr3.allwise_best_neighbour` ⨝ `catalogs.allwise` (AIP) / `gaiadr1.allwise_original_valid` (ESA).
+- **Join key — important.** For both catalogues use `<original_valid|catalogs>.designation = best_neighbour.original_ext_source_id`. Do **not** join AllWISE on `allwise_oid` — on ESA that deterministically triggers `java.sql.SQLException: PooledConnection has already been closed` and on AIP it works but has no upside. The `designation` string join is correct for both PSC catalogues (AllWISE designations are `Jhhmmss.ss±ddmmss.s`; 2MASS are `hhmmssss±ddmmsss`).
+- Column mapping to the module's canonical schema:
+  - 2MASS PSC: `j_m → j_mag`, `j_msigcom → e_j_mag`, `h_m → h_mag`, `h_msigcom → e_h_mag`, `ks_m → k_mag` (ESA) **or** `k_m → k_mag` (AIP), `ks_msigcom → e_k_mag` (ESA) / `k_msigcom → e_k_mag` (AIP), `designation → tmass_source_id`, `bn.angular_distance → tmass_angular_distance`, `bn.xm_flag → tmass_xm_quality_flag`.
+  - AllWISE: `w1mpro → w1_mag`, `w1mpro_error → e_w1_mag` (ESA) / `w1sigmpro → e_w1_mag` (AIP), analogous for W2, `designation → allwise_source_id`, `bn.angular_distance → allwise_angular_distance`, `bn.xm_flag → allwise_xm_quality_flag`.
+- Batched async TAP UPLOAD, 10 000 ids/chunk, per-chunk checkpoints at `data/interim/enrich_batches/ir/{tmass,allwise}/batch_NNNN.parquet`. Resumable across crashes.
+- **Stream 3 Ye-OK subset (164 314 stars, 2026-04-19 reference run):** AIP wall-clock ~80 min; 2MASS counterpart rate 99.49%; AllWISE counterpart rate 100.00%; IR-complete (all 5 mags present) 99.46%. 881 stars flagged `ir_missing_flag=True` and should be dropped (or routed through the missingness branch) before Pipeline 1 inference.
+- Output: `data/raw/ir_photometry/stream3_existing_ir.parquet` (~10 MB Parquet, 18 cols, float32 mags, Int8 quality flags) with JSON provenance sidecar.
 
 ---
 
@@ -401,6 +420,41 @@ Applied in `src/arqueogal/data/gaia_xp.py`, in order:
 - No coefficient should be > 10× the typical magnitude-stratified median of its column — outliers flagged with `xp_outlier_flag`.
 - `has_xp_continuous` from the `gaia_source` join should be True for every star. If not, the XP query silently failed — halt and investigate.
 
+### 6.6 Ye+2024 `NO_SYNTH_PHOT` selection function
+
+The Ye+2024 NN flux-correction refuses to correct a non-trivial minority of stars because `gaiaxpy.generate` cannot produce the synthetic photometry the NN expects (internally flagged `YE2024_FLAG_NO_SYNTH_PHOT`, emitted as `ye2024_flag == 1`). Thread-1 diagnostics on Stream 1 (N = 324,054; 2.60 % globally flagged) showed the failure rate is a *strong* function of Galactic latitude and G magnitude: **10.48 % in the plane (`|b| < 5°`) vs 0.08 % off-plane (`|b| > 15°`), i.e., a 134× ratio**, and it is essentially zero for G ≲ 14 at any latitude, rising to 40 % at `|b| < 5°` for G > 15.5. The rejection is *not* a uniformly-random sample — it tracks regions where crowding, extinction, and Gaia XP de-blending failures preferentially remove stars. The D-Cat-b release therefore exposes this as a per-star scalar:
+
+- **`selection_prob` column**: defined as `1 − P(NO_SYNTH_PHOT | |b|, G)`, i.e., the probability that a star at the given `(|b|, G)` would have been *retained* by the Ye+2024 correction (flag == 0). Clipped to `[0.01, 1.0]` — the floor keeps inverse weights finite in the plane-faint corner while remaining honest (users should treat `selection_prob < 0.1` as informative about catalogue completeness, not as a number to extrapolate).
+- **Stratification (v1):** 5×5 grid on `(|b|, G)` with edges `|b| ∈ {0, 5, 10, 20, 45, 90}°` and `G ∈ {2.0, 11.0, 12.5, 14.0, 15.5, 17.65}`. 1 of 25 cells is sparse (N < 200); its rate is consistent with the neighbouring cells so no regression fallback is triggered. If future ingestion tips cells below threshold, the planned fallback is `statsmodels.nonparametric.lowess` or `scipy.ndimage.gaussian_filter` on the rate grid; the scorer contract is unchanged.
+- **v2 stratification** (post-D-Cat-b): extend to `(|b|, G, Teff, log g)` and/or include line-of-sight Av.
+- **Scorer:** `arqueogal.data.selection_function.score_selection_prob(b_deg, g_mag) → np.ndarray` in `[0.01, 1.0]`. Loads the v1 Parquet artefact.
+- **Artefact location:** `reports/selection_function/selection_function_v1.parquet` with sidecar `selection_function_v1.provenance.json`. Methodology narrative at `reports/selection_function/selection_function_v1.md`.
+- **Builder:** `scripts/build_selection_function_v1.py`. Deterministic. Read-only on the input; atomic write on the output.
+- **Downstream use:** Stream 3 ingestion calls `score_selection_prob` on each star's `(b_deg, g_mag)` and writes the scalar into the per-star D-Cat-b catalogue. Users needing inverse weights compute `1.0 / selection_prob`.
+
+### 6.7 Compound selection function (v1.1) — Ye retention × IR completeness
+
+v1.1 extends the §6.6 selection function with a second, multiplicative component: **P(IR-complete | |b|, G, Teff, log g)**. The IR-dependency diagnostic confirmed the five 2MASS/AllWISE magnitudes (J, H, K, W1, W2) are load-bearing on all five Pipeline-1 labels. Stars without 2MASS/AllWISE counterparts (~0.37 % of Stream 1) fall into the "IR=0 rare-pattern" regime at inference (training used `nan_to_num(0.0)` on those rows); their per-star predictions are scientifically different from the IR-complete majority. Volume-complete downstream analyses therefore need *both* `P(Ye-retained)` and `P(IR-complete)` per star.
+
+- **Compound definition:** `p_compound = p_ye_retained · p_ir_complete · p_parallax · p_extinction`. In v1.1 the last two factors are 0/1 gates (True → 1.0, False → 0.0) that take a per-star data-availability flag; smooth parallax / extinction-availability probabilities are earmarked for v1.2.
+- **IR-completeness definition:** a row is IR-complete iff all five IR magnitudes are finite *and* non-zero. Both conditions are enforced for clean training→inference transfer (the zero-sentinel is the downstream `nan_to_num` stand-in for "no counterpart").
+- **IR grid:** 5×5×3×2 on `(|b|, G, Teff, log g)` — same |b|×G edges as v1 for compositional ease; `Teff ∈ {3000, 4400, 4900, 6500} K` (cool / mid / warm giants) and `log g ∈ {0, 2.5, 5.0}` (luminous giants / lower-RGB+RC). 150 possible cells; on Stream 1, 145 populate and 112 are dense (N ≥ 100). Per-cell Laplace smoothing `(N_c + 1) / (N_t + 2)` prevents 0 or 1 extremes; `[0.01, 1.0]` clamp matches v1.
+- **Sparse-cell fallback:** when a 4-D cell has N < 100 *or* when Teff / log g are unavailable at scoring time, the scorer falls back to the always-dense |b|×G marginal. Out-of-range inputs are clamped to the nearest edge.
+- **Global Stream-1 rate:** P(IR-complete) = 99.63 % (vs the ~99.9 % training-domain heuristic referenced in the IR-dependency diagnostic). Most of the gap is concentrated in faint-in-plane cells (bright `|b|<5°` drops to ~94 %).
+- **Scorers** (all in `arqueogal.data.selection_function`):
+  - `score_selection_prob(b_deg, g_mag)` — v1, unchanged for backwards compatibility.
+  - `score_ir_completeness(b_deg, g_mag, teff, logg)` — new.
+  - `score_compound_selection_prob(b_deg, g_mag, teff, logg, parallax_over_error=None, av_missing=False)` — returns a dict with `p_ye_retained`, `p_ir_complete`, `p_compound`, and a `components` breakdown.
+- **Artefacts:**
+  - `reports/selection_function/ir_completeness_v1.{parquet,md,provenance.json}` — the 4-D grid plus the |b|×G marginal fallback (both stored in the same Parquet, distinguished by a `grid` column).
+  - `reports/selection_function/selection_function_v1.1.{parquet,md,provenance.json}` — the |b|×G-marginal compound table (Ye retention joined with IR completeness) for consumers who do not carry Teff / log g at scoring time. v1 remains in place at `selection_function_v1.*` for historical reference.
+- **Builder:** `scripts/build_selection_function_v11.py`. Deterministic. Read-only on the input; atomic writes on outputs.
+- **Known limitations (v1.1):**
+  1. `p_parallax` and `p_extinction` are 0/1 gates — upgrade path is v1.2.
+  2. IR-completeness table is computed on the Stream 1 (APOGEE × Gaia XP) basis; cross-check on first Stream-3 Ye run is scheduled.
+  3. Piecewise-constant inside each 4-D cell — smoothing is v1.3 work if structure inside bins ever grows.
+  4. Coarse Teff stratification (3 bins); refine if future data ingestion produces material 4-D structure inside any of them.
+
 ---
 
 ## 7. Distances
@@ -455,7 +509,7 @@ WHERE source_id IN (__batch__)
 
 ### 7.3 Distance selection logic
 
-For Pipeline 1 and Pipeline 2:
+For Pipeline 1 (and, by extension, for the kinematics module that may be shared with Starfold):
 - Primary: `r_med_photogeo` from Bailer-Jones+2021.
 - Cross-check and uncertainty inflation: where StarHorse2 `dist50` is available, compare. If |log10(r_BJ/d_SH2)| > 0.3 (factor of 2 disagreement), flag the star as `dist_conflict` and inflate the distance uncertainty to encompass both.
 - Inside Pipeline 1 itself, distance is also a model output — the final feature vector carries a `distance_prior` (Bailer-Jones) and its σ, and the ML jointly re-fits.
@@ -579,7 +633,7 @@ From Streams 1 and 3:
 ### 9.3 Potential
 
 **Primary**: `McMillan17` via galpy (McMillan 2017, MNRAS 465, 76). Well-constrained rotation curve, disc+bulge+halo components.
-**Sensitivity check**: run a subset with `MWPotential2014` (Bovy 2015) and record the per-star action differences — if systematic actions shift by > 20% between potentials, Pipeline 2 conclusions must carry a "potential-dependent" caveat in the D5.1 release.
+**Sensitivity check**: run a subset with `MWPotential2014` (Bovy 2015) and record the per-star action differences — if systematic actions shift by > 20% between potentials, any downstream population-classification conclusions (Starfold / D5.1) must carry a "potential-dependent" caveat.
 
 ### 9.4 Outputs
 
@@ -592,11 +646,11 @@ Per star:
 
 Naive MC for actions is expensive (2 M stars × N_MC × ~1 ms/sample = impractical at N_MC > 10). Two-tier strategy:
 - **Stream 3 bulk (1.5 M stars)**: compute central-value actions only. Reports uncertainties from analytic error propagation (Jacobian) as a first-order approximation.
-- **Pipeline 2 D-Cat-d subsample**: for stars that Pipeline 2 soft-assigns to boundary clusters (see research_brief §10.3), compute N_MC = 100 full MC draws from the astrometric covariance using `numpy.random.multivariate_normal` with the 5×5 Gaia covariance matrix. This is ~10⁴ stars × 100 × 1 ms = ~15 min. Affordable only because we restrict to boundary cases.
+- **Boundary-star MC subsample (Starfold-driven)**: full MC draws (N_MC ≈ 100) from the astrometric covariance via `numpy.random.multivariate_normal` on the 5×5 Gaia covariance are triggered downstream for stars Starfold soft-assigns to boundary clusters. This is ~10⁴ stars × 100 × 1 ms = ~15 min. Affordable only because it is restricted to boundary cases. The kinematics utility in this repo produces the central values + Jacobian; Starfold drives the MC.
 
 ### 9.6 Output schema
 
-Append to `data/processed/pipeline2_features.parquet`: one row per star with `J_R`, `J_z`, `L_z`, `ecc`, `r_peri`, `r_apo`, `z_max`, `E`, plus LSR-referenced velocities and their uncertainties. ~1.5 M × 20 float32 columns ≈ **~120 MB Parquet**.
+One row per star with `J_R`, `J_z`, `L_z`, `ecc`, `r_peri`, `r_apo`, `z_max`, `E`, plus LSR-referenced velocities and their uncertainties. ~1.5 M × 20 float32 columns ≈ **~120 MB Parquet**, written alongside the Stream 3 inference product for downstream consumers (Starfold or this repo's own diagnostics) to join by `source_id`.
 
 ---
 
@@ -625,21 +679,9 @@ After all streams are ingested, cross-matched, and enriched, the analysis-ready 
 
 Same columns as 10.1 minus the APOGEE-sourced labels, plus Andrae+2023 labels as cross-reference diagnostics.
 
-### 10.3 `pipeline2_features.parquet`
+### 10.3 Downstream feature-matrix assembly (Starfold)
 
-~1.5 M rows, chrono-chemo-kinematic feature vector for Pipeline 2 clustering.
-
-| Column | Source |
-|---|---|
-| `source_id` | join key |
-| `age`, `age_err` | Task 4 output (future); null for now |
-| `fe_h`, `fe_h_err` | APOGEE if overlap, else Pipeline 1 Tier 1 |
-| `mg_fe`, `mg_fe_err` | APOGEE if overlap, else Pipeline 1 Tier 2 |
-| `al_fe`, `al_fe_err` | APOGEE where Tier 1/2 supports |
-| `c_n`, `c_n_err` | RGB only, evolutionary-stage-gated |
-| `J_R`, `J_z`, `L_z`, `ecc`, `r_peri`, `r_apo`, `z_max`, `E` | §9 |
-| `v_phi`, `sqrt_u2_plus_w2` | backward-compatibility with Neitzel+2025 |
-| `evolutionary_stage_prob` | from Pipeline 1 head |
+Starfold (separate repo) is the downstream consumer of this repo's Pipeline 1 prediction parquets. Its chrono-chemo-kinematic feature-matrix assembly (age, individual abundances, actions, evolutionary-stage gating of [C/N], backward-compatibility columns with Neitzel+2025) is documented there. The inputs Starfold joins on are the Pipeline 1 prediction parquets (`data/processed/pipeline1_predictions_stream3_joint*.parquet`) plus, optionally, the Stream 3 kinematics output from §9. No `pipeline2_features.parquet` is materialised in this repo.
 
 ---
 
@@ -686,9 +728,9 @@ Level 5 (kinematics):
 
 Level 6 (master catalogs):
   - Join all intermediates → data/processed/pipeline1_training.parquet,
-                               pipeline1_inference.parquet,
-                               pipeline2_features.parquet
+                               pipeline1_inference.parquet
   - Provenance JSON for each
+  - Starfold (downstream) joins Pipeline 1 prediction parquets + kinematics
 ```
 
 Expected total wall time from cold start, assuming reasonable AIP/GAVO responsiveness: **~12–16 hours** over 2–3 sessions. Most time is TAP queries (XP is the slowest) and galpy integration.
@@ -713,7 +755,6 @@ Final budget audit at the end of ingestion. If the total exceeds 4.5 GB, re-eval
 | `data/interim/stream3_gaia_rgbrc.parquet` (without XP — joined at use time) | | 320 MB |
 | `data/processed/pipeline1_training.parquet` | | 400 MB |
 | `data/processed/pipeline1_inference.parquet` | | 700 MB |
-| `data/processed/pipeline2_features.parquet` | | 250 MB |
 | `data/provenance/` | JSON sidecars | <10 MB |
 | **Total** | | **~5.1 GB** |
 

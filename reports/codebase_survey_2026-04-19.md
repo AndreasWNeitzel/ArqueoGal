@@ -1,9 +1,17 @@
 # ArqueoGal — Full Codebase Technical Report
 **Working copy date:** 2026-04-19 · **Repo:** `/home/aneitzel/projects/ArqueoGal` · **Branch:** `master` (pre–initial-commit at time of writing)
 
-This report describes, module-by-module, what the ArqueoGal code under `src/arqueogal/` and `scripts/` actually does. It is assembled from (a) a codegraph dump (1 156 functions / 3 513 call edges in `src`; 846 / 3 321 in `scripts`), (b) targeted per-module reads of source files, and (c) the three canonical docs (`docs/research_brief.md`, `docs/data_acquisition.md`, `docs/data_overview.md`) plus `CLAUDE.md` and `README.md`.
+> **Dated snapshot — read this first.** This report captures the repository
+> state on **2026-04-19**. On **2026-04-22** the `src/arqueogal/population_classifier/`
+> tree ("Pipeline 2") was spun out to the separate **Starfold** repository
+> (<https://github.com/AndreasWNeitzel/Starfold>); all Pipeline-2 sections,
+> module counts, config names, and test counts below describe that earlier
+> state, not the current one. For current scope see
+> [`docs/plan/04_pipeline2_main.md`](../docs/plan/04_pipeline2_main.md).
 
-> **Note to downstream reviewer.** Section 11 is an explicit alignment check between what the docs / `CLAUDE.md` / `README.md` claim and what the code actually does. Flag any discrepancy surfaced there first.
+This report describes, module-by-module, what the ArqueoGal code under `src/arqueogal/` and `scripts/` actually does. It is assembled from (a) a codegraph dump (1 156 functions / 3 513 call edges in `src`; 846 / 3 321 in `scripts`), (b) targeted per-module reads of source files, and (c) the canonical docs (`docs/research_brief.md`, `docs/data_acquisition.md`, `docs/data_overview.md`) plus `README.md`.
+
+> **Note to downstream reviewer.** Section 11 is an explicit alignment check between what the canonical docs / `README.md` claim and what the code actually does. Flag any discrepancy surfaced there first.
 
 > **Post-review fix record (2026-04-19, after the reviewer pass).** Three must-fix items were resolved before this report was committed:
 > 1. **Ye+2024 docstring drift** — `src/arqueogal/data/gaia_xp.py` module docstring and `scripts/fetch_gaia_xp.py` (docstring + provenance notes) now describe Ye+2024 as live, driven by `scripts/apply_ye2024_xp.py`. See §11.2 item 3.
@@ -16,7 +24,7 @@ This report describes, module-by-module, what the ArqueoGal code under `src/arqu
 
 - **Grant:** FCT 2024.15303.PEX (DOI: 10.54499/2024.15303.PEX). PI: Tiago Campante (CAUP/IA, Porto). Period: 2026-02 – 2027-08 (18 months).
 - **Workspace:** personal development area of Andreas Neitzel (PhD student, Co-I). Not the team-wide repo.
-- **Deliverables built here** (from `README.md` §Deliverables, corroborated by `CLAUDE.md`):
+- **Deliverables built here** (from `README.md` §Deliverables, corroborated by the research brief):
   - **D-Cat-b** (supporting, Aug 2026 / Month 6) — XP-based chemical abundance catalogue for stars without APOGEE DR19 spectroscopy.
   - **D5.1** (Dec 2026 / Month 10) — open-source ML tool for automated stellar-population classification.
   - **D-Cat-d** (Feb 2027 / Month 12) — stellar-population membership probabilities appended to the ArqueoGal all-sky catalogue.
@@ -34,7 +42,6 @@ This report describes, module-by-module, what the ArqueoGal code under `src/arqu
 
 ```
 ArqueoGal/
-├── CLAUDE.md                    ← project instructions for Claude (~330 lines)
 ├── README.md                    ← elevator pitch, Credentials, References (~119 lines)
 ├── pyproject.toml               ← pkg name arqueogal 0.1.0, py 3.12, ruff + pytest
 ├── codegraph.py                 ← present at top level (wrapper)
@@ -377,25 +384,25 @@ Top functions by fan-out:
 
 ---
 
-## 11. Alignment check — docs / CLAUDE.md / README.md vs code
+## 11. Alignment check — docs / README.md vs code
 
 ### 11.1 Claims that are corroborated by code
 
 | Claim | Source | Code evidence |
 |---|---|---|
-| Gaia zpt + G-mag corrections are mandatory at ingestion. | CLAUDE.md §data-acquisition tooling, data_acquisition.md §3.7 | `data/gaia_corrections.py` implements both live; `scripts/apply_gaia_corrections.py` enforces on every raw enrichment Parquet. |
-| XP preprocessing order: Ye+2024 → normalise by c_0 → log + z-score c_0. | CLAUDE.md, data_acquisition.md §6.4 | `data/gaia_xp.py` contains `apply_ye2024_correction`, `normalise_xp`, `zscore_c0` as separate functions. `scripts/apply_ye2024_xp.py` drives step 1; `scripts/build_pipeline1_features_stream1.py` drives 2–4. |
-| Mészáros+2025 [X/M] corrections. | CLAUDE.md, data_acquisition.md | `data/apogee_dr19.py` applies live; `scripts/emit_apogee_corrected.py`, `plot_meszaros_correction_deltas.py`. |
+| Gaia zpt + G-mag corrections are mandatory at ingestion. | data_acquisition.md §3.7 | `data/gaia_corrections.py` implements both live; `scripts/apply_gaia_corrections.py` enforces on every raw enrichment Parquet. |
+| XP preprocessing order: Ye+2024 → normalise by c_0 → log + z-score c_0. | data_acquisition.md §6.4 | `data/gaia_xp.py` contains `apply_ye2024_correction`, `normalise_xp`, `zscore_c0` as separate functions. `scripts/apply_ye2024_xp.py` drives step 1; `scripts/build_pipeline1_features_stream1.py` drives 2–4. |
+| Mészáros+2025 [X/M] corrections. | data_acquisition.md | `data/apogee_dr19.py` applies live; `scripts/emit_apogee_corrected.py`, `plot_meszaros_correction_deltas.py`. |
 | Three streams as described. | README.md, data_overview.md | Three separate orchestrators `ingest_stream{1,2,3}.py` + matching enrichment and fetchers. |
 | AIP bearer token via `GAIA_AIP_TOKEN`; YAML fallback; YAML wins when both set. | README.md §Credentials | `data/credentials.py` logic matches (YAML has priority, env var fallback, `ARQUEOGAL_CREDENTIALS_PATH` override). |
-| Tier 1 per-star / Tier 2 population / Tier 3 not released. | CLAUDE.md, research_brief.md, data_overview.md §6 | `xp_abundances/main/data.py` `FeatureLayout` and tier lists; `tier_promotion.py` six-test protocol. |
-| Pipeline 2 = Parametric UMAP + HDBSCAN, DBCV-optimised, MC ensemble, six-diagnostic stack. | CLAUDE.md, research_brief.md | All eight `population_classifier/main/` modules match: `embedding.py` (Parametric UMAP), `clustering.py` (HDBSCAN soft), `hyperparameter.py` (DBCV 3 240-cell grid), `mc_ensemble.py` (N = 50), `diagnostics.py` (six tests). |
-| 5 GB storage budget, no FIRE-2 for pipelines, no push beyond G = 17. | CLAUDE.md | `dust_maps.py` deliberately omits Bayestar19 per doc; no FIRE-2 imports in Pipeline-1 main; `features.py`/`data.py` do not expose G > 17 feature paths. |
-| Segregated main vs experimental. | CLAUDE.md | `src/arqueogal/*/main/` and `src/arqueogal/*/experimental/` trees exist; no cross-imports detected in codegraph. |
+| Tier 1 per-star / Tier 2 population / Tier 3 not released. | research_brief.md, data_overview.md §6 | `xp_abundances/main/data.py` `FeatureLayout` and tier lists; `tier_promotion.py` six-test protocol. |
+| Pipeline 2 = Parametric UMAP + HDBSCAN, DBCV-optimised, MC ensemble, six-diagnostic stack. | research_brief.md | All eight `population_classifier/main/` modules match: `embedding.py` (Parametric UMAP), `clustering.py` (HDBSCAN soft), `hyperparameter.py` (DBCV 3 240-cell grid), `mc_ensemble.py` (N = 50), `diagnostics.py` (six tests). |
+| 5 GB storage budget, no FIRE-2 for pipelines, no push beyond G = 17. | working invariants | `dust_maps.py` deliberately omits Bayestar19 per doc; no FIRE-2 imports in Pipeline-1 main; `features.py`/`data.py` do not expose G > 17 feature paths. |
+| Segregated main vs experimental. | working invariants | `src/arqueogal/*/main/` and `src/arqueogal/*/experimental/` trees exist; no cross-imports detected in codegraph. |
 
 ### 11.2 Discrepancies / cautions the reviewer should note
 
-1. **Test tree gap.** `tests/xp_abundances/experimental/` and `tests/population_classifier/experimental/` directories exist but are **empty**. CLAUDE.md mandates "separate test trees for `main/` and `experimental/`" — this is a gap, not a contradiction, because the experimental trees themselves are also currently sparse.
+1. **Test tree gap.** `tests/xp_abundances/experimental/` and `tests/population_classifier/experimental/` directories exist but are **empty**. The project conventions mandate "separate test trees for `main/` and `experimental/`" — this is a gap, not a contradiction, because the experimental trees themselves are also currently sparse.
 
 2. **xp_abundances `config.py`, `sanity.py` lack tests** (2 of 14 main-pipeline modules). `halfway_umap.py` was added to the test tree on 2026-04-19 (`tests/xp_abundances/main/test_halfway_umap.py`, 10 tests, UMAP mocked via `sys.modules`).
 
@@ -418,11 +425,11 @@ Top functions by fan-out:
 
 8. **`fetch_gaia_xp.py` is the only script that explicitly does NOT apply the §6.4 preprocessing** — it only fetches raw coefficients. The preprocessing is applied by `apply_ye2024_xp.py` and then `build_pipeline1_features_stream1.py` / `emit_stream1_with_hermite.py`. Correct separation, but downstream code that bypasses these scripts and reads `xp_coeffs_raw.parquet` directly would silently skip preprocessing. No evidence any production code does this.
 
-9. **Stream 2 consumer status.** CLAUDE.md: "Not used by Pipelines 1 or 2 yet". data_overview.md §1: "Neither Pipeline 1 nor Pipeline 2 consumes it yet". Pipeline 1 feature builder imports and configs do not reference Stream 2. Corroborated.
+9. **Stream 2 consumer status.** data_overview.md §1: "Neither Pipeline 1 nor Pipeline 2 consumes it yet". Pipeline 1 feature builder imports and configs do not reference Stream 2. Corroborated.
 
 10. **Scripts count — confirmed 31.** An earlier-session scratchpad summary had said 36 scripts; direct count of `.py` files under `scripts/` confirms 31. No code-vs-docs issue.
 
-### 11.3 CLAUDE.md "Don't" rules vs code
+### 11.3 Invariant "Don't" rules vs code
 
 | Rule | Check |
 |---|---|
@@ -525,7 +532,7 @@ Stream 3's Pipeline 1 inference feature matrix and Pipeline 2 feature matrix are
 - Pytest: `testpaths = tests`, `pythonpath = src`, `addopts = "-v --tb=short"`, markers include `slow`.
 - Dev deps: ruff, pytest, pytest-cov.
 
-Environment rules (from CLAUDE.md §Environment, §Hardware):
+Environment rules (project conventions, §Environment, §Hardware):
 - Host: WSL2 Ubuntu, RTX 3060 6 GB VRAM.
 - Python venv `~/.venvs/rapids25.10_python3.12_cuda13/`, activated via `rapidsenv` shell alias.
 - No new venvs. No `pip install` that bumps cudf/cuml/numpy/pandas/pyarrow.
@@ -544,5 +551,5 @@ The most important things for a discrepancy scanner to verify against source:
 1. **`data/gaia_xp.py:apply_ye2024_correction` is LIVE** (not stub). Docstring drift in this module and in `scripts/fetch_gaia_xp.py` was resolved 2026-04-19.
 2. **GP-smoothing uncertainty calibrator is retained dead code**, not production. Production is `shrunken_per_cell_per_label_scale`.
 3. **Three audit/tier-promotion subtests are stubs/deferred** (SHAP, decorrelated subsample, cross-catalogue consistency) — these are the only known completeness gaps in the release-gate code.
-4. **Experimental test trees are empty** — CLAUDE.md aspiration rather than an implementation gap, but flag it.
+4. **Experimental test trees are empty** — a convention aspiration rather than an implementation gap, but flag it.
 5. **No TODO/FIXME/NotImplementedError scattered across the main pipelines** beyond the four items above.

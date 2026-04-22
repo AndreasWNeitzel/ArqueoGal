@@ -1,6 +1,6 @@
 # ArqueoGal — Data Overview
 
-**Scope:** a visual tour of the data ArqueoGal ingests, what gets produced at each stage, and how Stream 1 / Stream 2 / Stream 3 feed the two ML pipelines.
+**Scope:** a visual tour of the data ArqueoGal ingests, what gets produced at each stage, and how Stream 1 / Stream 2 / Stream 3 feed Pipeline 1 (and, downstream, the Starfold population classifier in its separate repo).
 **Companion documents:** [`research_brief.md`](research_brief.md) (scientific rationale, methodology), [`data_acquisition.md`](data_acquisition.md) (TAP queries, cross-matching, preprocessing recipes).
 **How to regenerate these figures:** `python scripts/plot_data_overview.py` — writes PNG + PDF into `reports/figures/data_overview/`. Re-run whenever the feature matrices change.
 
@@ -12,14 +12,14 @@ This document is the canonical, one-page entry point for anyone (collaborator, r
 
 ![Data flow](../reports/figures/data_overview/panel_01_data_flow.png)
 
-Three acquisition streams feed two machine-learning pipelines, which produce three deliverables on the FCT timeline.
+Three acquisition streams feed Pipeline 1 in this repo; the predictions flow downstream to Starfold (separate repo) which produces D5.1 and D-Cat-d.
 
 - **Stream 1** (APOGEE DR19 × Gaia DR3 on RGB+RC giants, ~324 k rows) is the **training set** for Pipeline 1. Every row carries calibrated APOGEE DR19 ASPCAP labels ($T_\mathrm{eff}$, $\log g$, [M/H], [Fe/H], [α/M], per-element [X/M]) plus Gaia DR3 XP coefficients, after Mészáros+2025 $T_\mathrm{eff}$-trend corrections on APOGEE DR19 and Lindegren+2021 zpt + Riello+2021 G-mag corrections on Gaia.
-- **Stream 2** (TESS Hon+2021 $\nu_\mathrm{max}$ × Gaia DR3, ~158 k rows) is **pre-staged** for Task 4 asteroseismic ages (led externally by Campante/Miglio). Neither Pipeline 1 nor Pipeline 2 consumes it yet — it is here so the ingestion, cross-match, and provenance scaffolding are ready when age labels arrive.
-- **Stream 3** (Andrae+2023 vetted RGB+RC × Gaia DR3, ~168 k rows sub-selected from 10.5 M) is the **inference set** — where Pipeline 1 predicts abundances in the XP-only regime, feeding Pipeline 2's chrono-chemo-kinematic feature vector.
+- **Stream 2** (TESS Hon+2021 $\nu_\mathrm{max}$ × Gaia DR3, ~158 k rows) is **pre-staged** for Task 4 asteroseismic ages (led externally by Campante/Miglio). Pipeline 1 does not consume it yet — it is here so the ingestion, cross-match, and provenance scaffolding are ready when age labels arrive; Starfold will eventually join on the Task 4 output.
+- **Stream 3** (Andrae+2023 vetted RGB+RC × Gaia DR3, ~168 k rows sub-selected from 10.5 M) is the **inference set** — where Pipeline 1 predicts abundances in the XP-only regime; the resulting prediction parquets are the input Starfold consumes.
 - **External** priors (Edenhofer+2024, Lallement+2022, SFD, Bailer-Jones+2021 distances, GSP-Phot neighborhood-median extinction) are composed into every stream's feature row according to `data_acquisition.md` §8.5.
 
-**Training data flows Stream 1 → Pipeline 1.** **Inference data flows Stream 3 → Pipeline 1 → Pipeline 2.** Pipeline 2 produces D-Cat-d (soft membership probabilities); Pipeline 1 outputs feed D-Cat-b (chemical abundances). D5.1 is the open-source release of Pipeline 2.
+**Training data flows Stream 1 → Pipeline 1.** **Inference data flows Stream 3 → Pipeline 1 → (Pipeline 1 prediction parquet) → Starfold.** Starfold produces D-Cat-d (soft membership probabilities) and D5.1 (the open-source classifier release); Pipeline 1 outputs feed D-Cat-b (chemical abundances) directly from this repo.
 
 ---
 
@@ -48,7 +48,7 @@ Stream 1 in the $(T_\mathrm{eff}, \log g)$ plane, coloured by [M/H]. The red das
 
 ![Tinsley-Wallerstein](../reports/figures/data_overview/panel_04_tinsley_wallerstein.png)
 
-[α/M] vs [Fe/H] hexbin number density for Stream 1 (colorbar: stars per hex bin). **The bimodal high-α / low-α sequence is the single most important structural signal Pipeline 2 must recover.** If our unsupervised clustering on the full 10–11D chrono-chemo-kinematic vector fails to separate these two sequences as distinct components, the method is broken — this is the simplest ground-truth check against known Milky Way disc structure. The visible knee near $[\mathrm{Fe/H}] \approx -0.5$ and the clean low-α plateau near $[\alpha/\mathrm{M}] \approx 0$ are the expected APOGEE DR19 morphology.
+[α/M] vs [Fe/H] hexbin number density for Stream 1 (colorbar: stars per hex bin). **The bimodal high-α / low-α sequence is the single most important structural signal Starfold (downstream) must recover.** If the unsupervised clustering there, on the full 10–11D chrono-chemo-kinematic vector, fails to separate these two sequences as distinct components, the method is broken — this is the simplest ground-truth check against known Milky Way disc structure. The visible knee near $[\mathrm{Fe/H}] \approx -0.5$ and the clean low-α plateau near $[\alpha/\mathrm{M}] \approx 0$ are the expected APOGEE DR19 morphology.
 
 ---
 

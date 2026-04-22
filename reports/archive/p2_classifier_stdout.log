@@ -1,0 +1,22 @@
+2026-04-21 22:35:29,181 INFO run_population_classifier: device = cuda  umap_backend = cuml
+2026-04-21 22:35:29,181 INFO run_population_classifier: loading features from pipeline2_features_stream3_volume_v2.parquet
+2026-04-21 22:35:29,641 INFO run_population_classifier:   212287 rows × 9 columns
+2026-04-21 22:35:29,651 INFO run_population_classifier: building standardised feature matrix (spec=pipeline2_v1_reduced)
+2026-04-21 22:35:29,991 INFO run_population_classifier:   X shape=(212287, 8); 212287 rows kept, 0 excluded (feature NaN)
+2026-04-21 22:35:29,991 INFO run_population_classifier:   scaler m_h       μ=-0.081  σ=0.234
+2026-04-21 22:35:29,992 INFO run_population_classifier:   scaler alpha_m   μ=+0.055  σ=0.067
+2026-04-21 22:35:29,992 INFO run_population_classifier:   scaler mg_m      μ=+0.076  σ=0.085
+2026-04-21 22:35:29,992 INFO run_population_classifier:   scaler J_R       μ=+41.928  σ=60.211
+2026-04-21 22:35:29,992 INFO run_population_classifier:   scaler J_z       μ=+11.951  σ=21.023
+2026-04-21 22:35:29,992 INFO run_population_classifier:   scaler L_z       μ=+1712.188  σ=354.647
+2026-04-21 22:35:29,992 INFO run_population_classifier:   scaler ecc       μ=+0.160  σ=0.104
+2026-04-21 22:35:29,993 INFO run_population_classifier:   scaler E         μ=-160770.456  σ=9752.404
+2026-04-21 22:35:38,264 INFO run_population_classifier: UMAP config (cuml): {'backend': 'cuml', 'n_components': 2, 'n_neighbors': 30, 'min_dist': 0.0, 'n_epochs': 100, 'seed': 0}
+[2026-04-21 22:35:38.283] [CUML] [info] build_algo set to brute_force_knn because random_state is given
+2026-04-21 22:35:38,284 INFO run_population_classifier: fitting UMAP on full n=212287 (cuml fit_transform)
+2026-04-21 22:35:45,018 INFO run_population_classifier: embedding shape=(212287, 2)
+2026-04-21 22:35:45,021 INFO run_population_classifier: HDBSCAN grid-search 'v1' (12 HDBSCAN cells per UMAP-point)
+/home/aneitzel/.venvs/rapids25.10_python3.12_cuda13/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:359: UserWarning: resource_tracker: There appear to be 10 leaked semlock objects to clean up at shutdown
+  warnings.warn(
+/home/aneitzel/.venvs/rapids25.10_python3.12_cuda13/lib/python3.12/site-packages/joblib/externals/loky/backend/resource_tracker.py:359: UserWarning: resource_tracker: There appear to be 1 leaked folder objects to clean up at shutdown
+  warnings.warn(

@@ -172,8 +172,9 @@ def ingest_stream3(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
         row_count_before=n_raw,
         row_count_after=n_merged,
         notes=(
-            "Stream 3 inference / Pipeline-2 feature basis: "
-            "Andrae+2023 vetted-RGB, stratified in (Teff, logg, [M/H], G)."
+            "Stream 3 inference (predictions downstream-consumed by "
+            "Starfold, separate repo): Andrae+2023 vetted-RGB, stratified "
+            "in (Teff, logg, [M/H], G)."
         ),
         extra={
             "andrae_rows_loaded": n_raw,

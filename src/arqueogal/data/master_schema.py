@@ -1,12 +1,17 @@
 """Master-catalog schemas — §10 of data_acquisition.md.
 
-Defines the column contracts for the three analysis-ready Parquet products
+Defines the column contracts for the analysis-ready Parquet products
 that live in ``data/processed/``:
 
 - :data:`PIPELINE1_TRAINING_SCHEMA` — APOGEE × Gaia × XP supervised set.
 - :data:`PIPELINE1_INFERENCE_SCHEMA` — Gaia RGB+RC + XP, no APOGEE labels.
-- :data:`PIPELINE2_FEATURES_SCHEMA` — chrono-chemo-kinematic vector for
-  Pipeline 2 clustering.
+- :data:`PIPELINE2_FEATURES_SCHEMA` — retained for historical schema
+  compatibility. Population classification moved to the separate
+  **Starfold** repository on 2026-04-22; Starfold is responsible for its
+  own chrono-chemo-kinematic feature-matrix assembly on top of this
+  repo's Pipeline 1 prediction parquets. The schema is kept in the
+  registry as a reference contract and is not written to by any
+  production driver in this repo.
 
 Each schema is a frozen :class:`MasterSchema` carrying a flat set of
 ``required`` column names plus ``optional`` columns that downstream
@@ -218,7 +223,9 @@ Same shape as :data:`PIPELINE1_TRAINING_SCHEMA` minus the APOGEE-sourced
 labels; Andrae+2023 labels are kept as cross-reference diagnostics.
 """
 
-# --- §10.3 pipeline2_features ------------------------------------------------
+# --- legacy population-classifier feature schema (historical) ---------------
+# Kept as a reference contract; see module docstring. Not written by any
+# production driver in this repo after 2026-04-22.
 
 _PIPELINE2_CHEMO = (
     "fe_h", "fe_h_err",
@@ -245,9 +252,16 @@ PIPELINE2_FEATURES_SCHEMA: Final[MasterSchema] = MasterSchema(
     optional=_PIPELINE2_AGE,
     # ``age`` / ``age_err`` are optional in the near-term product because
     # Task 4 (asteroseismic age pipeline) has not yet landed — schema
-    # acceptance should not block Pipeline 2 development on its absence.
+    # acceptance should not block downstream clustering development (now
+    # in Starfold) on its absence.
 )
-"""§10.3 Pipeline 2 feature-vector schema (~1.5 M rows)."""
+"""Legacy chrono-chemo-kinematic feature-vector schema (~1.5 M rows).
+
+Population classification was moved to the separate **Starfold** repository
+on 2026-04-22. This schema is retained as a reference contract for any
+downstream consumer that still wants to materialise the same shape; the
+active feature-matrix definition lives in Starfold.
+"""
 
 
 SCHEMAS: Final[dict[str, MasterSchema]] = {
