@@ -15,7 +15,9 @@ keywords = ["galactic-archaeology", "stellar-populations", "gaia", "apogee", "ma
 
 # Runtime deps are managed by the monolithic venv — this list is for documentation only.
 # Do NOT use `pip install -e .` to pull these; they are already installed.
-dependencies = []
+dependencies = [
+    "aim>=3.29.1",
+]
 
 [project.optional-dependencies]
 dev = ["ruff", "pytest", "pytest-cov"]

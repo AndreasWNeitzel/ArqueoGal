@@ -56,3 +56,6 @@ Thumbs.db
 .ruff_cache/
 .mypy_cache/
 .pytest_cache/
+
+# aim experiment tracking DB (Phase 5)
+.aim/
