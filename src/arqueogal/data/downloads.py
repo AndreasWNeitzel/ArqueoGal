@@ -106,9 +106,7 @@ def download(  # noqa: PLR0913 — keyword-only tuning knobs with safe defaults
     digest = hasher.hexdigest()
     if expected_sha256 is not None and digest.lower() != expected_sha256.lower():
         tmp.unlink(missing_ok=True)
-        raise ValueError(
-            f"SHA-256 mismatch for {url}: got {digest}, expected {expected_sha256}"
-        )
+        raise ValueError(f"SHA-256 mismatch for {url}: got {digest}, expected {expected_sha256}")
 
     os.replace(tmp, dest)
     logger.info("downloaded %s (%d bytes, sha256=%s)", dest, size, digest)

@@ -28,7 +28,12 @@ TIC_V82_VIZIER_TABLE: Final[str] = '"IV/39/tic82"'
 """§4.3: VizieR catalogue identifier for the TESS Input Catalog v8.2."""
 
 TIC_V82_COLUMNS: Final[tuple[str, ...]] = (
-    "TIC", "GAIA", "RAJ2000", "DEJ2000", "Tmag", "plx",
+    "TIC",
+    "GAIA",
+    "RAJ2000",
+    "DEJ2000",
+    "Tmag",
+    "plx",
 )
 """§4.3: minimal set we ingest. ``GAIA`` is the Gaia DR2 source_id."""
 

@@ -91,7 +91,8 @@ class EnsemblePrediction:
 
 
 def _build_model_from_blob(
-    blob: dict[str, Any], device: torch.device,
+    blob: dict[str, Any],
+    device: torch.device,
 ) -> XpAbundanceModel:
     """Rehydrate an :class:`XpAbundanceModel` from a checkpoint dict.
 
@@ -142,13 +143,11 @@ def _extract_calibration(blob: dict[str, Any]) -> CalibrationArtifacts:
     art.temperature_per_cell = {int(k): float(v) for k, v in temp.items()}
     iso = cal.get("isotonic_per_label") or {}
     art.isotonic_per_label = {
-        int(k): {"X": np.asarray(v["X"]), "y": np.asarray(v["y"])}
-        for k, v in iso.items()
+        int(k): {"X": np.asarray(v["X"]), "y": np.asarray(v["y"])} for k, v in iso.items()
     }
     conf = cal.get("conformal_scores")
     art.conformal_scores = (
-        np.asarray(conf, dtype=np.float32) if conf is not None
-        else np.zeros(0, dtype=np.float32)
+        np.asarray(conf, dtype=np.float32) if conf is not None else np.zeros(0, dtype=np.float32)
     )
     art.cell_definition = cal.get("cell_definition") or {}
     return art
@@ -183,10 +182,14 @@ def load_ensemble(
             )
         model = _build_model_from_blob(blob, device)
         cal = _extract_calibration(blob)
-        members.append(EnsembleMember(
-            model=model, calibration=cal,
-            seed=int(blob.get("random_seed", -1)), blob=blob,
-        ))
+        members.append(
+            EnsembleMember(
+                model=model,
+                calibration=cal,
+                seed=int(blob.get("random_seed", -1)),
+                blob=blob,
+            )
+        )
     return members
 
 
@@ -218,9 +221,7 @@ def predict_ensemble(
             cell_ids_m = np.zeros(mu_m.shape[0], dtype=np.int64)
         else:
             if cell_ids.shape[0] != mu_m.shape[0]:
-                raise ValueError(
-                    f"cell_ids length {cell_ids.shape[0]} != batch N {mu_m.shape[0]}"
-                )
+                raise ValueError(f"cell_ids length {cell_ids.shape[0]} != batch N {mu_m.shape[0]}")
             cell_ids_m = cell_ids
         mu_m, L_m = apply_calibration(mu_m, L_m, m.calibration, cell_ids=cell_ids_m)
         mus.append(mu_m)

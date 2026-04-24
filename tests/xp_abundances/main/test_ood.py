@@ -18,6 +18,7 @@ from arqueogal.xp_abundances.main.ood import (
 
 # --- Mahalanobis OOD: fit ---------------------------------------------------
 
+
 def test_fit_mahalanobis_recovers_mean_and_precision() -> None:
     """On isotropic Gaussian training data, μ ≈ 0, Σ⁻¹ ≈ I."""
     rng = np.random.default_rng(0)
@@ -26,7 +27,9 @@ def test_fit_mahalanobis_recovers_mean_and_precision() -> None:
     np.testing.assert_allclose(bundle.feature_mean, 0.0, atol=0.1)
     # precision should be close to identity (since Σ ≈ I).
     np.testing.assert_allclose(
-        bundle.feature_precision, np.eye(10), atol=0.1,
+        bundle.feature_precision,
+        np.eye(10),
+        atol=0.1,
     )
 
 
@@ -62,6 +65,7 @@ def test_fit_mahalanobis_rejects_non_2d() -> None:
 
 
 # --- Mahalanobis OOD: score & flag ------------------------------------------
+
 
 def test_score_mahalanobis_shape_and_finite() -> None:
     rng = np.random.default_rng(3)
@@ -135,6 +139,7 @@ def test_mahalanobis_bundle_roundtrip() -> None:
 
 # --- Ensemble disagreement --------------------------------------------------
 
+
 def test_ensemble_disagreement_ratio_calibrated_ensemble() -> None:
     """Members agreeing on μ (low epistemic) → low ratio."""
     rng = np.random.default_rng(10)
@@ -186,6 +191,7 @@ def test_flag_ensemble_ood_threshold_semantics() -> None:
 
 
 # --- Combined status --------------------------------------------------------
+
 
 def test_combined_ood_status_level_counts() -> None:
     mahal = np.array([False, True, False, True])

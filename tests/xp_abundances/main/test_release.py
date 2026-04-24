@@ -25,9 +25,12 @@ from arqueogal.xp_abundances.main.release import (
 
 def _row(
     *,
-    ood_joint=False, latent_support=False,
-    regime_b=False, mode_ambiguous=False,
-    ood_disagreement=False, aux_missing=False,
+    ood_joint=False,
+    latent_support=False,
+    regime_b=False,
+    mode_ambiguous=False,
+    ood_disagreement=False,
+    aux_missing=False,
     pred_nan=False,
 ):
     return {
@@ -52,23 +55,29 @@ def test_clean_row_is_tier_1():
     assert tier.iloc[0] == 1
 
 
-@pytest.mark.parametrize("caveat_kw", [
-    {"regime_b": True},
-    {"mode_ambiguous": True},
-    {"ood_disagreement": True},
-    {"aux_missing": True},
-])
+@pytest.mark.parametrize(
+    "caveat_kw",
+    [
+        {"regime_b": True},
+        {"mode_ambiguous": True},
+        {"ood_disagreement": True},
+        {"aux_missing": True},
+    ],
+)
 def test_single_caveat_demotes_to_tier_2(caveat_kw):
     df = pd.DataFrame([_row(**caveat_kw)])
     tier = assign_release_tier(df)
     assert tier.iloc[0] == 2
 
 
-@pytest.mark.parametrize("kill_kw", [
-    {"ood_joint": True},
-    {"latent_support": True},
-    {"pred_nan": True},
-])
+@pytest.mark.parametrize(
+    "kill_kw",
+    [
+        {"ood_joint": True},
+        {"latent_support": True},
+        {"pred_nan": True},
+    ],
+)
 def test_single_hard_kill_demotes_to_tier_3(kill_kw):
     df = pd.DataFrame([_row(**kill_kw)])
     tier = assign_release_tier(df)
@@ -84,8 +93,13 @@ def test_hard_kill_trumps_caveat():
 def test_missing_flag_columns_are_treated_as_false():
     # Strip all caveat flags — remaining row must be Tier 1
     row = _row()
-    for key in ("regime_b_flag", "mode_ambiguous_flag", "ood_disagreement_flag",
-                "aux_missing_any", "latent_support_flag"):
+    for key in (
+        "regime_b_flag",
+        "mode_ambiguous_flag",
+        "ood_disagreement_flag",
+        "aux_missing_any",
+        "latent_support_flag",
+    ):
         row.pop(key)
     df = pd.DataFrame([row])
     tier = assign_release_tier(df)
@@ -94,11 +108,11 @@ def test_missing_flag_columns_are_treated_as_false():
 
 def test_tier_counts():
     rows = [
-        _row(),                         # tier 1
-        _row(regime_b=True),            # tier 2
-        _row(mode_ambiguous=True),      # tier 2
-        _row(ood_joint=True),           # tier 3
-        _row(pred_nan=True),            # tier 3
+        _row(),  # tier 1
+        _row(regime_b=True),  # tier 2
+        _row(mode_ambiguous=True),  # tier 2
+        _row(ood_joint=True),  # tier 3
+        _row(pred_nan=True),  # tier 3
     ]
     df = pd.DataFrame(rows)
     df["release_tier"] = assign_release_tier(df)

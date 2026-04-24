@@ -168,12 +168,20 @@ def compute_actions_mc(
     """
     cfg = config or KinematicsConfig()
     required = set(REQUIRED_INPUT_COLS) | {
-        "parallax", "parallax_error",
-        "pmra_error", "pmdec_error",
+        "parallax",
+        "parallax_error",
+        "pmra_error",
+        "pmdec_error",
         "radial_velocity_error",
-        "ra_dec_corr", "ra_parallax_corr", "ra_pmra_corr", "ra_pmdec_corr",
-        "dec_parallax_corr", "dec_pmra_corr", "dec_pmdec_corr",
-        "parallax_pmra_corr", "parallax_pmdec_corr",
+        "ra_dec_corr",
+        "ra_parallax_corr",
+        "ra_pmra_corr",
+        "ra_pmdec_corr",
+        "dec_parallax_corr",
+        "dec_pmra_corr",
+        "dec_pmdec_corr",
+        "parallax_pmra_corr",
+        "parallax_pmdec_corr",
         "pmra_pmdec_corr",
     }
     missing = required - set(df.columns)
@@ -217,7 +225,8 @@ def _drop_nan_rows(df: pd.DataFrame) -> pd.DataFrame:
     if n_dropped:
         logger.info(
             "kinematics: dropped %d/%d rows with non-finite phase-space inputs",
-            int(n_dropped), len(df),
+            int(n_dropped),
+            len(df),
         )
     return df.loc[finite].reset_index(drop=True)
 
@@ -340,15 +349,21 @@ def _draw_astrometric_sample(df: pd.DataFrame, rng: np.random.Generator) -> pd.D
     for i in range(n):
         cov3 = np.array(
             [
-                [sig[i, 2] ** 2,
-                 rho_plx_pmra[i] * sig[i, 2] * sig[i, 3],
-                 rho_plx_pmdec[i] * sig[i, 2] * sig[i, 4]],
-                [rho_plx_pmra[i] * sig[i, 2] * sig[i, 3],
-                 sig[i, 3] ** 2,
-                 rho_pmra_pmdec[i] * sig[i, 3] * sig[i, 4]],
-                [rho_plx_pmdec[i] * sig[i, 2] * sig[i, 4],
-                 rho_pmra_pmdec[i] * sig[i, 3] * sig[i, 4],
-                 sig[i, 4] ** 2],
+                [
+                    sig[i, 2] ** 2,
+                    rho_plx_pmra[i] * sig[i, 2] * sig[i, 3],
+                    rho_plx_pmdec[i] * sig[i, 2] * sig[i, 4],
+                ],
+                [
+                    rho_plx_pmra[i] * sig[i, 2] * sig[i, 3],
+                    sig[i, 3] ** 2,
+                    rho_pmra_pmdec[i] * sig[i, 3] * sig[i, 4],
+                ],
+                [
+                    rho_plx_pmdec[i] * sig[i, 2] * sig[i, 4],
+                    rho_pmra_pmdec[i] * sig[i, 3] * sig[i, 4],
+                    sig[i, 4] ** 2,
+                ],
             ]
         )
         draws[i] = rng.multivariate_normal([0.0, 0.0, 0.0], cov3)

@@ -96,6 +96,8 @@ def _is_transient_tap_error(exc: BaseException) -> bool:
     """Heuristic: is this TAP error likely transient (retryable)?"""
     msg = str(exc)
     return any(m.lower() in msg.lower() for m in _TRANSIENT_ERROR_MARKERS)
+
+
 """Hard ceiling on async job wait; raise rather than block forever."""
 
 
@@ -238,7 +240,9 @@ def run_async(
     """
     logger.info(
         "async TAP submit on %s (format=%s, queue=%s)",
-        service.baseurl, response_format or "default", queue or "default",
+        service.baseurl,
+        response_format or "default",
+        queue or "default",
     )
     submit_kwargs: dict[str, str] = {"language": language}
     if response_format is not None:
@@ -330,13 +334,15 @@ def batched_in_query(  # noqa: PLR0913 — keyword-only tuning knobs with safe d
         if not batch:
             return
         adql = adql_template.replace(BATCH_PLACEHOLDER, ",".join(str(i) for i in batch))
-        logger.info(
-            "batch %d: %d ids, %s", batch_idx, len(batch), "async" if use_async else "sync"
-        )
+        logger.info("batch %d: %d ids, %s", batch_idx, len(batch), "async" if use_async else "sync")
         yield (
             run_async(
-                service, adql, timeout_sec=timeout_sec,
-                response_format=response_format, queue=queue, runid=runid,
+                service,
+                adql,
+                timeout_sec=timeout_sec,
+                response_format=response_format,
+                queue=queue,
+                runid=runid,
             )
             if use_async
             else run_sync(service, adql, response_format=response_format)
@@ -438,18 +444,14 @@ def batched_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with safe d
 
     for idx in range(n_batches):
         chunk = ids[idx * batch_size : (idx + 1) * batch_size]
-        batch_file = (
-            ckpt / f"{checkpoint_prefix}_{idx:04d}.parquet" if ckpt is not None else None
-        )
+        batch_file = ckpt / f"{checkpoint_prefix}_{idx:04d}.parquet" if ckpt is not None else None
 
         if batch_file is not None and batch_file.is_file():
             logger.info("batch %d/%d: reusing %s", idx + 1, n_batches, batch_file)
             frames.append(pd.read_parquet(batch_file))
             continue
 
-        batch_adql = adql_template.replace(
-            BATCH_PLACEHOLDER, ",".join(str(i) for i in chunk)
-        )
+        batch_adql = adql_template.replace(BATCH_PLACEHOLDER, ",".join(str(i) for i in chunk))
         logger.info(
             "batch %d/%d: %d ids (%s)",
             idx + 1,
@@ -459,8 +461,12 @@ def batched_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with safe d
         )
         table = (
             run_async(
-                service, batch_adql, timeout_sec=timeout_sec,
-                response_format=response_format, queue=queue, runid=runid,
+                service,
+                batch_adql,
+                timeout_sec=timeout_sec,
+                response_format=response_format,
+                queue=queue,
+                runid=runid,
             )
             if use_async
             else run_sync(service, batch_adql, response_format=response_format)
@@ -555,7 +561,8 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
         # Gentle guard against the common mistake of forgetting the JOIN.
         logger.warning(
             "adql_template does not reference tap_upload.%s; "
-            "are you sure it uses the uploaded table?", upload_name,
+            "are you sure it uses the uploaded table?",
+            upload_name,
         )
     if batch_size <= 0:
         raise ValueError("batch_size must be positive")
@@ -579,9 +586,7 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
 
     for idx in range(n_batches):
         chunk = ids[idx * batch_size : (idx + 1) * batch_size]
-        batch_file = (
-            ckpt / f"{checkpoint_prefix}_{idx:04d}.parquet" if ckpt is not None else None
-        )
+        batch_file = ckpt / f"{checkpoint_prefix}_{idx:04d}.parquet" if ckpt is not None else None
         if batch_file is not None and batch_file.is_file():
             logger.info("batch %d/%d: reusing %s", idx + 1, n_batches, batch_file)
             frames.append(pd.read_parquet(batch_file))
@@ -590,7 +595,10 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
         upload = _Table({"source_id": chunk})
         logger.info(
             "batch %d/%d: upload %d ids to tap_upload.%s",
-            idx + 1, n_batches, len(chunk), upload_name,
+            idx + 1,
+            n_batches,
+            len(chunk),
+            upload_name,
         )
 
         frame: pd.DataFrame | None = None
@@ -608,12 +616,14 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
                 job.wait(phases=["COMPLETED", "ERROR", "ABORTED"], timeout=timeout_sec)
                 if job.phase != "COMPLETED":
                     raise RuntimeError(
-                        f"async TAP upload job ended in {job.phase!r}: "
-                        f"{_safe_error_message(job)}"
+                        f"async TAP upload job ended in {job.phase!r}: {_safe_error_message(job)}"
                     )
                 logger.info(
                     "batch %d/%d completed on attempt %d: %s",
-                    idx + 1, n_batches, attempt + 1, job.url,
+                    idx + 1,
+                    n_batches,
+                    attempt + 1,
+                    job.url,
                 )
                 frame = job.fetch_result().to_table().to_pandas()
                 break
@@ -624,10 +634,13 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
                     jitter = delay * 0.25 * (2 * random.random() - 1)  # noqa: S311
                     sleep_for = max(0.5, delay + jitter)
                     logger.warning(
-                        "batch %d/%d attempt %d/%d transient error; "
-                        "retrying in %.1fs: %s",
-                        idx + 1, n_batches, attempt + 1, max_retries + 1,
-                        sleep_for, str(exc)[:180],
+                        "batch %d/%d attempt %d/%d transient error; retrying in %.1fs: %s",
+                        idx + 1,
+                        n_batches,
+                        attempt + 1,
+                        max_retries + 1,
+                        sleep_for,
+                        str(exc)[:180],
                     )
                     time.sleep(sleep_for)
                     continue
@@ -638,7 +651,7 @@ def batched_upload_fetch_df(  # noqa: PLR0913 — keyword-only tuning knobs with
         if frame is None:
             # Should be unreachable: the loop either sets frame or re-raises.
             raise RuntimeError(
-                f"batch {idx+1}/{n_batches} exhausted {max_retries+1} attempts"
+                f"batch {idx + 1}/{n_batches} exhausted {max_retries + 1} attempts"
             ) from last_exc
 
         if batch_file is not None:

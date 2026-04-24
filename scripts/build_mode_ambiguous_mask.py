@@ -51,7 +51,9 @@ def _sha256(p: Path) -> str:
 def _git_sha() -> str:
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=REPO, text=True,
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO,
+            text=True,
         ).strip()
     except Exception:  # noqa: BLE001 — provenance is best-effort
         return "unknown"
@@ -94,12 +96,15 @@ def main() -> None:
     n_cells_bi = int(grid.is_bimodal.sum())
     _LOG.info(
         "cells: total=%d evaluated=%d bimodal=%d",
-        n_cells_total, n_cells_eval, n_cells_bi,
+        n_cells_total,
+        n_cells_eval,
+        n_cells_bi,
     )
     stars_in_bi = int(grid.n_per_cell[grid.is_bimodal].sum())
     _LOG.info(
         "training stars in bimodal cells: %d / %d  (%.2f%%)",
-        stars_in_bi, int(grid.n_per_cell.sum()),
+        stars_in_bi,
+        int(grid.n_per_cell.sum()),
         100.0 * stars_in_bi / max(1, int(grid.n_per_cell.sum())),
     )
 
@@ -115,7 +120,8 @@ def main() -> None:
     grid.save(args.output, provenance=provenance)
     _LOG.info("wrote %s", args.output)
     _LOG.info(
-        "wrote %s", args.output.with_suffix(args.output.suffix + ".provenance.json"),
+        "wrote %s",
+        args.output.with_suffix(args.output.suffix + ".provenance.json"),
     )
 
 

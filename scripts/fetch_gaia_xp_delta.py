@@ -135,18 +135,14 @@ def _fetch_chunk_upload(
                     try:
                         job.raise_if_error()
                     except Exception as exc:  # noqa: BLE001
-                        raise RuntimeError(
-                            f"async job ended in {job.phase!r}: {exc!r}"
-                        ) from exc
+                        raise RuntimeError(f"async job ended in {job.phase!r}: {exc!r}") from exc
                     raise RuntimeError(f"async job ended in {job.phase!r}")
                 table = job.fetch_result().to_table()
             finally:
                 try:
                     job.delete()
                 except Exception as exc:  # noqa: BLE001
-                    log.warning(
-                        "chunk %d: failed to delete async job: %r", chunk_idx, exc
-                    )
+                    log.warning("chunk %d: failed to delete async job: %r", chunk_idx, exc)
             df = table.to_pandas()
             if "source_id" in df.columns:
                 df["source_id"] = df["source_id"].astype("int64")
@@ -157,7 +153,10 @@ def _fetch_chunk_upload(
             wait = min(30 * retries, 120)
             log.warning(
                 "chunk %d UPLOAD attempt %d failed: %r — sleeping %ds",
-                chunk_idx, retries, exc, wait,
+                chunk_idx,
+                retries,
+                exc,
+                wait,
             )
             time.sleep(wait)
     raise RuntimeError(
@@ -210,15 +209,15 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     log.info("checkpoints: %s", args.checkpoint_dir)
 
     ids_df = pd.read_parquet(args.source_id_parquet, columns=["source_id"])
-    source_ids = (
-        ids_df["source_id"].astype("int64").drop_duplicates().sort_values().to_list()
-    )
+    source_ids = ids_df["source_id"].astype("int64").drop_duplicates().sort_values().to_list()
     n_src = len(source_ids)
     batch_size = XP_BATCH_SIZE
     n_batches = (n_src + batch_size - 1) // batch_size
     log.info(
         "%d unique source_ids → %d batches of %d (AIP TAP UPLOAD)",
-        n_src, n_batches, batch_size,
+        n_src,
+        n_batches,
+        batch_size,
     )
 
     args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -250,7 +249,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
         wall_elapsed = time.time() - t0
         if wall_elapsed > MAX_WALLCLOCK_SEC:
             halt_reason = (
-                f"wall-clock {wall_elapsed/3600:.2f} h exceeds {MAX_WALLCLOCK_SEC/3600:.1f} h"
+                f"wall-clock {wall_elapsed / 3600:.2f} h exceeds {MAX_WALLCLOCK_SEC / 3600:.1f} h"
             )
             log.error("HALT: %s", halt_reason)
             break
@@ -274,7 +273,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
                 continue
             except Exception as exc:  # noqa: BLE001
                 log.warning(
-                    "chunk %d: corrupt ckpt (%r) — refetching", idx, exc,
+                    "chunk %d: corrupt ckpt (%r) — refetching",
+                    idx,
+                    exc,
                 )
                 chunk_file.unlink(missing_ok=True)
 
@@ -288,9 +289,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
             log.error(msg)
             n_chunks_incomplete += 1
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                halt_reason = (
-                    f"{consecutive_failures} consecutive chunk failures — aborting"
-                )
+                halt_reason = f"{consecutive_failures} consecutive chunk failures — aborting"
                 log.error("HALT: %s", halt_reason)
                 break
             pbar.update(1)
@@ -313,12 +312,18 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
         fetched_frames.append(df_batch)
 
         pbar.set_postfix(
-            rows=n_out, s=f"{elapsed:.1f}", retries=retries,
+            rows=n_out,
+            s=f"{elapsed:.1f}",
+            retries=retries,
         )
         pbar.update(1)
         log.info(
             "chunk %d/%d: %d rows in %.1f s (retries=%d)",
-            idx + 1, n_batches, n_out, elapsed, retries,
+            idx + 1,
+            n_batches,
+            n_out,
+            elapsed,
+            retries,
         )
 
         # Status snapshot every 10 chunks (or last).
@@ -351,7 +356,10 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     out_sha = _sha256_of(args.output_parquet)
     log.info(
         "wrote %s (%.1f MB, %d cols, sha256=%s…)",
-        args.output_parquet, size_mb, len(df_full.columns), out_sha[:12],
+        args.output_parquet,
+        size_mb,
+        len(df_full.columns),
+        out_sha[:12],
     )
 
     # Stars returned vs requested.

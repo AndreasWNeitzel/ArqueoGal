@@ -50,7 +50,8 @@ def _attach_galactic_coords(df: pd.DataFrame, features_path: Path) -> pd.DataFra
     import astropy.units as u
 
     feats = pd.read_parquet(
-        features_path, columns=["source_id", "ra_deg", "dec_deg", "b_deg"],
+        features_path,
+        columns=["source_id", "ra_deg", "dec_deg", "b_deg"],
     )
     df = df.merge(feats, on="source_id", how="left")
     m = np.isfinite(df["ra_deg"].to_numpy()) & np.isfinite(df["dec_deg"].to_numpy())
@@ -65,12 +66,18 @@ def _attach_galactic_coords(df: pd.DataFrame, features_path: Path) -> pd.DataFra
     df["l_deg"] = l_deg
     return df
 
+
 COLS = {
-    "teff": "teff_pred", "logg": "logg_pred",
-    "mh": "mh_pred", "alpha_m": "alpha_m_pred", "mg_h": "mg_h_pred",
+    "teff": "teff_pred",
+    "logg": "logg_pred",
+    "mh": "mh_pred",
+    "alpha_m": "alpha_m_pred",
+    "mg_h": "mg_h_pred",
     "alpha_sig": "alpha_m_sigma",
-    "ood": "ood_joint_flag", "latent": "latent_support_flag",
-    "l": "l_deg", "b": "b_deg",
+    "ood": "ood_joint_flag",
+    "latent": "latent_support_flag",
+    "l": "l_deg",
+    "b": "b_deg",
 }
 
 
@@ -85,25 +92,42 @@ def _combined_flag(df: pd.DataFrame) -> np.ndarray:
         lat = df[COLS["latent"]].fillna(False).astype(bool).to_numpy()
         return ood | lat
     return ood
+
+
 RANGE = {
-    "teff": (4000, 5500), "logg": (0.9, 3.7),
-    "mh": (-2.0, 0.5), "alpha_m": (-0.2, 0.5), "mg_h": (-2.0, 0.6),
+    "teff": (4000, 5500),
+    "logg": (0.9, 3.7),
+    "mh": (-2.0, 0.5),
+    "alpha_m": (-0.2, 0.5),
+    "mg_h": (-2.0, 0.6),
 }
 PRETTY = {
-    "teff": r"$T_{\rm eff}$ [K]", "logg": r"$\log g$ [dex]",
-    "mh": r"$[{\rm M/H}]$ [dex]", "alpha_m": r"$[\alpha/{\rm M}]$ [dex]",
+    "teff": r"$T_{\rm eff}$ [K]",
+    "logg": r"$\log g$ [dex]",
+    "mh": r"$[{\rm M/H}]$ [dex]",
+    "alpha_m": r"$[\alpha/{\rm M}]$ [dex]",
     "mg_h": r"$[{\rm Mg/H}]$ [dex]",
 }
 
 
 def _hex(ax, x, y, xr, yr, xlab, ylab, title, invert_x=False, invert_y=False) -> None:
-    x_lo, x_hi = sorted(xr); y_lo, y_hi = sorted(yr)
+    x_lo, x_hi = sorted(xr)
+    y_lo, y_hi = sorted(yr)
     m = np.isfinite(x) & np.isfinite(y)
-    h = ax.hexbin(x[m], y[m], gridsize=60, cmap="viridis", mincnt=1,
-                  extent=(x_lo, x_hi, y_lo, y_hi), linewidths=0)
+    h = ax.hexbin(
+        x[m],
+        y[m],
+        gridsize=60,
+        cmap="viridis",
+        mincnt=1,
+        extent=(x_lo, x_hi, y_lo, y_hi),
+        linewidths=0,
+    )
     ax.set_xlim(x_hi if invert_x else x_lo, x_lo if invert_x else x_hi)
     ax.set_ylim(y_hi if invert_y else y_lo, y_lo if invert_y else y_hi)
-    ax.set_xlabel(xlab); ax.set_ylabel(ylab); ax.set_title(title)
+    ax.set_xlabel(xlab)
+    ax.set_ylabel(ylab)
+    ax.set_title(title)
     return h
 
 
@@ -126,8 +150,7 @@ def _sky_mollweide(ax, l_deg, b_deg, flag, title, cbar_label="flag rate") -> Non
     lam = 0.5 * (lam_edges[:-1] + lam_edges[1:])
     phi = 0.5 * (phi_edges[:-1] + phi_edges[1:])
     L, P = np.meshgrid(lam, phi, indexing="xy")
-    im = ax.pcolormesh(L, P, rate.T, cmap="magma", vmin=0.0, vmax=1.0,
-                       shading="nearest")
+    im = ax.pcolormesh(L, P, rate.T, cmap="magma", vmin=0.0, vmax=1.0, shading="nearest")
     ax.set_xticks(np.deg2rad([-120, -60, 0, 60, 120]))
     ax.set_yticks(np.deg2rad([-60, -30, 0, 30, 60]))
     ax.set_xticklabels(["120°", "60°", "0°", "300°", "240°"], fontsize=8)
@@ -141,8 +164,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--volume", type=Path, default=_DEF_VOL)
     ap.add_argument("--uniform", type=Path, default=_DEF_UNI)
-    ap.add_argument("--features", type=Path, default=_DEF_FEATURES,
-                    help="Stream-3 features parquet — source of (ra_deg, dec_deg, b_deg)")
+    ap.add_argument(
+        "--features",
+        type=Path,
+        default=_DEF_FEATURES,
+        help="Stream-3 features parquet — source of (ra_deg, dec_deg, b_deg)",
+    )
     ap.add_argument("--output", type=Path, default=_DEF_OUT)
     args = ap.parse_args()
 
@@ -163,48 +190,100 @@ def main() -> None:
 
     # Row 1: HRD
     axV = fig.add_subplot(gs[0, 0])
-    _hex(axV, vol_ok[COLS["teff"]].to_numpy(), vol_ok[COLS["logg"]].to_numpy(),
-         RANGE["teff"], RANGE["logg"], PRETTY["teff"], PRETTY["logg"],
-         f"HRD — volume arm, support-clean (n={len(vol_ok):,})",
-         invert_x=True, invert_y=True)
+    _hex(
+        axV,
+        vol_ok[COLS["teff"]].to_numpy(),
+        vol_ok[COLS["logg"]].to_numpy(),
+        RANGE["teff"],
+        RANGE["logg"],
+        PRETTY["teff"],
+        PRETTY["logg"],
+        f"HRD — volume arm, support-clean (n={len(vol_ok):,})",
+        invert_x=True,
+        invert_y=True,
+    )
     axU = fig.add_subplot(gs[0, 1])
-    _hex(axU, uni_ok[COLS["teff"]].to_numpy(), uni_ok[COLS["logg"]].to_numpy(),
-         RANGE["teff"], RANGE["logg"], PRETTY["teff"], PRETTY["logg"],
-         f"HRD — uniform arm, support-clean (n={len(uni_ok):,})",
-         invert_x=True, invert_y=True)
+    _hex(
+        axU,
+        uni_ok[COLS["teff"]].to_numpy(),
+        uni_ok[COLS["logg"]].to_numpy(),
+        RANGE["teff"],
+        RANGE["logg"],
+        PRETTY["teff"],
+        PRETTY["logg"],
+        f"HRD — uniform arm, support-clean (n={len(uni_ok):,})",
+        invert_x=True,
+        invert_y=True,
+    )
 
     # Row 2: [M/H] / [α/M]
     axV = fig.add_subplot(gs[1, 0])
-    _hex(axV, vol_ok[COLS["mh"]].to_numpy(), vol_ok[COLS["alpha_m"]].to_numpy(),
-         RANGE["mh"], RANGE["alpha_m"], PRETTY["mh"], PRETTY["alpha_m"],
-         "[M/H] vs [α/M] — volume arm")
+    _hex(
+        axV,
+        vol_ok[COLS["mh"]].to_numpy(),
+        vol_ok[COLS["alpha_m"]].to_numpy(),
+        RANGE["mh"],
+        RANGE["alpha_m"],
+        PRETTY["mh"],
+        PRETTY["alpha_m"],
+        "[M/H] vs [α/M] — volume arm",
+    )
     axU = fig.add_subplot(gs[1, 1])
-    _hex(axU, uni_ok[COLS["mh"]].to_numpy(), uni_ok[COLS["alpha_m"]].to_numpy(),
-         RANGE["mh"], RANGE["alpha_m"], PRETTY["mh"], PRETTY["alpha_m"],
-         "[M/H] vs [α/M] — uniform arm")
+    _hex(
+        axU,
+        uni_ok[COLS["mh"]].to_numpy(),
+        uni_ok[COLS["alpha_m"]].to_numpy(),
+        RANGE["mh"],
+        RANGE["alpha_m"],
+        PRETTY["mh"],
+        PRETTY["alpha_m"],
+        "[M/H] vs [α/M] — uniform arm",
+    )
 
     # Row 3: [M/H] / [Mg/H]
     axV = fig.add_subplot(gs[2, 0])
-    _hex(axV, vol_ok[COLS["mh"]].to_numpy(), vol_ok[COLS["mg_h"]].to_numpy(),
-         RANGE["mh"], RANGE["mg_h"], PRETTY["mh"], PRETTY["mg_h"],
-         "[M/H] vs [Mg/H] — volume arm")
+    _hex(
+        axV,
+        vol_ok[COLS["mh"]].to_numpy(),
+        vol_ok[COLS["mg_h"]].to_numpy(),
+        RANGE["mh"],
+        RANGE["mg_h"],
+        PRETTY["mh"],
+        PRETTY["mg_h"],
+        "[M/H] vs [Mg/H] — volume arm",
+    )
     axU = fig.add_subplot(gs[2, 1])
-    _hex(axU, uni_ok[COLS["mh"]].to_numpy(), uni_ok[COLS["mg_h"]].to_numpy(),
-         RANGE["mh"], RANGE["mg_h"], PRETTY["mh"], PRETTY["mg_h"],
-         "[M/H] vs [Mg/H] — uniform arm")
+    _hex(
+        axU,
+        uni_ok[COLS["mh"]].to_numpy(),
+        uni_ok[COLS["mg_h"]].to_numpy(),
+        RANGE["mh"],
+        RANGE["mg_h"],
+        PRETTY["mh"],
+        PRETTY["mg_h"],
+        "[M/H] vs [Mg/H] — uniform arm",
+    )
 
     # Row 4: sky combined-OOD rate (uniform, all-sky) + α σ histogram
     ax_sky = fig.add_subplot(gs[3, 0], projection="mollweide")
     if COLS["l"] in uni.columns and COLS["b"] in uni.columns:
         _sky_mollweide(
-            ax_sky, uni[COLS["l"]].to_numpy(), uni[COLS["b"]].to_numpy(),
+            ax_sky,
+            uni[COLS["l"]].to_numpy(),
+            uni[COLS["b"]].to_numpy(),
             uni_bad.astype(float),
             "combined-OOD rate by sky pixel (uniform)",
             cbar_label="combined flag rate",
         )
     else:
-        ax_sky.text(0.5, 0.5, "l_deg/b_deg not in predictions",
-                    ha="center", va="center", transform=ax_sky.transAxes)
+        ax_sky.text(
+            0.5,
+            0.5,
+            "l_deg/b_deg not in predictions",
+            ha="center",
+            va="center",
+            transform=ax_sky.transAxes,
+        )
         ax_sky.set_title("OOD sky map — unavailable")
 
     ax_sig = fig.add_subplot(gs[3, 1])
@@ -212,12 +291,26 @@ def main() -> None:
     sa_v = sa_v[np.isfinite(sa_v)]
     sa_u = uni_ok[COLS["alpha_sig"]].to_numpy()
     sa_u = sa_u[np.isfinite(sa_u)]
-    ax_sig.hist(sa_v, bins=60, range=(0.0, 0.25), histtype="step",
-                color="tab:blue", linewidth=1.5, density=True,
-                label=f"volume (n={len(sa_v):,})")
-    ax_sig.hist(sa_u, bins=60, range=(0.0, 0.25), histtype="step",
-                color="tab:orange", linewidth=1.5, density=True,
-                label=f"uniform (n={len(sa_u):,})")
+    ax_sig.hist(
+        sa_v,
+        bins=60,
+        range=(0.0, 0.25),
+        histtype="step",
+        color="tab:blue",
+        linewidth=1.5,
+        density=True,
+        label=f"volume (n={len(sa_v):,})",
+    )
+    ax_sig.hist(
+        sa_u,
+        bins=60,
+        range=(0.0, 0.25),
+        histtype="step",
+        color="tab:orange",
+        linewidth=1.5,
+        density=True,
+        label=f"uniform (n={len(sa_u):,})",
+    )
     ax_sig.set_xlabel(r"reported $\sigma_\alpha$ [dex]")
     ax_sig.set_ylabel("density")
     ax_sig.set_title(r"Stream-3 $\sigma_\alpha$ — volume vs uniform (OOD-clean)")
@@ -244,7 +337,7 @@ def main() -> None:
     fig.suptitle(suptitle, fontsize=12, y=0.995)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output, bbox_inches="tight")
-    print(f"wrote {args.output} ({args.output.stat().st_size/1024:.0f} KiB)")
+    print(f"wrote {args.output} ({args.output.stat().st_size / 1024:.0f} KiB)")
 
 
 if __name__ == "__main__":

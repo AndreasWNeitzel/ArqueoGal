@@ -83,8 +83,7 @@ def main() -> None:
     # doesn't clash. Confirmed: only 'source_id' overlaps between the files.
     overlap = set(apogee.columns) & set(gaia.columns) - {"source_id"}
     if overlap:
-        logger.warning("unexpected column overlap: %s — using Gaia values",
-                       sorted(overlap))
+        logger.warning("unexpected column overlap: %s — using Gaia values", sorted(overlap))
         apogee = apogee.drop(columns=list(overlap))
 
     merged = apogee.merge(gaia, on="source_id", how="inner")
@@ -92,7 +91,10 @@ def main() -> None:
     n_out = len(merged)
     logger.info(
         "inner join: %d × %d → %d rows (%d APOGEE rows dropped, no Gaia)",
-        n_in, len(gaia), n_out, n_in - n_out,
+        n_in,
+        len(gaia),
+        n_out,
+        n_in - n_out,
     )
 
     _write_parquet_atomic(merged, out)

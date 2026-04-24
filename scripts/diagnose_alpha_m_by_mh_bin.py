@@ -88,8 +88,8 @@ def _ensemble_predict(ensemble_dir: Path, device: torch.device) -> dict:
             )
 
     mu_bar_scaled = np.mean(np.stack(per_mu), axis=0)  # (N, K) in scaled HUMAN units
-    mu_bar = scaler.inverse_mean(mu_bar_scaled)        # back to human units
-    y_truth = scaler.inverse_mean(y_human_scaled)      # human units
+    mu_bar = scaler.inverse_mean(mu_bar_scaled)  # back to human units
+    y_truth = scaler.inverse_mean(y_human_scaled)  # human units
 
     labels = list(scaler.label_names)
     mh_idx = labels.index("mh_apogee")
@@ -114,21 +114,29 @@ def _stratify_by_mh_bin(preds: dict, edges: tuple[float, ...]) -> list[dict]:
         finite_a = np.isfinite(preds["alpha_m_truth"]) & np.isfinite(preds["alpha_m_pred"]) & m
         n = int(finite_a.sum())
         if n == 0:
-            rows.append({
-                "bin": BIN_LABELS[b], "n": 0, "alpha_pred_mean": None,
-                "alpha_truth_mean": None, "bias": None, "abs_bias": None,
-            })
+            rows.append(
+                {
+                    "bin": BIN_LABELS[b],
+                    "n": 0,
+                    "alpha_pred_mean": None,
+                    "alpha_truth_mean": None,
+                    "bias": None,
+                    "abs_bias": None,
+                }
+            )
             continue
         pred = float(preds["alpha_m_pred"][finite_a].mean())
         truth = float(preds["alpha_m_truth"][finite_a].mean())
-        rows.append({
-            "bin": BIN_LABELS[b],
-            "n": n,
-            "alpha_pred_mean": pred,
-            "alpha_truth_mean": truth,
-            "bias": pred - truth,
-            "abs_bias": abs(pred - truth),
-        })
+        rows.append(
+            {
+                "bin": BIN_LABELS[b],
+                "n": n,
+                "alpha_pred_mean": pred,
+                "alpha_truth_mean": truth,
+                "bias": pred - truth,
+                "abs_bias": abs(pred - truth),
+            }
+        )
     return rows
 
 
@@ -143,9 +151,11 @@ def main() -> None:
     v11_bins = _stratify_by_mh_bin(v11, MH_EDGES)
 
     print()
-    print(f"{'bin':<20} {'n':>6}  "
-          f"{'v1_pred':>8} {'v1_truth':>9} {'v1_bias':>9}   "
-          f"{'v11_pred':>9} {'v11_truth':>10} {'v11_bias':>10}   {'Δ|bias|':>8}")
+    print(
+        f"{'bin':<20} {'n':>6}  "
+        f"{'v1_pred':>8} {'v1_truth':>9} {'v1_bias':>9}   "
+        f"{'v11_pred':>9} {'v11_truth':>10} {'v11_bias':>10}   {'Δ|bias|':>8}"
+    )
     print("-" * 120)
     for r1, r11 in zip(v1_bins, v11_bins, strict=True):
         if r1["n"] == 0:
@@ -161,13 +171,17 @@ def main() -> None:
 
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     with OUT_JSON.open("w") as f:
-        json.dump({
-            "mh_bin_edges": list(MH_EDGES),
-            "v1_ensemble": str(V1_ENSEMBLE),
-            "v11_ensemble": str(V11_ENSEMBLE),
-            "v1": v1_bins,
-            "v1_1": v11_bins,
-        }, f, indent=2)
+        json.dump(
+            {
+                "mh_bin_edges": list(MH_EDGES),
+                "v1_ensemble": str(V1_ENSEMBLE),
+                "v11_ensemble": str(V11_ENSEMBLE),
+                "v1": v1_bins,
+                "v1_1": v11_bins,
+            },
+            f,
+            indent=2,
+        )
     _LOG.info("wrote %s", OUT_JSON)
 
 

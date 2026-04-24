@@ -65,24 +65,38 @@ def _block_layout_for_tiny_tiers(tiers: LabelTiers) -> CovarianceBlockLayout:
 
 
 def _save_member(
-    tmp_path: Path, cfg: TrainingConfig, layout: FeatureLayout, tiers: LabelTiers,
-    *, seed: int,
+    tmp_path: Path,
+    cfg: TrainingConfig,
+    layout: FeatureLayout,
+    tiers: LabelTiers,
+    *,
+    seed: int,
 ) -> Path:
     torch.manual_seed(seed)
-    model = XpAbundanceModel(ModelConfig(
-        input_dim=layout.input_dim,
-        block_layout=_block_layout_for_tiny_tiers(tiers),
-        latent_dim=cfg.latent_dim, trunk_hidden=cfg.trunk_hidden,
-        head_hidden=cfg.head_hidden, dropout=cfg.dropout,
-    ))
+    model = XpAbundanceModel(
+        ModelConfig(
+            input_dim=layout.input_dim,
+            block_layout=_block_layout_for_tiny_tiers(tiers),
+            latent_dim=cfg.latent_dim,
+            trunk_hidden=cfg.trunk_hidden,
+            head_hidden=cfg.head_hidden,
+            dropout=cfg.dropout,
+        )
+    )
     log_temp = torch.tensor(0.0)
     rng = np.random.default_rng(seed)
     Y_fit = rng.standard_normal((32, tiers.n_labels)).astype(np.float32)
     scaler = LabelScaler.fit(Y_fit, tiers.all_labels)
     path = tmp_path / f"xp_abundances_main_20260418_abcdef1_seed{seed}.pt"
     save_checkpoint(
-        path, model=model, log_temp=log_temp, cfg=cfg, layout=layout,
-        tiers=tiers, label_scaler=scaler, seed=seed,
+        path,
+        model=model,
+        log_temp=log_temp,
+        cfg=cfg,
+        layout=layout,
+        tiers=tiers,
+        label_scaler=scaler,
+        seed=seed,
     )
     return path
 
@@ -187,6 +201,8 @@ def test_predict_ensemble_cell_ids_length_validation(tmp_path: Path) -> None:
     loader = _tiny_loader(layout, tiers, n=6)
     with pytest.raises(ValueError, match="cell_ids length"):
         predict_ensemble(
-            members, loader, device=torch.device("cpu"),
+            members,
+            loader,
+            device=torch.device("cpu"),
             cell_ids=np.zeros(999, dtype=np.int64),
         )

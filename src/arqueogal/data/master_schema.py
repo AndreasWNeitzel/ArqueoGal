@@ -53,8 +53,10 @@ XP_N_COEFFS: Final[int] = 55
 """Number of Hermite coefficients per band in Gaia DR3 XP (§6.1)."""
 
 XP_ARRAY_COLS: Final[tuple[str, ...]] = (
-    "bp_coeffs_norm", "rp_coeffs_norm",
-    "bp_coeff_errs_norm", "rp_coeff_errs_norm",
+    "bp_coeffs_norm",
+    "rp_coeffs_norm",
+    "bp_coeff_errs_norm",
+    "rp_coeff_errs_norm",
 )
 """XP columns whose cells are length-55 float32 lists.
 
@@ -70,18 +72,27 @@ XP_SCALAR_COLS: Final[tuple[str, ...]] = ("bp_c0_z", "rp_c0_z")
 
 _TRAINING_IDENTIFIERS = ("source_id", "apogee_id", "sdss_id")
 _TRAINING_ASTROMETRY = (
-    "ra", "dec",
-    "parallax_corr", "parallax_error",
-    "pmra", "pmra_error",
-    "pmdec", "pmdec_error",
+    "ra",
+    "dec",
+    "parallax_corr",
+    "parallax_error",
+    "pmra",
+    "pmra_error",
+    "pmdec",
+    "pmdec_error",
 )
 _TRAINING_PHOTOMETRY = (
-    "phot_g_mean_mag_corr", "bp_rp", "bp_g", "g_rp",
+    "phot_g_mean_mag_corr",
+    "bp_rp",
+    "bp_g",
+    "g_rp",
 )
 _TRAINING_DISTANCE = ("r_med_photogeo", "r_lo_photogeo", "r_hi_photogeo")
 _TRAINING_EXTINCTION = (
-    "av_los", "av_los_source",
-    "av_nbhd_median", "av_nbhd_std",
+    "av_los",
+    "av_los_source",
+    "av_nbhd_median",
+    "av_nbhd_std",
 )
 """§8.2 composes Edenhofer+2024 / Lallement+2022 / SFD into one ``av_los``
 column plus a categorical ``av_los_source`` ∈ {0, 1, 2, -1} telling the
@@ -91,16 +102,35 @@ mostly NaN — each star falls in exactly one distance bin)."""
 
 # APOGEE labels — §3 / apogee_dr19.ABUNDANCE_ELEMENTS.
 _APOGEE_ATMOS_LABELS = (
-    "teff_apogee", "e_teff_apogee",
-    "logg_apogee", "e_logg_apogee",
-    "mh_apogee", "e_mh_apogee",
-    "alpha_m_apogee", "e_alpha_m_apogee",
+    "teff_apogee",
+    "e_teff_apogee",
+    "logg_apogee",
+    "e_logg_apogee",
+    "mh_apogee",
+    "e_mh_apogee",
+    "alpha_m_apogee",
+    "e_alpha_m_apogee",
 )
 APOGEE_ELEMENT_LABELS: Final[tuple[str, ...]] = tuple(
     col
     for el in (
-        "c", "n", "o", "na", "mg", "al", "si", "s", "k",
-        "ca", "ti", "v", "cr", "mn", "fe", "ni", "ce",
+        "c",
+        "n",
+        "o",
+        "na",
+        "mg",
+        "al",
+        "si",
+        "s",
+        "k",
+        "ca",
+        "ti",
+        "v",
+        "cr",
+        "mn",
+        "fe",
+        "ni",
+        "ce",
     )
     for col in (f"{el}_h_apogee", f"e_{el}_h_apogee")
 )
@@ -145,16 +175,12 @@ class MasterSchema:
         """
         missing = [c for c in self.required if c not in df.columns]
         if missing:
-            raise SchemaError(
-                f"{self.name}: missing required columns {missing}"
-            )
+            raise SchemaError(f"{self.name}: missing required columns {missing}")
         if check_array_lengths and self.array_length is not None:
             for col in self.array_cols:
                 if col not in df.columns:
                     continue
-                bad = df[col].map(
-                    lambda v, _n=self.array_length: v is None or len(v) != _n
-                )
+                bad = df[col].map(lambda v, _n=self.array_length: v is None or len(v) != _n)
                 if bad.any():
                     raise SchemaError(
                         f"{self.name}: column {col!r} has "
@@ -190,7 +216,9 @@ PIPELINE1_TRAINING_SCHEMA: Final[MasterSchema] = MasterSchema(
 # --- §10.2 pipeline1_inference -----------------------------------------------
 
 _ANDRAE_DIAG_COLS: Final[tuple[str, ...]] = (
-    "teff_xgboost", "logg_xgboost", "mh_xgboost",
+    "teff_xgboost",
+    "logg_xgboost",
+    "mh_xgboost",
 )
 """Andrae+2023 labels carried through as inference-time diagnostics (§10.2)."""
 
@@ -228,15 +256,25 @@ labels; Andrae+2023 labels are kept as cross-reference diagnostics.
 # production driver in this repo after 2026-04-22.
 
 _PIPELINE2_CHEMO = (
-    "fe_h", "fe_h_err",
-    "mg_fe", "mg_fe_err",
-    "al_fe", "al_fe_err",
-    "c_n", "c_n_err",
+    "fe_h",
+    "fe_h_err",
+    "mg_fe",
+    "mg_fe_err",
+    "al_fe",
+    "al_fe_err",
+    "c_n",
+    "c_n_err",
 )
 _PIPELINE2_AGE = ("age", "age_err")
 _PIPELINE2_KINEMATICS = (
-    "J_R", "J_z", "L_z",
-    "ecc", "r_peri", "r_apo", "z_max", "E",
+    "J_R",
+    "J_z",
+    "L_z",
+    "ecc",
+    "r_peri",
+    "r_apo",
+    "z_max",
+    "E",
 )
 _PIPELINE2_NEITZEL2025_COMPAT = ("v_phi", "sqrt_u2_plus_w2")
 

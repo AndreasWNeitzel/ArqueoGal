@@ -118,9 +118,7 @@ def test_happy_path_writes_parquet_and_sidecar(
     assert flags == {"n_ok": 3, "n_no_synth_phot": 0, "n_calibrate_fail": 0}
 
 
-def test_output_schema_is_sampled_flux(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_output_schema_is_sampled_flux(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     ids = [1, 2, 3]
     out_path, _ = mod.ingest_xp(tmp_path, ids, _coords_df(ids), service=svc)
@@ -152,15 +150,11 @@ def test_missing_coords_column_raises(tmp_path: Path) -> None:
         mod.ingest_xp(tmp_path, [1], bad, service=svc)
 
 
-def test_provenance_has_xp_tap_source(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_provenance_has_xp_tap_source(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     ids = [1, 2, 3, 4, 5]
     mod.ingest_xp(tmp_path, ids, _coords_df(ids), service=svc)
-    meta = json.loads(
-        (tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text())
     tap = [s for s in meta["sources"] if s["kind"] == "tap"]
     assert len(tap) == 1
     assert "xp_continuous_mean_spectrum" in tap[0]["name"]
@@ -173,9 +167,7 @@ def test_provenance_records_ye2024_correction(
     svc = MagicMock(spec=TAPService)
     ids = [1, 2, 3]
     mod.ingest_xp(tmp_path, ids, _coords_df(ids), service=svc)
-    meta = json.loads(
-        (tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text())
     corrections = " | ".join(meta["corrections"]).lower()
     assert "ye+2024" in corrections
     assert "ccm89" in corrections
@@ -184,9 +176,7 @@ def test_provenance_records_ye2024_correction(
     assert meta["extra"]["ye2024_sampling_n"] == YE2024_N_OUTPUT
 
 
-def test_provenance_records_flag_counts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_provenance_records_flag_counts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Flag counts (OK / no-synth-phot / calibrate-fail) land in provenance extras."""
     svc = MagicMock(spec=TAPService)
 
@@ -208,15 +198,11 @@ def test_provenance_records_flag_counts(
     ids = [1, 2, 3]
     _, flags = mod.ingest_xp(tmp_path, ids, _coords_df(ids), service=svc)
     assert flags == {"n_ok": 2, "n_no_synth_phot": 1, "n_calibrate_fail": 0}
-    meta = json.loads(
-        (tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text())
     assert meta["extra"]["ye2024_flag_counts"] == flags
 
 
-def test_custom_batch_size_propagates(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_custom_batch_size_propagates(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     ids = [1, 2, 3]
     mod.ingest_xp(tmp_path, ids, _coords_df(ids), service=svc, batch_size=2500)
@@ -224,29 +210,21 @@ def test_custom_batch_size_propagates(
     assert patched_pipeline["ye_kwargs"]["batch_size"] == 2500
 
 
-def test_checkpoint_dir_recorded(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_checkpoint_dir_recorded(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     ids = [1, 2, 3]
     mod.ingest_xp(tmp_path, ids, _coords_df(ids), service=svc)
-    meta = json.loads(
-        (tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text())
     expected = tmp_path / "interim" / "enrich_batches" / "xp"
     assert meta["extra"]["xp_checkpoint_dir"] == str(expected)
     assert patched_pipeline["fetch_kwargs"]["checkpoint_dir"] == expected
 
 
-def test_row_counts_in_provenance(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_row_counts_in_provenance(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     ids = list(range(1, 11))
     mod.ingest_xp(tmp_path, ids, _coords_df(ids), service=svc)
-    meta = json.loads(
-        (tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "xp_sampled_corrected.provenance.json").read_text())
     assert meta["row_count_before"] == 10
     assert meta["extra"]["source_ids_requested"] == 10
     assert meta["extra"]["xp_rows_returned"] == 10

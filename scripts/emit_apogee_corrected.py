@@ -43,7 +43,10 @@ def main() -> None:
     for _, row in summary.iterrows():
         logger.info(
             "  %-12s n=%7d  <Δ>=%+7.4f dex  rms=%7.4f dex",
-            row["element"], int(row["n_applied"]), row["mean_shift"], row["rms_shift"],
+            row["element"],
+            int(row["n_applied"]),
+            row["mean_shift"],
+            row["rms_shift"],
         )
 
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -307,9 +307,7 @@ def score_ir_completeness(
 
     shapes = {b_arr.shape, g_arr.shape, t_arr.shape, l_arr.shape}
     if len(shapes) > 1:
-        raise ValueError(
-            f"b_deg, g_mag, teff, logg must have the same length; got {shapes}"
-        )
+        raise ValueError(f"b_deg, g_mag, teff, logg must have the same length; got {shapes}")
 
     abs_b = np.abs(b_arr)
     abs_b_clamped = np.clip(abs_b, b_edges[0], np.nextafter(b_edges[-1], -np.inf))
@@ -326,10 +324,14 @@ def score_ir_completeness(
         t_clamped = np.clip(t_arr[has_tl], t_edges[0], np.nextafter(t_edges[-1], -np.inf))
         l_clamped = np.clip(l_arr[has_tl], l_edges[0], np.nextafter(l_edges[-1], -np.inf))
         it = np.clip(
-            np.searchsorted(t_edges, t_clamped, side="right") - 1, 0, prob_4d.shape[2] - 1,
+            np.searchsorted(t_edges, t_clamped, side="right") - 1,
+            0,
+            prob_4d.shape[2] - 1,
         )
         il = np.clip(
-            np.searchsorted(l_edges, l_clamped, side="right") - 1, 0, prob_4d.shape[3] - 1,
+            np.searchsorted(l_edges, l_clamped, side="right") - 1,
+            0,
+            prob_4d.shape[3] - 1,
         )
         candidate = prob_4d[ib[has_tl], ig[has_tl], it, il]
         # Sparse / empty 4-D cells stay NaN in the grid — keep the marginal
@@ -418,11 +420,15 @@ def score_compound_selection_prob(
       scoring, call the component functions directly on arrays.
     """
     p_ye_arr = score_selection_prob(
-        np.asarray([b_deg]), np.asarray([g_mag]), artifact_path=ye_artifact_path,
+        np.asarray([b_deg]),
+        np.asarray([g_mag]),
+        artifact_path=ye_artifact_path,
     )
     p_ir_arr = score_ir_completeness(
-        np.asarray([b_deg]), np.asarray([g_mag]),
-        np.asarray([teff]), np.asarray([logg]),
+        np.asarray([b_deg]),
+        np.asarray([g_mag]),
+        np.asarray([teff]),
+        np.asarray([logg]),
         artifact_path=ir_artifact_path,
     )
     p_ye = float(p_ye_arr[0])

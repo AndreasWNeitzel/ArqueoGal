@@ -24,6 +24,7 @@ from arqueogal.xp_abundances.main.model import (
 
 # --- XpFeatureAdapter: shape + c0 masking ------------------------------------
 
+
 def test_adapter_full_layout_input_dim() -> None:
     """Default layout: 54 BP + 54 RP + 2 c0 + 3 residuals + 26 aux = 139."""
     layout = FeatureLayout()
@@ -117,6 +118,7 @@ def test_adapter_batched_and_unbatched() -> None:
 
 # --- Integration: adapter → Encoder trunk → projection -----------------------
 
+
 def test_adapter_feeds_encoder_produces_32d_projection() -> None:
     """Post-#130 sanity: adapter output → trunk → (h_32, z_32) for both layouts.
 
@@ -153,6 +155,7 @@ def test_adapter_toggle_produces_consistent_trunk_shapes() -> None:
 
 
 # --- reorder_labels_human_to_block -------------------------------------------
+
 
 def test_reorder_default_layout_matches_tiers() -> None:
     """The default layout's human order IS LabelTiers order, so this must not raise."""
@@ -218,7 +221,8 @@ def test_reorder_rejects_mismatched_orderings() -> None:
     tiers = LabelTiers()
     # Build an anonymous layout whose label_order_human ≠ tiers.all_labels.
     bogus_layout = CovarianceBlockLayout.anonymous(
-        block_sizes=(3, 4, 4, 6), n_diagonal_only=4,
+        block_sizes=(3, 4, 4, 6),
+        n_diagonal_only=4,
     )
     Y = np.zeros((1, tiers.n_labels), dtype=np.float32)
     with pytest.raises(ValueError, match="does not match"):

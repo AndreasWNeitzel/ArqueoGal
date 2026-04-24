@@ -49,8 +49,25 @@ def test_xp_array_and_scalar_cols_are_named() -> None:
 def test_apogee_labels_cover_all_elements() -> None:
     """Every element in apogee_dr19.ABUNDANCE_ELEMENTS has an _h_apogee +
     error pair."""
-    elements = ("c", "n", "o", "na", "mg", "al", "si", "s", "k",
-                "ca", "ti", "v", "cr", "mn", "fe", "ni", "ce")
+    elements = (
+        "c",
+        "n",
+        "o",
+        "na",
+        "mg",
+        "al",
+        "si",
+        "s",
+        "k",
+        "ca",
+        "ti",
+        "v",
+        "cr",
+        "mn",
+        "fe",
+        "ni",
+        "ce",
+    )
     for el in elements:
         assert f"{el}_h_apogee" in APOGEE_ELEMENT_LABELS
         assert f"e_{el}_h_apogee" in APOGEE_ELEMENT_LABELS
@@ -62,7 +79,9 @@ def test_apogee_labels_cover_all_elements() -> None:
 
 def test_schema_registry_has_three_entries() -> None:
     assert set(SCHEMAS) == {
-        "pipeline1_training", "pipeline1_inference", "pipeline2_features",
+        "pipeline1_training",
+        "pipeline1_inference",
+        "pipeline2_features",
     }
 
 

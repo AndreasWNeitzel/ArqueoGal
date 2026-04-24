@@ -91,9 +91,7 @@ def test_fetch_bailerjones_batches(monkeypatch: pytest.MonkeyPatch) -> None:
         return _fake_bj_table(ids)
 
     monkeypatch.setattr(tap_mod, "run_async", fake_async)
-    monkeypatch.setattr(
-        tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire")
-    )
+    monkeypatch.setattr(tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire"))
 
     service = MagicMock(spec=TAPService)
     out = fetch_bailerjones(service, list(range(1, 8)), batch_size=3)
@@ -111,9 +109,7 @@ def test_fetch_bailerjones_checkpoint_reuse(
 ) -> None:
     ckpt = tmp_path / "bj"
     ckpt.mkdir()
-    _fake_bj_table([10, 11]).to_pandas().to_parquet(
-        ckpt / "bj_batch_0000.parquet", index=False
-    )
+    _fake_bj_table([10, 11]).to_pandas().to_parquet(ckpt / "bj_batch_0000.parquet", index=False)
 
     def no_network(*_a, **_kw):
         raise AssertionError("should not hit TAP")

@@ -76,12 +76,26 @@ def main() -> None:
     _LOG.info("inner-join rows=%d", len(merged))
 
     # Stratify independently on each dataset's own predicted [M/H].
-    v1_rows = _stratify(df1.rename(columns={"mh_pred": "mh_pred",
-                                            "alpha_m_pred": "alpha_m_pred",
-                                            "alpha_m_sigma": "alpha_m_sigma"}), tag="v1")
-    v11_rows = _stratify(df11.rename(columns={"mh_pred": "mh_pred",
-                                              "alpha_m_pred": "alpha_m_pred",
-                                              "alpha_m_sigma": "alpha_m_sigma"}), tag="v11")
+    v1_rows = _stratify(
+        df1.rename(
+            columns={
+                "mh_pred": "mh_pred",
+                "alpha_m_pred": "alpha_m_pred",
+                "alpha_m_sigma": "alpha_m_sigma",
+            }
+        ),
+        tag="v1",
+    )
+    v11_rows = _stratify(
+        df11.rename(
+            columns={
+                "mh_pred": "mh_pred",
+                "alpha_m_pred": "alpha_m_pred",
+                "alpha_m_sigma": "alpha_m_sigma",
+            }
+        ),
+        tag="v11",
+    )
 
     # Pairwise table on the inner join, bin by v1's predicted [M/H] so the
     # "same stars" interpretation stays clean.
@@ -91,10 +105,12 @@ def main() -> None:
     bin_idx = np.digitize(mh_v1, MH_EDGES)
 
     print()
-    print(f"{'[M/H] bin (v1)':<20} {'n':>8}  "
-          f"{'v1_α_mean':>10} {'v11_α_mean':>11}  "
-          f"{'v1_α_med':>10} {'v11_α_med':>11}  "
-          f"{'Δα_mean':>10}  {'v1_σ_mean':>10} {'v11_σ_mean':>11}")
+    print(
+        f"{'[M/H] bin (v1)':<20} {'n':>8}  "
+        f"{'v1_α_mean':>10} {'v11_α_mean':>11}  "
+        f"{'v1_α_med':>10} {'v11_α_med':>11}  "
+        f"{'Δα_mean':>10}  {'v1_σ_mean':>10} {'v11_σ_mean':>11}"
+    )
     print("-" * 126)
     pair_rows = []
     for b in range(len(MH_EDGES) + 1):
@@ -126,17 +142,21 @@ def main() -> None:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w") as f:
-        json.dump({
-            "mh_bin_edges": list(MH_EDGES),
-            "v1_parquet": str(args.v1),
-            "v11_parquet": str(args.v11),
-            "n_v1": len(df1),
-            "n_v11": len(df11),
-            "n_inner_join": len(merged),
-            "v1_standalone": v1_rows,
-            "v11_standalone": v11_rows,
-            "paired_by_v1_mh_bin": pair_rows,
-        }, f, indent=2)
+        json.dump(
+            {
+                "mh_bin_edges": list(MH_EDGES),
+                "v1_parquet": str(args.v1),
+                "v11_parquet": str(args.v11),
+                "n_v1": len(df1),
+                "n_v11": len(df11),
+                "n_inner_join": len(merged),
+                "v1_standalone": v1_rows,
+                "v11_standalone": v11_rows,
+                "paired_by_v1_mh_bin": pair_rows,
+            },
+            f,
+            indent=2,
+        )
     _LOG.info("wrote %s", args.out)
 
 

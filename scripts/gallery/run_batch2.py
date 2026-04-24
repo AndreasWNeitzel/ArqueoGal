@@ -3,6 +3,7 @@
 One command produces every data-layer figure:
     PYTHONPATH=src python scripts/gallery/run_batch2.py
 """
+
 from __future__ import annotations
 
 import sys
@@ -15,12 +16,12 @@ sys.path.insert(0, str(ROOT / "scripts" / "gallery"))
 sys.path.insert(0, str(ROOT / "src"))
 
 STAGES = [
-    ("plot_00_data_sources",     "00 data sources"),
-    ("plot_01_gaia_xp_raw",      "01 raw XP"),
-    ("plot_02_ye_correction",    "02 Ye correction"),
-    ("plot_04_extinction",       "04 extinction"),
-    ("plot_05_ir_photometry",    "05 IR photometry"),
-    ("plot_06_selection_function","06 selection function"),
+    ("plot_00_data_sources", "00 data sources"),
+    ("plot_01_gaia_xp_raw", "01 raw XP"),
+    ("plot_02_ye_correction", "02 Ye correction"),
+    ("plot_04_extinction", "04 extinction"),
+    ("plot_05_ir_photometry", "05 IR photometry"),
+    ("plot_06_selection_function", "06 selection function"),
 ]
 
 

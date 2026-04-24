@@ -56,24 +56,34 @@ DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet
 
 
 def _build_cfg_for_loader(
-    parquet: Path, pretrained_ckpt: Path, batch_size: int, seed: int,
+    parquet: Path,
+    pretrained_ckpt: Path,
+    batch_size: int,
+    seed: int,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
         output_dir=REPO_ROOT / "tmp_ood",
-        epochs=1, batch_size=batch_size, num_workers=2,
+        epochs=1,
+        batch_size=batch_size,
+        num_workers=2,
         amp_dtype="bfloat16",
-        use_c0_scalars=True, encoder_lr_ratio=0.1,
+        use_c0_scalars=True,
+        encoder_lr_ratio=0.1,
         pretrained_encoder_ckpt=pretrained_ckpt,
-        reload_head_from_pretrained=False, split_seed=seed,
+        reload_head_from_pretrained=False,
+        split_seed=seed,
         output_prefix="xp_abundances_main_oodeval",
         loss_weights=LossWeights(supcon=0.0, beta_nll=1.0, beta=0.5),
-        temperature_init=0.10, ensemble_seeds=(0,),
+        temperature_init=0.10,
+        ensemble_seeds=(0,),
     )
 
 
 def _reconstruct_model(
-    blob: dict, layout: FeatureLayout, block_layout: CovarianceBlockLayout,
+    blob: dict,
+    layout: FeatureLayout,
+    block_layout: CovarianceBlockLayout,
     device: torch.device,
 ) -> tuple[XpAbundanceModel, XpFeatureAdapter]:
     cfg_yaml = json.loads(blob["config_yaml"])
@@ -85,9 +95,12 @@ def _reconstruct_model(
 
     model = XpAbundanceModel(
         ModelConfig(
-            input_dim=layout.input_dim, block_layout=block_layout,
-            latent_dim=latent_dim, trunk_hidden=trunk_hidden,
-            head_hidden=head_hidden, dropout=dropout,
+            input_dim=layout.input_dim,
+            block_layout=block_layout,
+            latent_dim=latent_dim,
+            trunk_hidden=trunk_hidden,
+            head_hidden=head_hidden,
+            dropout=dropout,
         ),
     ).to(device)
     model.encoder.load_state_dict(blob["encoder"])
@@ -97,8 +110,10 @@ def _reconstruct_model(
 
 
 def _collect_member_preds(
-    model: XpAbundanceModel, adapter: XpFeatureAdapter,
-    loader, device: torch.device,
+    model: XpAbundanceModel,
+    adapter: XpFeatureAdapter,
+    loader,
+    device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray]:
     model.eval()
     mus: list[np.ndarray] = []
@@ -125,8 +140,7 @@ def _xp_feature_block(df: pd.DataFrame, layout: FeatureLayout) -> np.ndarray:
 def _histogram_counts(values: np.ndarray, bin_edges: np.ndarray) -> dict[str, int]:
     counts, _ = np.histogram(values[np.isfinite(values)], bins=bin_edges)
     return {
-        f"[{bin_edges[i]:.3g}, {bin_edges[i+1]:.3g})": int(counts[i])
-        for i in range(len(counts))
+        f"[{bin_edges[i]:.3g}, {bin_edges[i + 1]:.3g})": int(counts[i]) for i in range(len(counts))
     }
 
 
@@ -136,11 +150,18 @@ def main() -> None:
     p.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
     p.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     p.add_argument("--batch-size", type=int, default=1024)
-    p.add_argument("--p-threshold", type=float, default=0.99,
-                   help="Mahalanobis distance quantile for the training-set"
-                        " OOD threshold.")
-    p.add_argument("--ensemble-threshold", type=float, default=0.5,
-                   help="epistemic/total σ ratio cutoff for ensemble disagreement.")
+    p.add_argument(
+        "--p-threshold",
+        type=float,
+        default=0.99,
+        help="Mahalanobis distance quantile for the training-set OOD threshold.",
+    )
+    p.add_argument(
+        "--ensemble-threshold",
+        type=float,
+        default=0.5,
+        help="epistemic/total σ ratio cutoff for ensemble disagreement.",
+    )
     p.add_argument("--tag", type=str, default="ensemble_5label")
     args = p.parse_args()
 
@@ -148,14 +169,16 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     member_ckpts = sorted(
-        [p for p in args.ensemble.glob(
-            "member_seed*/xp_abundances_main_ensemble*_seed*_best.pt",
-        )],
+        [
+            p
+            for p in args.ensemble.glob(
+                "member_seed*/xp_abundances_main_ensemble*_seed*_best.pt",
+            )
+        ],
     )
     if not member_ckpts:
         raise FileNotFoundError(f"no member checkpoints under {args.ensemble}")
-    _LOG.info("device=%s ensemble=%s members=%d",
-              device, args.ensemble, len(member_ckpts))
+    _LOG.info("device=%s ensemble=%s members=%d", device, args.ensemble, len(member_ckpts))
 
     layout = FeatureLayout()
     first_blob = load_checkpoint(member_ckpts[0], map_location="cpu")
@@ -172,11 +195,16 @@ def main() -> None:
     block_layout = CovarianceBlockLayout.from_dict(first_blob["block_layout"])
 
     cfg = _build_cfg_for_loader(
-        parquet=args.parquet, pretrained_ckpt=pretrained_ckpt,
-        batch_size=args.batch_size, seed=split_seed,
+        parquet=args.parquet,
+        pretrained_ckpt=pretrained_ckpt,
+        batch_size=args.batch_size,
+        seed=split_seed,
     )
     train_loader, val_loader, _, _ = build_dataloaders(
-        cfg, layout, tiers, seed=split_seed,
+        cfg,
+        layout,
+        tiers,
+        seed=split_seed,
     )
     _LOG.info("train batches=%d val batches=%d", len(train_loader), len(val_loader))
 
@@ -184,7 +212,9 @@ def main() -> None:
     full_df = pd.read_parquet(
         args.parquet,
         columns=[
-            "source_id", *layout.bp_coef_cols, *layout.rp_coef_cols,
+            "source_id",
+            *layout.bp_coef_cols,
+            *layout.rp_coef_cols,
         ],
     ).drop_duplicates(subset="source_id", keep="first")
     sid_to_xp = full_df.set_index("source_id")
@@ -200,11 +230,15 @@ def main() -> None:
 
     # Fit Mahalanobis OOD on training, flag val.
     ood_bundle = fit_mahalanobis_ood(
-        X_train, p_threshold=args.p_threshold, regularization=1e-6,
+        X_train,
+        p_threshold=args.p_threshold,
+        regularization=1e-6,
     )
     _LOG.info(
         "Mahalanobis bundle: n_train=%d threshold=%.3f p=%.3f",
-        ood_bundle.n_training, ood_bundle.threshold, ood_bundle.p_threshold,
+        ood_bundle.n_training,
+        ood_bundle.threshold,
+        ood_bundle.p_threshold,
     )
 
     mahal_scores = score_mahalanobis_ood(X_val, ood_bundle)
@@ -227,7 +261,9 @@ def main() -> None:
     sigma_diag_per_member = np.sqrt(np.einsum("kbij,kbij->kbi", Ls, Ls))
     ens_ratio = ensemble_disagreement_ratio(mus, sigma_diag_per_member)
     ens_flags = flag_ensemble_ood(
-        mus, sigma_diag_per_member, threshold=args.ensemble_threshold,
+        mus,
+        sigma_diag_per_member,
+        threshold=args.ensemble_threshold,
     )
     ens_flag_rate = float(ens_flags.mean())
     _LOG.info("Ensemble disagreement flag rate on val: %.4f", ens_flag_rate)
@@ -243,19 +279,22 @@ def main() -> None:
 
     # Regime B envelope on predicted Teff / log g + val b_deg.
     b_deg_df = pd.read_parquet(
-        args.parquet, columns=["source_id", "b_deg"],
+        args.parquet,
+        columns=["source_id", "b_deg"],
     ).drop_duplicates(subset="source_id", keep="first")
     b_deg_by_sid = dict(
         zip(b_deg_df["source_id"].to_numpy(), b_deg_df["b_deg"].to_numpy()),
     )
     b_deg_val = np.asarray(
-        [b_deg_by_sid.get(int(sid), np.nan) for sid in val_sids], dtype=np.float64,
+        [b_deg_by_sid.get(int(sid), np.nan) for sid in val_sids],
+        dtype=np.float64,
     )
     mu_bar_scaled = mus.mean(axis=0)
     mean_block = np.asarray(first_blob["label_scaler_mean"], dtype=np.float64)
     scale_block = np.asarray(first_blob["label_scaler_scale"], dtype=np.float64)
     perm = block_layout.human_to_block_perm.cpu().numpy()
-    mean_block = mean_block[perm]; scale_block = scale_block[perm]
+    mean_block = mean_block[perm]
+    scale_block = scale_block[perm]
     mu_bar = (mu_bar_scaled * scale_block[None] + mean_block[None]).astype(np.float64)
     envelope = RegimeBEnvelope()
     inside_envelope = envelope.mask(mu_bar[:, 0], mu_bar[:, 1], b_deg_val)

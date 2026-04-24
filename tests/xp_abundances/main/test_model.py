@@ -174,7 +174,9 @@ def test_cross_block_entries_of_L_are_exactly_zero() -> None:
     block_sizes = (3, 2, 4)
     n_diag = 2
     head = BlockCholeskyHead(
-        latent_dim=32, block_sizes=block_sizes, n_diagonal_only=n_diag,
+        latent_dim=32,
+        block_sizes=block_sizes,
+        n_diagonal_only=n_diag,
     )
     h = torch.randn(4, 32)
     _, L = head(h)
@@ -192,7 +194,9 @@ def test_cross_block_entries_of_L_are_exactly_zero() -> None:
             if i == j:
                 continue
             sub = L[
-                :, starts[i] : starts[i] + ki, starts[j] : starts[j] + kj,
+                :,
+                starts[i] : starts[i] + ki,
+                starts[j] : starts[j] + kj,
             ]
             assert torch.all(sub == 0.0), f"cross-block ({i},{j}) nonzero"
     # Between diag-only tail and every dense block.
@@ -207,7 +211,9 @@ def test_diagonal_only_tail_is_truly_diagonal() -> None:
     block_sizes = (3, 2)
     n_diag = 4
     head = BlockCholeskyHead(
-        latent_dim=32, block_sizes=block_sizes, n_diagonal_only=n_diag,
+        latent_dim=32,
+        block_sizes=block_sizes,
+        n_diagonal_only=n_diag,
     )
     h = torch.randn(4, 32)
     _, L = head(h)

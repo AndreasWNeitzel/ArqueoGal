@@ -89,8 +89,10 @@ def test_aip_service_yaml_wins_over_env_token(monkeypatch: pytest.MonkeyPatch) -
     service = aip_service(credentials=creds)
     # YAML path produces a pyvo AuthSession, NOT a plain requests.Session with a
     # bearer header — the token fallback should not fire.
-    assert not hasattr(service._session, "headers") or \
-        service._session.headers.get("Authorization") != "Token ignored-if-yaml-present"
+    assert (
+        not hasattr(service._session, "headers")
+        or service._session.headers.get("Authorization") != "Token ignored-if-yaml-present"
+    )
 
 
 def test_aip_service_blank_env_token_not_used(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -143,9 +145,7 @@ def test_batched_in_query_substitutes_ids_and_batches(monkeypatch: pytest.Monkey
 
     service = MagicMock(spec=TAPService)
     template = "SELECT id FROM tbl WHERE id IN (__batch__)"
-    results = list(
-        batched_in_query(service, template, range(1, 8), batch_size=3, mode="sync")
-    )
+    results = list(batched_in_query(service, template, range(1, 8), batch_size=3, mode="sync"))
 
     assert calls == [
         "SELECT id FROM tbl WHERE id IN (1,2,3)",
@@ -297,9 +297,7 @@ def test_batched_fetch_df_async_by_default(monkeypatch: pytest.MonkeyPatch) -> N
         return _fake_table(_extract_ids(adql))
 
     monkeypatch.setattr(tap_mod, "run_async", fake_async)
-    monkeypatch.setattr(
-        tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire")
-    )
+    monkeypatch.setattr(tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire"))
 
     service = MagicMock(spec=TAPService)
     batched_fetch_df(service, [1, 2], "WHERE id IN (__batch__)", batch_size=5)
@@ -365,12 +363,22 @@ def test_batched_fetch_df_checkpoint_prefix_distinguishes_kinds(
 
     service = MagicMock(spec=TAPService)
     batched_fetch_df(
-        service, [1], "WHERE id IN (__batch__)", batch_size=5,
-        mode="sync", checkpoint_dir=tmp_path, checkpoint_prefix="alpha",
+        service,
+        [1],
+        "WHERE id IN (__batch__)",
+        batch_size=5,
+        mode="sync",
+        checkpoint_dir=tmp_path,
+        checkpoint_prefix="alpha",
     )
     batched_fetch_df(
-        service, [2], "WHERE id IN (__batch__)", batch_size=5,
-        mode="sync", checkpoint_dir=tmp_path, checkpoint_prefix="beta",
+        service,
+        [2],
+        "WHERE id IN (__batch__)",
+        batch_size=5,
+        mode="sync",
+        checkpoint_dir=tmp_path,
+        checkpoint_prefix="beta",
     )
 
     names = sorted(p.name for p in tmp_path.iterdir())
@@ -380,6 +388,4 @@ def test_batched_fetch_df_checkpoint_prefix_distinguishes_kinds(
 def test_batched_fetch_df_rejects_non_castable_ids() -> None:
     service = MagicMock(spec=TAPService)
     with pytest.raises((TypeError, ValueError)):
-        batched_fetch_df(
-            service, ["not-an-int"], "WHERE id IN (__batch__)", batch_size=10
-        )
+        batched_fetch_df(service, ["not-an-int"], "WHERE id IN (__batch__)", batch_size=10)

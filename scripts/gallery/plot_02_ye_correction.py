@@ -9,6 +9,7 @@ Outputs:
 "Before" = raw coefficients calibrated via gaiaxpy (no NN correction).
 "After"  = xp_sampled_corrected.parquet (post-Ye NN output, SFD-dereddened).
 """
+
 from __future__ import annotations
 
 import sys
@@ -49,9 +50,7 @@ def _pick_before_after_pairs(
     """
     from gaiaxpy import calibrate
 
-    xp_raw = pq.read_table(
-        DATA_INTERIM / "xp_coeffs_raw_delta.parquet"
-    ).to_pandas()
+    xp_raw = pq.read_table(DATA_INTERIM / "xp_coeffs_raw_delta.parquet").to_pandas()
     xp_cor = pq.read_table(
         DATA_INTERIM / "xp_sampled_corrected_delta.parquet"
         if (DATA_INTERIM / "xp_sampled_corrected_delta.parquet").exists()
@@ -65,24 +64,26 @@ def _pick_before_after_pairs(
     idx = sample_index(len(ok), n, np.random.default_rng(seed))
     sub = ok.iloc[idx].reset_index(drop=True)
 
-    cal_in = pd.DataFrame({
-        "source_id": sub["source_id"],
-        "bp_coefficients": sub["bp_coefficients"].apply(np.asarray).tolist(),
-        "rp_coefficients": sub["rp_coefficients"].apply(np.asarray).tolist(),
-        "bp_coefficient_errors": sub["bp_coefficient_errors"].apply(np.asarray).tolist(),
-        "rp_coefficient_errors": sub["rp_coefficient_errors"].apply(np.asarray).tolist(),
-        "bp_n_parameters": [55] * len(sub),
-        "rp_n_parameters": [55] * len(sub),
-        "bp_coefficient_correlations": [np.zeros(55 * 56 // 2, dtype=np.float32)] * len(sub),
-        "rp_coefficient_correlations": [np.zeros(55 * 56 // 2, dtype=np.float32)] * len(sub),
-        "bp_standard_deviation": sub["bp_standard_deviation"],
-        "rp_standard_deviation": sub["rp_standard_deviation"],
-        "bp_n_relevant_bases": sub["bp_n_relevant_bases"],
-        "rp_n_relevant_bases": sub["rp_n_relevant_bases"],
-        "bp_n_measurements": sub["bp_n_measurements"],
-        "rp_n_measurements": sub["rp_n_measurements"],
-        "solution_id": [1636148068921376768] * len(sub),
-    })
+    cal_in = pd.DataFrame(
+        {
+            "source_id": sub["source_id"],
+            "bp_coefficients": sub["bp_coefficients"].apply(np.asarray).tolist(),
+            "rp_coefficients": sub["rp_coefficients"].apply(np.asarray).tolist(),
+            "bp_coefficient_errors": sub["bp_coefficient_errors"].apply(np.asarray).tolist(),
+            "rp_coefficient_errors": sub["rp_coefficient_errors"].apply(np.asarray).tolist(),
+            "bp_n_parameters": [55] * len(sub),
+            "rp_n_parameters": [55] * len(sub),
+            "bp_coefficient_correlations": [np.zeros(55 * 56 // 2, dtype=np.float32)] * len(sub),
+            "rp_coefficient_correlations": [np.zeros(55 * 56 // 2, dtype=np.float32)] * len(sub),
+            "bp_standard_deviation": sub["bp_standard_deviation"],
+            "rp_standard_deviation": sub["rp_standard_deviation"],
+            "bp_n_relevant_bases": sub["bp_n_relevant_bases"],
+            "rp_n_relevant_bases": sub["rp_n_relevant_bases"],
+            "bp_n_measurements": sub["bp_n_measurements"],
+            "rp_n_measurements": sub["rp_n_measurements"],
+            "solution_id": [1636148068921376768] * len(sub),
+        }
+    )
 
     cal_df, _ = calibrate(
         cal_in,
@@ -104,9 +105,18 @@ def _pick_before_after_pairs(
 def _load_star_info(source_ids: np.ndarray) -> pd.DataFrame:
     """Best-effort metadata join. The delta-XP stars come from Stream 3, so we
     prefer Andrae+2023 labels there; fall back to APOGEE via Stream 1."""
-    wanted = {"source_id", "teff_apogee", "logg_apogee", "mh_apogee",
-              "teff_andrae", "logg_andrae", "mh_andrae",
-              "g_mag", "av_sfd", "bp_rp"}
+    wanted = {
+        "source_id",
+        "teff_apogee",
+        "logg_apogee",
+        "mh_apogee",
+        "teff_andrae",
+        "logg_andrae",
+        "mh_andrae",
+        "g_mag",
+        "av_sfd",
+        "bp_rp",
+    }
     frames = []
     for path in (
         DATA_PROCESSED / "pipeline1_features_stream3.parquet",
@@ -124,9 +134,7 @@ def _load_star_info(source_ids: np.ndarray) -> pd.DataFrame:
             frames.append(t)
     if not frames:
         return pd.DataFrame({"source_id": source_ids})
-    info = pd.concat(frames, ignore_index=True).drop_duplicates(
-        "source_id", keep="first"
-    )
+    info = pd.concat(frames, ignore_index=True).drop_duplicates("source_id", keep="first")
     # Collapse APOGEE/Andrae into unified `teff/logg/mh` columns, preferring APOGEE
     for label, suffix in (("teff", "teff"), ("logg", "logg"), ("mh", "mh")):
         ap = f"{suffix}_apogee"
@@ -180,8 +188,12 @@ def before_after_sed() -> None:
     fig, axes = plt.subplots(2, 3, figsize=(15, 9), sharex=True)
 
     for ax, i in zip(axes.flat, idx_show):
-        ax.plot(YE_SAMPLING_NM, before_n[i], color="#888", lw=1.2, label="pre-Ye (gaiaxpy calibrate)")
-        ax.plot(YE_SAMPLING_NM, after_n[i], color=PALETTE["v11"], lw=1.2, label="post-Ye (+dereddened)")
+        ax.plot(
+            YE_SAMPLING_NM, before_n[i], color="#888", lw=1.2, label="pre-Ye (gaiaxpy calibrate)"
+        )
+        ax.plot(
+            YE_SAMPLING_NM, after_n[i], color=PALETTE["v11"], lw=1.2, label="post-Ye (+dereddened)"
+        )
         ax.set_xlabel(r"$\lambda$ [nm]")
         ax.set_ylabel("flux (pre-Ye peak-normalised)")
         ax.grid(alpha=0.3)
@@ -210,11 +222,14 @@ def before_after_sed() -> None:
         if src:
             line2 += f"   (labels: {src})"
 
-        ax.set_title("   ".join(line1_bits) + "\n" + line2,
-                     fontsize=9, loc="left")
+        ax.set_title("   ".join(line1_bits) + "\n" + line2, fontsize=9, loc="left")
 
-    fig.suptitle("Ye+2024 NN correction: before / after on 6 Stream-3 delta stars",
-                 fontsize=12, fontweight="bold", y=1.00)
+    fig.suptitle(
+        "Ye+2024 NN correction: before / after on 6 Stream-3 delta stars",
+        fontsize=12,
+        fontweight="bold",
+        y=1.00,
+    )
     save_fig(fig, OUT / "ye_before_after_sed.png")
 
     # --- delta-flux distribution -----------------------------------------
@@ -230,16 +245,34 @@ def before_after_sed() -> None:
     p98 = np.nanpercentile(delta_frac, 98, axis=0)
 
     fig, ax = plt.subplots(figsize=(12, 5))
-    ax.fill_between(YE_SAMPLING_NM, p02, p98, color="#f0c9a4", alpha=0.65,
-                    edgecolor="#a6560a", linewidth=0.7, label="2–98%")
-    ax.fill_between(YE_SAMPLING_NM, p16, p84, color="#d88b4d", alpha=0.85,
-                    edgecolor="#7f2704", linewidth=0.9, label="16–84%")
+    ax.fill_between(
+        YE_SAMPLING_NM,
+        p02,
+        p98,
+        color="#f0c9a4",
+        alpha=0.65,
+        edgecolor="#a6560a",
+        linewidth=0.7,
+        label="2–98%",
+    )
+    ax.fill_between(
+        YE_SAMPLING_NM,
+        p16,
+        p84,
+        color="#d88b4d",
+        alpha=0.85,
+        edgecolor="#7f2704",
+        linewidth=0.9,
+        label="16–84%",
+    )
     ax.plot(YE_SAMPLING_NM, p50, color="#7f2704", lw=1.8, label="median")
     ax.axhline(0, color="k", lw=0.5, ls="--")
     ax.set_xlabel(r"$\lambda$ [nm]")
     ax.set_ylabel(r"$\Delta\,\mathrm{flux}\,/\,|\mathrm{before}|$  (post $-$ pre, fractional)")
-    ax.set_title(rf"Ye+2024 correction magnitude vs wavelength "
-                 rf"(n={len(before)} Stream-3 delta stars)")
+    ax.set_title(
+        rf"Ye+2024 correction magnitude vs wavelength "
+        rf"(n={len(before)} Stream-3 delta stars)"
+    )
     ax.set_ylim(-0.001, 0.001)
     ax.legend(loc="upper right")
     save_fig(fig, OUT / "ye_delta_distribution.png")
@@ -258,13 +291,22 @@ def flag_sky_map() -> None:
 
     total = len(merged)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6),
-                              subplot_kw={"projection": "mollweide"})
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6), subplot_kw={"projection": "mollweide"})
     ok = merged[merged["ye2024_flag"] == 0]
     not_ok = merged[merged["ye2024_flag"] != 0]
     for ax, sub, title, col in (
-        (axes[0], ok, f"Ye flag = OK  (n={len(ok):,}, {100*len(ok)/total:.1f}%)", PALETTE["ok"]),
-        (axes[1], not_ok, f"Ye flag ≠ OK  (n={len(not_ok):,}, {100*len(not_ok)/total:.1f}%)", PALETTE["bad"]),
+        (
+            axes[0],
+            ok,
+            f"Ye flag = OK  (n={len(ok):,}, {100 * len(ok) / total:.1f}%)",
+            PALETTE["ok"],
+        ),
+        (
+            axes[1],
+            not_ok,
+            f"Ye flag ≠ OK  (n={len(not_ok):,}, {100 * len(not_ok) / total:.1f}%)",
+            PALETTE["bad"],
+        ),
     ):
         n_plot = min(len(sub), 40_000)
         idx = sample_index(len(sub), n_plot)
@@ -273,8 +315,12 @@ def flag_sky_map() -> None:
         ax.set_title(title)
         style_galactic_mollweide(ax)
 
-    fig.suptitle("Ye+2024 NN correction outcomes on Stream 1  —  Galactic coordinates",
-                 fontsize=13, fontweight="bold", y=1.02)
+    fig.suptitle(
+        "Ye+2024 NN correction outcomes on Stream 1  —  Galactic coordinates",
+        fontsize=13,
+        fontweight="bold",
+        y=1.02,
+    )
     save_fig(fig, OUT / "ye_flag_sky_map.png")
 
 
@@ -293,13 +339,21 @@ def flag_vs_g() -> None:
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
 
     g_bins = np.linspace(merged["g_mag"].min(), merged["g_mag"].max(), 40)
-    for fv, label, color in [(0, "OK", PALETTE["ok"]),
-                              (1, "NO_SYNTH_PHOT", PALETTE["bad"]),
-                              (2, "CALIBRATE_FAIL", "#333")]:
+    for fv, label, color in [
+        (0, "OK", PALETTE["ok"]),
+        (1, "NO_SYNTH_PHOT", PALETTE["bad"]),
+        (2, "CALIBRATE_FAIL", "#333"),
+    ]:
         sub = merged[merged["ye2024_flag"] == fv]
         if len(sub):
-            axes[0].hist(sub["g_mag"], bins=g_bins, histtype="step",
-                         label=f"{label}  (n={len(sub):,})", color=color, lw=1.4)
+            axes[0].hist(
+                sub["g_mag"],
+                bins=g_bins,
+                histtype="step",
+                label=f"{label}  (n={len(sub):,})",
+                color=color,
+                lw=1.4,
+            )
     axes[0].set_xlabel(r"$G$ [mag]")
     axes[0].set_ylabel("count")
     axes[0].set_yscale("log")

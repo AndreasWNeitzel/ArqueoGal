@@ -150,12 +150,8 @@ def ingest_xp(  # noqa: PLR0913 — keyword-only tuning knobs with safe defaults
     )
     flag_counts = {
         "n_ok": int((corrected["ye2024_flag"] == YE2024_FLAG_OK).sum()),
-        "n_no_synth_phot": int(
-            (corrected["ye2024_flag"] == YE2024_FLAG_NO_SYNTH_PHOT).sum()
-        ),
-        "n_calibrate_fail": int(
-            (corrected["ye2024_flag"] == YE2024_FLAG_CALIBRATE_FAIL).sum()
-        ),
+        "n_no_synth_phot": int((corrected["ye2024_flag"] == YE2024_FLAG_NO_SYNTH_PHOT).sum()),
+        "n_calibrate_fail": int((corrected["ye2024_flag"] == YE2024_FLAG_CALIBRATE_FAIL).sum()),
     }
 
     logger.info("Level-3: writing %s", output_path)
@@ -207,7 +203,9 @@ def ingest_xp(  # noqa: PLR0913 — keyword-only tuning knobs with safe defaults
     write_sidecar(prov)
     logger.info(
         "Level-3: done (%d rows → %s; Ye flags: %s)",
-        len(corrected), output_path, flag_counts,
+        len(corrected),
+        output_path,
+        flag_counts,
     )
     return output_path, flag_counts
 

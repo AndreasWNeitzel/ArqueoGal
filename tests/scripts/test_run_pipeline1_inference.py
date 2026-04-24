@@ -67,23 +67,33 @@ from arqueogal.xp_abundances.main.training import save_checkpoint
 # ---------------------------------------------------------------------------
 
 FIVE_LABELS: tuple[str, ...] = (
-    "teff_apogee", "logg_apogee", "mh_apogee",
-    "alpha_m_apogee", "mg_h_apogee",
+    "teff_apogee",
+    "logg_apogee",
+    "mh_apogee",
+    "alpha_m_apogee",
+    "mg_h_apogee",
 )
 
-TINY_BP_INDICES: tuple[int, ...] = tuple(range(1, 6))   # 5 BP coefs
-TINY_RP_INDICES: tuple[int, ...] = tuple(range(1, 6))   # 5 RP coefs
+TINY_BP_INDICES: tuple[int, ...] = tuple(range(1, 6))  # 5 BP coefs
+TINY_RP_INDICES: tuple[int, ...] = tuple(range(1, 6))  # 5 RP coefs
 TINY_AUX_COLS: tuple[str, ...] = ("parallax", "g_mag")  # 2 aux
-TINY_RESIDUAL_COLS: tuple[str, ...] = ()                # 0 residuals
+TINY_RESIDUAL_COLS: tuple[str, ...] = ()  # 0 residuals
 TINY_INPUT_DIM = 5 + 5 + 2 + 0 + 2  # = 14
 
 # Wider aux layout used for the aux-missingness-flag tests. Covers all three
 # flag channels (IR, parallax, extinction) — the minimal tiny layout carries
 # only 2 aux cols, which is not enough to exercise the three flag channels.
 FLAG_AUX_COLS: tuple[str, ...] = (
-    "parallax", "parallax_error",
-    "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
-    "av_edenhofer", "av_sfd", "av_lallement",
+    "parallax",
+    "parallax_error",
+    "j_mag",
+    "h_mag",
+    "k_mag",
+    "w1_mag",
+    "w2_mag",
+    "av_edenhofer",
+    "av_sfd",
+    "av_lallement",
 )
 FLAG_INPUT_DIM = 5 + 5 + 2 + 0 + len(FLAG_AUX_COLS)
 
@@ -123,50 +133,75 @@ def _five_label_block_layout() -> CovarianceBlockLayout:
 
 
 def _save_tiny_member(
-    ensemble_dir: Path, layout: FeatureLayout, seed: int,
+    ensemble_dir: Path,
+    layout: FeatureLayout,
+    seed: int,
 ) -> Path:
     """Write one tiny 5-label checkpoint into ``ensemble_dir/member_seed<seed>/``."""
     tiers = _five_label_tiers()
     block_layout = _five_label_block_layout()
     torch.manual_seed(seed)
-    model = XpAbundanceModel(ModelConfig(
-        input_dim=layout.input_dim,
-        block_layout=block_layout,
-        latent_dim=8, trunk_hidden=(16, 8), head_hidden=8, dropout=0.0,
-    ))
+    model = XpAbundanceModel(
+        ModelConfig(
+            input_dim=layout.input_dim,
+            block_layout=block_layout,
+            latent_dim=8,
+            trunk_hidden=(16, 8),
+            head_hidden=8,
+            dropout=0.0,
+        )
+    )
     log_temp = torch.tensor(0.0)
     cfg = TrainingConfig(
-        latent_dim=8, trunk_hidden=(16, 8), head_hidden=8, dropout=0.0,
+        latent_dim=8,
+        trunk_hidden=(16, 8),
+        head_hidden=8,
+        dropout=0.0,
         use_c0_scalars=True,
     )
     # Build a non-trivial scaler so `save_checkpoint` does not reject it.
     rng = np.random.default_rng(seed)
-    Y_fit = np.column_stack([
-        rng.normal(4600.0, 250.0, size=256),     # teff
-        rng.normal(2.4, 0.5, size=256),          # logg
-        rng.normal(-0.25, 0.35, size=256),       # mh
-        rng.normal(0.09, 0.10, size=256),        # alpha_m
-        rng.normal(-0.15, 0.29, size=256),       # mg_h
-    ]).astype(np.float32)
+    Y_fit = np.column_stack(
+        [
+            rng.normal(4600.0, 250.0, size=256),  # teff
+            rng.normal(2.4, 0.5, size=256),  # logg
+            rng.normal(-0.25, 0.35, size=256),  # mh
+            rng.normal(0.09, 0.10, size=256),  # alpha_m
+            rng.normal(-0.15, 0.29, size=256),  # mg_h
+        ]
+    ).astype(np.float32)
     scaler = LabelScaler.fit(Y_fit, FIVE_LABELS)
 
     member_dir = ensemble_dir / f"member_seed{seed}"
     member_dir.mkdir(parents=True, exist_ok=True)
     path = member_dir / f"xp_abundances_main_ensemble_5label_seed{seed}_best.pt"
     save_checkpoint(
-        path, model=model, log_temp=log_temp, cfg=cfg, layout=layout,
-        tiers=tiers, label_scaler=scaler, seed=seed,
+        path,
+        model=model,
+        log_temp=log_temp,
+        cfg=cfg,
+        layout=layout,
+        tiers=tiers,
+        label_scaler=scaler,
+        seed=seed,
     )
     return path
 
 
 def _write_frozen_stats_sidecar(
-    sidecar_path: Path, *, fingerprint: str, n_ratios: int = 54,
+    sidecar_path: Path,
+    *,
+    fingerprint: str,
+    n_ratios: int = 54,
 ) -> None:
     """Emit a minimal provenance JSON compatible with load_frozen_zscore_stats."""
-    coef_block = {"bp": {}, "rp": {}, "sigma_floor": 1e-20,
-                  "n_reference_population": 200,
-                  "reference_population": "test fixture"}
+    coef_block = {
+        "bp": {},
+        "rp": {},
+        "sigma_floor": 1e-20,
+        "n_reference_population": 200,
+        "reference_population": "test fixture",
+    }
     for i in range(1, n_ratios + 1):
         coef_block["bp"][str(i)] = {"mu": 0.0, "sigma": 1.0}
         coef_block["rp"][str(i)] = {"mu": 0.0, "sigma": 1.0}
@@ -186,7 +221,11 @@ def _write_frozen_stats_sidecar(
 
 
 def _synthetic_input_df(
-    n: int, layout: FeatureLayout, *, schema: str = "zscored", seed: int = 0,
+    n: int,
+    layout: FeatureLayout,
+    *,
+    schema: str = "zscored",
+    seed: int = 0,
 ) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     data: dict[str, np.ndarray] = {
@@ -254,13 +293,16 @@ def _write_tiny_mode_ambiguous_grid(path: Path) -> Path:
 
 def _install_stub_selection_function(monkeypatch: pytest.MonkeyPatch) -> None:
     """Short-circuit the selection-function artefact — tests don't ship one."""
+
     def _const_selection_prob(b_deg, g_mag, *, artifact_path=None):
         return np.full(np.asarray(b_deg).shape, 0.85, dtype=np.float64)
+
     monkeypatch.setattr(driver, "score_selection_prob", _const_selection_prob)
 
 
 def _seed_fixture_env(
-    tmp_path: Path, n_rows: int = 24,
+    tmp_path: Path,
+    n_rows: int = 24,
 ) -> dict[str, Path]:
     """Build ensemble_dir, frozen stats sidecar, input parquet, OOD parquet."""
     layout = _tiny_layout()
@@ -279,10 +321,14 @@ def _seed_fixture_env(
 
     # OOD training parquet — only needs the 108-D block cols, but in the tiny
     # layout that's 10-D; populate accordingly.
-    ood_df = pd.DataFrame({
-        **{c: np.random.default_rng(2).standard_normal(200).astype(np.float32)
-           for c in [*layout.bp_coef_cols, *layout.rp_coef_cols]},
-    })
+    ood_df = pd.DataFrame(
+        {
+            **{
+                c: np.random.default_rng(2).standard_normal(200).astype(np.float32)
+                for c in [*layout.bp_coef_cols, *layout.rp_coef_cols]
+            },
+        }
+    )
     ood_path = tmp_path / "ood_train.parquet"
     ood_df.to_parquet(ood_path, index=False)
 
@@ -304,6 +350,7 @@ def _seed_fixture_env(
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_end_to_end_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Driver runs on a 24-row synthetic input and writes a valid output."""
@@ -329,7 +376,8 @@ def test_end_to_end_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_output_schema_columns_and_dtypes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Every required column exists with the expected dtype."""
     env = _seed_fixture_env(tmp_path, n_rows=16)
@@ -373,8 +421,11 @@ def test_output_schema_columns_and_dtypes(
         assert out[c].dtype == np.float32, f"{c}: expected float32, got {out[c].dtype}"
     assert out["ood_mahalanobis_score"].dtype == np.float32
     for c in (
-        "ood_disagreement_flag", "ood_joint_flag", "regime_b_flag",
-        "mode_ambiguous_flag", "mode_ambiguous_in_grid",
+        "ood_disagreement_flag",
+        "ood_joint_flag",
+        "regime_b_flag",
+        "mode_ambiguous_flag",
+        "mode_ambiguous_in_grid",
     ):
         assert out[c].dtype == bool, f"{c}: expected bool"
     assert out["selection_prob"].dtype == np.float32
@@ -386,7 +437,8 @@ def test_output_schema_columns_and_dtypes(
 
 
 def test_row_count_preservation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     env = _seed_fixture_env(tmp_path, n_rows=31)
     _install_stub_selection_function(monkeypatch)
@@ -408,7 +460,8 @@ def test_row_count_preservation(
 
 
 def test_provenance_sidecar_validity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     env = _seed_fixture_env(tmp_path, n_rows=12)
     _install_stub_selection_function(monkeypatch)
@@ -429,18 +482,33 @@ def test_provenance_sidecar_validity(
     assert sidecar.is_file()
     prov = json.loads(sidecar.read_text())
     required_keys = {
-        "output_file", "script", "timestamp_utc", "git_sha",
-        "device", "n_input_rows", "n_output_rows",
-        "input", "ensemble", "frozen_stats", "ood", "regime_b",
-        "mode_ambiguous", "selection_prob", "label_tiers",
-        "prior_augmented_release_notes", "columns",
+        "output_file",
+        "script",
+        "timestamp_utc",
+        "git_sha",
+        "device",
+        "n_input_rows",
+        "n_output_rows",
+        "input",
+        "ensemble",
+        "frozen_stats",
+        "ood",
+        "regime_b",
+        "mode_ambiguous",
+        "selection_prob",
+        "label_tiers",
+        "prior_augmented_release_notes",
+        "columns",
     }
     missing = required_keys - set(prov.keys())
     assert not missing, f"sidecar missing keys: {missing}"
     # Tier annotations: Option 2.
     assert prov["label_tiers"] == {
-        "teff": "T1", "logg": "T1-caveat", "mh": "T1",
-        "alpha_m": "T1", "mg_h": "T1",
+        "teff": "T1",
+        "logg": "T1-caveat",
+        "mh": "T1",
+        "alpha_m": "T1",
+        "mg_h": "T1",
     }
     # Release notes must contain the exact user-ratified statements.
     assert "2.4x improvement" in prov["prior_augmented_release_notes"]["teff"]
@@ -452,7 +520,8 @@ def test_provenance_sidecar_validity(
 
 
 def test_basis_fingerprint_mismatch_fails_fast_with_no_output(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Driver raises FrozenStatsMismatchError and leaves no partial output."""
     env = _seed_fixture_env(tmp_path, n_rows=12)
@@ -484,7 +553,8 @@ def test_basis_fingerprint_mismatch_fails_fast_with_no_output(
 
 
 def test_schema_detection_raw_inputs_apply_frozen_zscore(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An input with bp_c0_log/rp_c0_log is detected as raw and z-scored in."""
     env = _seed_fixture_env(tmp_path, n_rows=10)
@@ -522,7 +592,8 @@ def test_schema_detection_raw_inputs_apply_frozen_zscore(
 
 
 def test_zscored_inputs_bypass_frozen_zscore(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Already-z-scored inputs do NOT re-apply frozen z-score."""
     env = _seed_fixture_env(tmp_path, n_rows=10)
@@ -556,7 +627,8 @@ def test_zscored_inputs_bypass_frozen_zscore(
 
 
 def test_atomic_write_on_failure_leaves_no_partial_output(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """If writing the parquet raises mid-write, no tmp/leftover file survives."""
     env = _seed_fixture_env(tmp_path, n_rows=10)
@@ -582,13 +654,17 @@ def test_atomic_write_on_failure_leaves_no_partial_output(
             layout=env["layout"],
         )
     assert not env["output"].exists()
-    leftovers = [p for p in env["output"].parent.iterdir()
-                 if p.name.startswith(env["output"].name + ".") and p.name.endswith(".tmp")]
+    leftovers = [
+        p
+        for p in env["output"].parent.iterdir()
+        if p.name.startswith(env["output"].name + ".") and p.name.endswith(".tmp")
+    ]
     assert not leftovers, f"leftover tmp files: {leftovers}"
 
 
 def test_nonmatching_label_names_rejected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Wrong label set in checkpoint trips the 5-label guard."""
     env = _seed_fixture_env(tmp_path, n_rows=10)
@@ -603,17 +679,27 @@ def test_nonmatching_label_names_rejected(
         tier3=(),
     )
     bad_block_layout = CovarianceBlockLayout(
-        block_sizes=(2,), n_diagonal_only=1,
+        block_sizes=(2,),
+        n_diagonal_only=1,
         label_order_block=bad_tiers.all_labels,
         label_order_human=bad_tiers.all_labels,
     )
     torch.manual_seed(0)
-    model = XpAbundanceModel(ModelConfig(
-        input_dim=layout.input_dim, block_layout=bad_block_layout,
-        latent_dim=8, trunk_hidden=(16, 8), head_hidden=8, dropout=0.0,
-    ))
+    model = XpAbundanceModel(
+        ModelConfig(
+            input_dim=layout.input_dim,
+            block_layout=bad_block_layout,
+            latent_dim=8,
+            trunk_hidden=(16, 8),
+            head_hidden=8,
+            dropout=0.0,
+        )
+    )
     cfg = TrainingConfig(
-        latent_dim=8, trunk_hidden=(16, 8), head_hidden=8, dropout=0.0,
+        latent_dim=8,
+        trunk_hidden=(16, 8),
+        head_hidden=8,
+        dropout=0.0,
         use_c0_scalars=True,
     )
     Y_fit = np.random.default_rng(0).standard_normal((64, 3)).astype(np.float32)
@@ -621,8 +707,13 @@ def test_nonmatching_label_names_rejected(
     (ensemble_dir / "member_seed0").mkdir()
     save_checkpoint(
         ensemble_dir / "member_seed0" / "bad_seed0_best.pt",
-        model=model, log_temp=torch.tensor(0.0), cfg=cfg,
-        layout=layout, tiers=bad_tiers, label_scaler=scaler, seed=0,
+        model=model,
+        log_temp=torch.tensor(0.0),
+        cfg=cfg,
+        layout=layout,
+        tiers=bad_tiers,
+        label_scaler=scaler,
+        seed=0,
     )
     with pytest.raises(RuntimeError, match="5-label"):
         driver.run_inference(
@@ -641,7 +732,8 @@ def test_nonmatching_label_names_rejected(
 
 
 def test_raw_schema_mahalanobis_rate_plausible_on_training_like_input(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Regression test for the Phase-3b Mahalanobis-on-raw-schema bug.
 
@@ -672,7 +764,9 @@ def test_raw_schema_mahalanobis_rate_plausible_on_training_like_input(
     fingerprint = _build_hermite_basis()["fingerprint_sha256"]
     coef_mu, coef_sigma = 12.0, 2.0
     coef_block = {
-        "bp": {}, "rp": {}, "sigma_floor": 1e-20,
+        "bp": {},
+        "rp": {},
+        "sigma_floor": 1e-20,
         "n_reference_population": 200,
         "reference_population": "regression-fixture-nontrivial",
     }
@@ -680,18 +774,22 @@ def test_raw_schema_mahalanobis_rate_plausible_on_training_like_input(
         coef_block["bp"][str(i)] = {"mu": coef_mu, "sigma": coef_sigma}
         coef_block["rp"][str(i)] = {"mu": coef_mu, "sigma": coef_sigma}
     frozen_stats_path = tmp_path / "stream1.provenance.json"
-    frozen_stats_path.write_text(json.dumps({
-        "extra": {
-            "basis_fingerprint_sha256": fingerprint,
-            "c0_zscore_frozen": {
-                "bp": {"mu_log10": 0.0, "sigma_log10": 1.0},
-                "rp": {"mu_log10": 0.0, "sigma_log10": 1.0},
-                "n_reference_population": 200,
-                "reference_population": "regression-fixture-nontrivial",
-            },
-            "coef_norm_zscore_frozen": coef_block,
-        },
-    }))
+    frozen_stats_path.write_text(
+        json.dumps(
+            {
+                "extra": {
+                    "basis_fingerprint_sha256": fingerprint,
+                    "c0_zscore_frozen": {
+                        "bp": {"mu_log10": 0.0, "sigma_log10": 1.0},
+                        "rp": {"mu_log10": 0.0, "sigma_log10": 1.0},
+                        "n_reference_population": 200,
+                        "reference_population": "regression-fixture-nontrivial",
+                    },
+                    "coef_norm_zscore_frozen": coef_block,
+                },
+            }
+        )
+    )
 
     # Raw input drawn from N(coef_mu, coef_sigma) — post-z-score this is N(0, 1)
     n_rows = 80
@@ -704,10 +802,14 @@ def test_raw_schema_mahalanobis_rate_plausible_on_training_like_input(
     }
     for i in range(1, 55):
         data[f"bp_coef_norm_{i}"] = rng.normal(
-            coef_mu, coef_sigma, size=n_rows,
+            coef_mu,
+            coef_sigma,
+            size=n_rows,
         ).astype(np.float32)
         data[f"rp_coef_norm_{i}"] = rng.normal(
-            coef_mu, coef_sigma, size=n_rows,
+            coef_mu,
+            coef_sigma,
+            size=n_rows,
         ).astype(np.float32)
     for col in layout.aux_cols:
         data[col] = rng.standard_normal(n_rows).astype(np.float32)
@@ -722,9 +824,7 @@ def test_raw_schema_mahalanobis_rate_plausible_on_training_like_input(
     ood_rng = np.random.default_rng(2)
     n_ref = 300
     ood_cols = [*layout.bp_coef_cols, *layout.rp_coef_cols]
-    ood_df = pd.DataFrame({
-        c: ood_rng.standard_normal(n_ref).astype(np.float32) for c in ood_cols
-    })
+    ood_df = pd.DataFrame({c: ood_rng.standard_normal(n_ref).astype(np.float32) for c in ood_cols})
     ood_path = tmp_path / "ood_train.parquet"
     ood_df.to_parquet(ood_path, index=False)
 
@@ -750,9 +850,7 @@ def test_raw_schema_mahalanobis_rate_plausible_on_training_like_input(
     # (1) Mahalanobis scores must be finite on a clean raw input
     scores = out["ood_mahalanobis_score"].to_numpy()
     n_finite = int(np.isfinite(scores).sum())
-    assert n_finite == n_rows, (
-        f"expected all {n_rows} Mahalanobis scores finite, got {n_finite}"
-    )
+    assert n_finite == n_rows, f"expected all {n_rows} Mahalanobis scores finite, got {n_finite}"
 
     # (2) The regression bar: Mahalanobis distance median. With the z-score
     # applied, features ~ N(0, 1), match the z-scored OOD centroid, so the
@@ -788,6 +886,7 @@ def test_schema_detection_requires_one_c0_convention() -> None:
 # Aux-missingness flag tests + nan_to_num regression
 # ---------------------------------------------------------------------------
 
+
 def _seed_flag_fixture_env(tmp_path: Path, n_rows: int = 8) -> dict[str, Path]:
     """Variant of :func:`_seed_fixture_env` using :func:`_flag_layout`.
 
@@ -818,10 +917,14 @@ def _seed_flag_fixture_env(tmp_path: Path, n_rows: int = 8) -> dict[str, Path]:
     input_path = tmp_path / "input.parquet"
     input_df.to_parquet(input_path, index=False)
 
-    ood_df = pd.DataFrame({
-        **{c: np.random.default_rng(2).standard_normal(200).astype(np.float32)
-           for c in [*layout.bp_coef_cols, *layout.rp_coef_cols]},
-    })
+    ood_df = pd.DataFrame(
+        {
+            **{
+                c: np.random.default_rng(2).standard_normal(200).astype(np.float32)
+                for c in [*layout.bp_coef_cols, *layout.rp_coef_cols]
+            },
+        }
+    )
     ood_path = tmp_path / "ood_train.parquet"
     ood_df.to_parquet(ood_path, index=False)
 
@@ -876,7 +979,8 @@ def _run_with_injected_nans(
 
 
 def test_nan_to_num_regression_produces_finite_predictions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """One NaN per aux column, one row at a time — all predictions must be finite.
 
@@ -900,7 +1004,8 @@ def test_nan_to_num_regression_produces_finite_predictions(
 
 
 def test_ir_missing_flag_truth_table(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """ir_missing_flag is True iff any IR column is NaN for that row."""
     # Row 0: j_mag NaN; row 1: w2_mag NaN; row 2: all clean; row 3: j+h NaN.
@@ -921,7 +1026,8 @@ def test_ir_missing_flag_truth_table(
 
 
 def test_parallax_missing_flag_truth_table(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """parallax_missing_flag fires on NaN parallax, NaN error, or low S/N."""
     env = _seed_flag_fixture_env(tmp_path, n_rows=6)
@@ -969,7 +1075,8 @@ def test_parallax_missing_flag_truth_table(
 
 
 def test_extinction_missing_flag_requires_all_three(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """extinction_missing_flag trips only when ALL THREE A_V maps are NaN."""
     # Row 0: one A_V NaN -> False.
@@ -990,7 +1097,8 @@ def test_extinction_missing_flag_requires_all_three(
 
 
 def test_compound_aux_missing_any_is_logical_or(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """aux_missing_any == ir_missing OR parallax_missing OR extinction_missing."""
     # Row 0: IR only; row 1: parallax only; row 2: extinction only;
@@ -1021,7 +1129,8 @@ def test_compound_aux_missing_any_is_logical_or(
 
 
 def test_ood_joint_flag_independent_of_aux_missingness(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Setting all aux NaN (with clean XP) must NOT trip ood_joint_flag alone.
 
@@ -1062,9 +1171,7 @@ def test_ood_joint_flag_independent_of_aux_missingness(
     # (XP block is clean) — aux-missingness does not contaminate the
     # XP-distribution OOD metric.
     mahal = out["ood_mahalanobis_score"].iloc[0]
-    assert np.isfinite(mahal), (
-        f"Mahalanobis score contaminated by aux NaN: {mahal}"
-    )
+    assert np.isfinite(mahal), f"Mahalanobis score contaminated by aux NaN: {mahal}"
     # And the predictions for this row are finite (nan_to_num worked).
     for name in driver.LABEL_SHORT_NAMES:
         assert np.isfinite(out[f"{name}_pred"].iloc[0]), (
@@ -1074,7 +1181,8 @@ def test_ood_joint_flag_independent_of_aux_missingness(
 
 
 def test_output_schema_includes_aux_missingness_columns(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The four new flag columns are present with bool dtype."""
     env = _seed_flag_fixture_env(tmp_path, n_rows=6)
@@ -1104,7 +1212,8 @@ def test_output_schema_includes_aux_missingness_columns(
 
 
 def test_provenance_records_aux_missingness_definitions(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Sidecar carries the flag definitions, thresholds, rates, and counts."""
     env = _seed_flag_fixture_env(tmp_path, n_rows=6)
@@ -1129,8 +1238,10 @@ def test_provenance_records_aux_missingness_definitions(
     prov = json.loads(sidecar.read_text())
     aux = prov["aux_missingness"]
     assert set(aux["definitions"].keys()) == {
-        "ir_missing_flag", "parallax_missing_flag",
-        "extinction_missing_flag", "aux_missing_any",
+        "ir_missing_flag",
+        "parallax_missing_flag",
+        "extinction_missing_flag",
+        "aux_missing_any",
     }
     assert aux["definitions"]["ir_missing_flag"]["ir_cols"] == list(driver.IR_COLS)
     assert (

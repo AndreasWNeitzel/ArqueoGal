@@ -70,29 +70,44 @@ POSITION_COLS = ("ra_deg", "dec_deg")
 """Equatorial coordinates from DR19 (ASPCAP cross-match positions)."""
 
 ASTROMETRY_COLS = (
-    "parallax_mas", "parallax_err_mas",
-    "pmra_mas_yr", "pmra_err_mas_yr",
-    "pmdec_mas_yr", "pmdec_err_mas_yr",
+    "parallax_mas",
+    "parallax_err_mas",
+    "pmra_mas_yr",
+    "pmra_err_mas_yr",
+    "pmdec_mas_yr",
+    "pmdec_err_mas_yr",
 )
 """Gaia DR3 astrometry propagated into DR19 (``plx``, ``pmra``, ``pmde`` + errs).
 Zero-point correction and G-mag correction still happen in :mod:`gaia_corrections`."""
 
 PHOTOMETRY_COLS = (
-    "g_mag", "bp_mag", "rp_mag",
-    "j_mag", "e_j_mag",
-    "h_mag", "e_h_mag",
-    "k_mag", "e_k_mag",
-    "w1_mag", "e_w1_mag",
-    "w2_mag", "e_w2_mag",
+    "g_mag",
+    "bp_mag",
+    "rp_mag",
+    "j_mag",
+    "e_j_mag",
+    "h_mag",
+    "e_h_mag",
+    "k_mag",
+    "e_k_mag",
+    "w1_mag",
+    "e_w1_mag",
+    "w2_mag",
+    "e_w2_mag",
 )
 """Gaia DR3 + 2MASS + WISE photometry as ingested by Astra (DR19)."""
 
 DUST_FROM_DR19_COLS = (
-    "ebv", "e_ebv",
-    "ebv_edenhofer_2023", "e_ebv_edenhofer_2023",
-    "ebv_bayestar_2019", "e_ebv_bayestar_2019",
-    "ebv_zhang_2023", "e_ebv_zhang_2023",
-    "ebv_sfd", "e_ebv_sfd",
+    "ebv",
+    "e_ebv",
+    "ebv_edenhofer_2023",
+    "e_ebv_edenhofer_2023",
+    "ebv_bayestar_2019",
+    "e_ebv_bayestar_2019",
+    "ebv_zhang_2023",
+    "e_ebv_zhang_2023",
+    "ebv_sfd",
+    "e_ebv_sfd",
 )
 """Per-star 3D + 2D dust values pre-baked into DR19.
 
@@ -111,32 +126,61 @@ subsample) still needs an external 3D dust map since those stars were not
 observed by APOGEE."""
 
 BJ_DISTANCE_COLS = (
-    "r_med_photogeo", "r_lo_photogeo", "r_hi_photogeo",
-    "r_med_geo", "r_lo_geo", "r_hi_geo",
+    "r_med_photogeo",
+    "r_lo_photogeo",
+    "r_hi_photogeo",
+    "r_med_geo",
+    "r_lo_geo",
+    "r_hi_geo",
 )
 """Bailer-Jones+2021 distances pre-joined into DR19. Same values as the
 GAVO ``gedr3dist.main`` fetch — handy as an independent cross-check."""
 
 ATMOS_COLS = (
-    "teff", "e_teff",
-    "logg", "e_logg",
-    "m_h_atm", "e_m_h_atm",
-    "alpha_m_atm", "e_alpha_m_atm",
-    "vsini", "vmicro",
+    "teff",
+    "e_teff",
+    "logg",
+    "e_logg",
+    "m_h_atm",
+    "e_m_h_atm",
+    "alpha_m_atm",
+    "e_alpha_m_atm",
+    "vsini",
+    "vmicro",
 )
 """Atmospheric parameters. DR19 does not publish macroturbulence (``vmacro``)."""
 
 ABUNDANCE_ELEMENTS = (
-    "c", "n", "o", "na", "mg", "al", "si", "s", "k",
-    "ca", "ti", "v", "cr", "mn", "fe", "ni", "ce",
+    "c",
+    "n",
+    "o",
+    "na",
+    "mg",
+    "al",
+    "si",
+    "s",
+    "k",
+    "ca",
+    "ti",
+    "v",
+    "cr",
+    "mn",
+    "fe",
+    "ni",
+    "ce",
 )
 """[X/H] abundances kept from DR19 (calibrated). DR19 names them ``{el}_h``;
 we expose them downstream as ``{el}_h_atm`` to match data_acquisition.md §3.2."""
 
 FLAG_COLS = (
-    "flag_bad", "flag_warn",
-    "snr", "result_flags", "initial_flags", "calibrated_flags",
-    "vhelio_avg", "vhelio_err",
+    "flag_bad",
+    "flag_warn",
+    "snr",
+    "result_flags",
+    "initial_flags",
+    "calibrated_flags",
+    "vhelio_avg",
+    "vhelio_err",
 )
 """DR19 quality flags and radial velocity. ``flag_bad``, ``flag_warn``,
 ``result_flags``, ``initial_flags``, ``calibrated_flags`` are bitmasks."""
@@ -298,13 +342,11 @@ def load_dr19(
             df["n_fe"] = df["n_h_atm"].astype(np.float64) - df["fe_h_atm"].astype(np.float64)
         elif col == "e_c_fe":
             df["e_c_fe"] = np.sqrt(
-                df["e_c_h_atm"].astype(np.float64) ** 2
-                + df["e_fe_h_atm"].astype(np.float64) ** 2
+                df["e_c_h_atm"].astype(np.float64) ** 2 + df["e_fe_h_atm"].astype(np.float64) ** 2
             )
         elif col == "e_n_fe":
             df["e_n_fe"] = np.sqrt(
-                df["e_n_h_atm"].astype(np.float64) ** 2
-                + df["e_fe_h_atm"].astype(np.float64) ** 2
+                df["e_n_h_atm"].astype(np.float64) ** 2 + df["e_fe_h_atm"].astype(np.float64) ** 2
             )
 
     # Reorder to requested column order.
@@ -380,20 +422,20 @@ MESZAROS2025_LOGG_MAX = 3.8
 # Mészáros+2025 Table 3 so they receive no correction here.
 MESZAROS2025_COEFFS: dict[str, tuple[float, float, float, float]] = {
     # canonical column → (a, b, offset_hot_Teff>6000, offset_cold_Teff<3500)
-    "alpha_m_atm": (-2.2918e-5, 0.0861,  -0.0514,  0.0059),
-    "o_h_atm":     (-4.0909e-5, 0.1651,  -0.0804,  0.0219),
-    "na_h_atm":    (-8.2173e-5, 0.4586,  -0.0344,  0.1710),
-    "mg_h_atm":    (-4.3932e-5, 0.1733,  -0.0903,  0.0195),
-    "al_h_atm":    ( 3.0850e-5, -0.1734,  0.0117, -0.0654),
-    "si_h_atm":    ( 1.1688e-5, -0.0594,  0.0107, -0.0185),
-    "s_h_atm":     (-1.0886e-6, 0.0214,   0.0149,  0.0176),
-    "k_h_atm":     (-7.0765e-5, 0.3220,  -0.1026,  0.0743),
-    "ca_h_atm":    ( 5.4495e-5, -0.2832,  0.0438, -0.0925),
-    "ti_h_atm":    (-1.1466e-4, 0.5137,  -0.1743,  0.1124),
-    "cr_h_atm":    (-6.4991e-6, 0.0099,  -0.0291, -0.0128),
-    "mn_h_atm":    (-1.0168e-4, 0.4999,  -0.1102,  0.1440),
-    "ni_h_atm":    (-2.3203e-5, 0.0806,  -0.0586, -0.0006),
-    "ce_h_atm":    ( 1.3833e-4, -0.5431,  0.2869, -0.0589),
+    "alpha_m_atm": (-2.2918e-5, 0.0861, -0.0514, 0.0059),
+    "o_h_atm": (-4.0909e-5, 0.1651, -0.0804, 0.0219),
+    "na_h_atm": (-8.2173e-5, 0.4586, -0.0344, 0.1710),
+    "mg_h_atm": (-4.3932e-5, 0.1733, -0.0903, 0.0195),
+    "al_h_atm": (3.0850e-5, -0.1734, 0.0117, -0.0654),
+    "si_h_atm": (1.1688e-5, -0.0594, 0.0107, -0.0185),
+    "s_h_atm": (-1.0886e-6, 0.0214, 0.0149, 0.0176),
+    "k_h_atm": (-7.0765e-5, 0.3220, -0.1026, 0.0743),
+    "ca_h_atm": (5.4495e-5, -0.2832, 0.0438, -0.0925),
+    "ti_h_atm": (-1.1466e-4, 0.5137, -0.1743, 0.1124),
+    "cr_h_atm": (-6.4991e-6, 0.0099, -0.0291, -0.0128),
+    "mn_h_atm": (-1.0168e-4, 0.4999, -0.1102, 0.1440),
+    "ni_h_atm": (-2.3203e-5, 0.0806, -0.0586, -0.0006),
+    "ce_h_atm": (1.3833e-4, -0.5431, 0.2869, -0.0589),
 }
 
 
@@ -446,9 +488,7 @@ def apply_meszaros2025_corrections(
     """
     required = {"teff", "logg"}
     if not required.issubset(df.columns):
-        raise KeyError(
-            f"apply_meszaros2025_corrections requires columns {sorted(required)}"
-        )
+        raise KeyError(f"apply_meszaros2025_corrections requires columns {sorted(required)}")
 
     out = df.copy()
     teff = out["teff"].to_numpy(dtype=np.float64, copy=False)

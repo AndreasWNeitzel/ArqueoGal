@@ -68,6 +68,7 @@ S3_ROW_CHUNK_DEFAULT: int = 50_000  # rows per Stream-3 assemble+encode+kNN pass
 
 # --- schema detection (mirrors scripts/run_pipeline1_inference.py) ------------
 
+
 def _detect_schema(cols: set[str]) -> str:
     has_z = "bp_c0_z" in cols and "rp_c0_z" in cols
     has_log = "bp_c0_log" in cols and "rp_c0_log" in cols
@@ -81,7 +82,10 @@ def _detect_schema(cols: set[str]) -> str:
 
 
 def _assemble_features(
-    df: pd.DataFrame, layout: FeatureLayout, stats, schema: str,
+    df: pd.DataFrame,
+    layout: FeatureLayout,
+    stats,
+    schema: str,
 ) -> np.ndarray:
     """Build the (N, input_dim) feature matrix in layout order.
 
@@ -106,7 +110,11 @@ def _assemble_features(
         bp_c0_log = df["bp_c0_log"].to_numpy(dtype=np.float64)
         rp_c0_log = df["rp_c0_log"].to_numpy(dtype=np.float64)
         bp_z, rp_z, bp_c0_z, rp_c0_z = apply_frozen_zscore(
-            bp_full, rp_full, bp_c0_log, rp_c0_log, stats,
+            bp_full,
+            rp_full,
+            bp_c0_log,
+            rp_c0_log,
+            stats,
         )
         bp_idx = {int(c.removeprefix("bp_coef_norm_")): k for k, c in enumerate(bp_all)}
         rp_idx = {int(c.removeprefix("rp_coef_norm_")): k for k, c in enumerate(rp_all)}
@@ -134,9 +142,13 @@ def _assemble_features(
 
 # --- embedding -----------------------------------------------------------------
 
+
 @torch.no_grad()
 def _encode(
-    X: np.ndarray, model, device: torch.device, batch: int = 8192,
+    X: np.ndarray,
+    model,
+    device: torch.device,
+    batch: int = 8192,
 ) -> np.ndarray:
     """Push rows of ``X`` through ``model.encoder`` → trunk latent ``h``.
 
@@ -150,9 +162,9 @@ def _encode(
     n, _ = X.shape
     out = np.empty((n, model.config.latent_dim), dtype=np.float32)
     for i in range(0, n, batch):
-        xb = torch.as_tensor(X[i:i + batch], device=device)
+        xb = torch.as_tensor(X[i : i + batch], device=device)
         h, _z = model.encoder(xb)
-        out[i:i + batch] = h.cpu().numpy()
+        out[i : i + batch] = h.cpu().numpy()
     return out
 
 
@@ -162,14 +174,17 @@ def _filter_finite_rows(H: np.ndarray, tag: str) -> tuple[np.ndarray, np.ndarray
     n_bad = int((~mask).sum())
     if n_bad:
         _LOG.warning(
-            "%s: %d / %d rows (%.3f%%) have non-finite latents — "
-            "dropping from reference",
-            tag, n_bad, len(H), 100.0 * n_bad / len(H),
+            "%s: %d / %d rows (%.3f%%) have non-finite latents — dropping from reference",
+            tag,
+            n_bad,
+            len(H),
+            100.0 * n_bad / len(H),
         )
     return H[mask], mask
 
 
 # --- kNN distance -------------------------------------------------------------
+
 
 @torch.no_grad()
 def _knn_mean_distance(
@@ -189,7 +204,7 @@ def _knn_mean_distance(
     n = H_query.shape[0]
     out = np.empty(n, dtype=np.float32)
     for i in range(0, n, chunk):
-        q_np = H_query[i:i + chunk]
+        q_np = H_query[i : i + chunk]
         q = torch.as_tensor(q_np, device=device, dtype=torch.float32)
         # Manual squared-Euclidean via (a-b)² = ‖a‖² - 2 a·b + ‖b‖², with
         # clamp to ≥0 before sqrt. torch.cdist's mm-accelerated default can
@@ -204,7 +219,7 @@ def _knn_mean_distance(
         # as +inf (guaranteed OOD).
         d = torch.where(torch.isnan(d), torch.full_like(d, float("inf")), d)
         dk, _ = torch.topk(d, k=k, dim=1, largest=False)
-        out[i:i + chunk] = dk.mean(dim=1).cpu().numpy()
+        out[i : i + chunk] = dk.mean(dim=1).cpu().numpy()
     return out
 
 
@@ -216,6 +231,7 @@ def _free_cuda() -> None:
 
 # --- provenance --------------------------------------------------------------
 
+
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -226,10 +242,14 @@ def _sha256(path: Path) -> str:
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "nogit"
 
@@ -252,21 +272,31 @@ class GateRun:
 
 # --- main --------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train-features", type=Path, required=True)
     parser.add_argument("--stream3-features", type=Path, required=True)
-    parser.add_argument("--checkpoint", type=Path, required=True,
-                        help="single ensemble-member checkpoint (.pt)")
+    parser.add_argument(
+        "--checkpoint", type=Path, required=True, help="single ensemble-member checkpoint (.pt)"
+    )
     parser.add_argument("--frozen-stats", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--k", type=int, default=KNN_K_DEFAULT)
     parser.add_argument("--threshold-quantile", type=float, default=THRESHOLD_QUANTILE_DEFAULT)
     parser.add_argument("--chunk", type=int, default=QUERY_CHUNK_DEFAULT)
-    parser.add_argument("--s3-row-chunk", type=int, default=S3_ROW_CHUNK_DEFAULT,
-                        help="Stream-3 rows processed per assemble+encode+kNN pass")
-    parser.add_argument("--split-seed", type=int, default=0,
-                        help="must match the TrainingConfig.split_seed used at training")
+    parser.add_argument(
+        "--s3-row-chunk",
+        type=int,
+        default=S3_ROW_CHUNK_DEFAULT,
+        help="Stream-3 rows processed per assemble+encode+kNN pass",
+    )
+    parser.add_argument(
+        "--split-seed",
+        type=int,
+        default=0,
+        help="must match the TrainingConfig.split_seed used at training",
+    )
     parser.add_argument("--val-frac", type=float, default=0.15)
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args()
@@ -304,8 +334,12 @@ def main() -> None:
     split_ids = stratified_split_ids(df_s1, fracs=fracs, seed=args.split_seed)
     train_ids = set(int(x) for x in split_ids["train"])
     val_ids = set(int(x) for x in split_ids["val"])
-    _LOG.info("  train=%d val=%d test=%d",
-              len(split_ids["train"]), len(split_ids["val"]), len(split_ids["test"]))
+    _LOG.info(
+        "  train=%d val=%d test=%d",
+        len(split_ids["train"]),
+        len(split_ids["val"]),
+        len(split_ids["test"]),
+    )
 
     df_s1_train = df_s1[df_s1["source_id"].isin(train_ids)].reset_index(drop=True)
     df_s1_val = df_s1[df_s1["source_id"].isin(val_ids)].reset_index(drop=True)
@@ -316,8 +350,7 @@ def main() -> None:
     X_train = _assemble_features(df_s1_train, layout, stats, schema_s1)
     H_train_raw = _encode(X_train, model, device)
     H_train, _train_finite = _filter_finite_rows(H_train_raw, "H_train")
-    _LOG.info("  H_train shape=%s (%d dropped)",
-              H_train.shape, len(H_train_raw) - len(H_train))
+    _LOG.info("  H_train shape=%s (%d dropped)", H_train.shape, len(H_train_raw) - len(H_train))
 
     # --- Encode val split -----------------------------------------------------
     _LOG.info("assembling + encoding Stream-1 val ...")
@@ -331,14 +364,20 @@ def main() -> None:
 
     _LOG.info("kNN (k=%d) val → train ...", args.k)
     d_val = _knn_mean_distance(
-        H_val, ref, ref_sq, k=args.k, chunk=args.chunk, device=device,
+        H_val,
+        ref,
+        ref_sq,
+        k=args.k,
+        chunk=args.chunk,
+        device=device,
     )
     d_val_finite = d_val[np.isfinite(d_val)]
     tau = float(np.quantile(d_val_finite, args.threshold_quantile))
     val_stats = {
         "n": int(len(d_val)),
         "n_finite": int(len(d_val_finite)),
-        "median": float(np.median(d_val_finite)), "mean": float(np.mean(d_val_finite)),
+        "median": float(np.median(d_val_finite)),
+        "mean": float(np.mean(d_val_finite)),
         "std": float(np.std(d_val_finite)),
         "p50": float(np.quantile(d_val_finite, 0.50)),
         "p95": float(np.quantile(d_val_finite, 0.95)),
@@ -367,9 +406,7 @@ def main() -> None:
     _LOG.info("  Stream-3 schema: %s", schema_s3)
 
     source_ids_s3 = df_s3["source_id"].to_numpy()
-    sample_col = (
-        df_s3["sample"].to_numpy() if "sample" in df_s3.columns else None
-    )
+    sample_col = df_s3["sample"].to_numpy() if "sample" in df_s3.columns else None
 
     _LOG.info(
         "assemble+encode+kNN Stream-3 in row-chunks (size=%d) ...",
@@ -382,13 +419,20 @@ def main() -> None:
         X_chunk = _assemble_features(df_chunk, layout, stats, schema_s3)
         H_chunk = _encode(X_chunk, model, device)
         d_s3[i:j] = _knn_mean_distance(
-            H_chunk, ref, ref_sq, k=args.k, chunk=args.chunk, device=device,
+            H_chunk,
+            ref,
+            ref_sq,
+            k=args.k,
+            chunk=args.chunk,
+            device=device,
         )
         del X_chunk, H_chunk, df_chunk
         _free_cuda()
         _LOG.info(
             "  [%d/%d] chunk rows=%d d_med=%.3f flag_rate=%.4f",
-            j, n_s3, j - i,
+            j,
+            n_s3,
+            j - i,
             float(np.median(d_s3[i:j][np.isfinite(d_s3[i:j])])),
             float((d_s3[i:j] > tau).mean()),
         )

@@ -82,9 +82,7 @@ def test_fetch_dr2_neighbourhood_batches(monkeypatch: pytest.MonkeyPatch) -> Non
         return _fake_nbh_table([(d, d * 10, 50.0, 0.01) for d in ids])
 
     monkeypatch.setattr(tap_mod, "run_async", fake_async)
-    monkeypatch.setattr(
-        tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire")
-    )
+    monkeypatch.setattr(tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire"))
 
     service = MagicMock(spec=TAPService)
     out = fetch_dr2_neighbourhood(service, [1, 2, 3, 4, 5], batch_size=2)

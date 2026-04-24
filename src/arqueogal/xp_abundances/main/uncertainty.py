@@ -74,8 +74,9 @@ class CalibrationArtifacts:
             for k, v in self.isotonic_per_label.items()
         }
         return {
-            "temperature_per_cell": {int(k): float(v)
-                                     for k, v in self.temperature_per_cell.items()},
+            "temperature_per_cell": {
+                int(k): float(v) for k, v in self.temperature_per_cell.items()
+            },
             "isotonic_per_label": iso_serialisable,
             "conformal_scores": self.conformal_scores.astype(np.float32),
             "cell_definition": dict(self.cell_definition),
@@ -83,6 +84,7 @@ class CalibrationArtifacts:
 
 
 # --- Prediction collection ---------------------------------------------------
+
 
 def collect_predictions(
     model: nn.Module,
@@ -124,6 +126,7 @@ def collect_predictions(
 
 
 # --- Cell binning ------------------------------------------------------------
+
 
 def bin_by_cells(
     features: np.ndarray,
@@ -171,11 +174,13 @@ def bin_by_cells(
 
 # --- Temperature scaling -----------------------------------------------------
 
+
 def _mahalanobis_per_star(mu: np.ndarray, L: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Per-star Mahalanobis distance ``||y-μ||²_Σ⁻¹``. Numpy triangular solve."""
     diff = (y - mu)[..., None]  # (B, n, 1)
     # Solve L z = diff for z; then mahal = ||z||². Use scipy's solve_triangular.
     from scipy.linalg import solve_triangular
+
     mahal = np.empty(mu.shape[0], dtype=np.float64)
     for b in range(mu.shape[0]):
         z = solve_triangular(L[b], diff[b], lower=True)
@@ -184,7 +189,10 @@ def _mahalanobis_per_star(mu: np.ndarray, L: np.ndarray, y: np.ndarray) -> np.nd
 
 
 def temperature_scaling_per_cell(
-    mu: np.ndarray, L: np.ndarray, y: np.ndarray, cell_ids: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
+    y: np.ndarray,
+    cell_ids: np.ndarray,
 ) -> dict[int, float]:
     """MLE temperature ``s`` per cell on the Cholesky factor.
 
@@ -208,6 +216,7 @@ def temperature_scaling_per_cell(
 
 
 # --- Shrunken per-cell-per-label scaling --------------------------------------
+
 
 def shrunken_per_cell_per_label_scale(  # noqa: PLR0913
     mu: np.ndarray,
@@ -320,6 +329,7 @@ def shrunken_per_cell_per_label_scale(  # noqa: PLR0913
 
 # --- GP-smoothed per-label scaling -------------------------------------------
 
+
 @dataclass
 class GpAlphaBundle:
     """Serialisable bundle of per-label GP α-smoothing artefacts.
@@ -369,11 +379,9 @@ class GpAlphaBundle:
 
 
 def _make_gp(length_scale: float, constant: float, noise: float) -> GaussianProcessRegressor:
-    kernel = (
-        ConstantKernel(constant, constant_value_bounds=(1e-3, 1e2))
-        * RBF(length_scale=length_scale, length_scale_bounds=(1e-1, 1e2))
-        + WhiteKernel(noise_level=noise, noise_level_bounds=(1e-6, 1e1))
-    )
+    kernel = ConstantKernel(constant, constant_value_bounds=(1e-3, 1e2)) * RBF(
+        length_scale=length_scale, length_scale_bounds=(1e-1, 1e2)
+    ) + WhiteKernel(noise_level=noise, noise_level_bounds=(1e-6, 1e1))
     return GaussianProcessRegressor(
         kernel=kernel,
         normalize_y=False,
@@ -499,10 +507,7 @@ def gp_smoothed_per_cell_per_label_scale(  # noqa: PLR0913, PLR0915
 
     # Training set for the GP: cells with n >= min_cell_stars_for_training
     # AND finite α per the label under consideration. Selection per label.
-    train_cell_ids = [
-        c for c in raw_alpha_per_cell
-        if cell_sizes[c] >= min_cell_stars_for_training
-    ]
+    train_cell_ids = [c for c in raw_alpha_per_cell if cell_sizes[c] >= min_cell_stars_for_training]
     if not train_cell_ids:
         raise RuntimeError(
             "no cells pass min_cell_stars_for_training — GP fit requires "
@@ -528,30 +533,40 @@ def gp_smoothed_per_cell_per_label_scale(  # noqa: PLR0913, PLR0915
     all_cell_list = sorted(cell_centers.keys())
     all_centers = (
         np.vstack([cell_centers[c] for c in all_cell_list])
-        if all_cell_list else np.zeros((0, n_feat))
+        if all_cell_list
+        else np.zeros((0, n_feat))
     )
     # α at each cell center, per label. Cells without a valid center
     # (n_c < min_cell_stars) fall back to global_alpha below.
-    alpha_per_cell_center: dict[int, np.ndarray] = {
-        c: global_alpha.copy() for c in all_cell_list
-    }
+    alpha_per_cell_center: dict[int, np.ndarray] = {c: global_alpha.copy() for c in all_cell_list}
 
     for j in range(n_labels):
         tgt_raw = train_alpha[:, j]
         finite = np.isfinite(tgt_raw)
         if finite.sum() < 4:
-            kernel_params.append({"length_scale": float("nan"),
-                                  "constant": float("nan"),
-                                  "noise_level": float("nan")})
-            training_diagnostics.append({
-                "n_train_cells": int(finite.sum()),
-                "length_scale": None, "constant": None, "noise_level": None,
-                "train_log_alpha_rmse": None,
-            })
-            log_alpha_targets[:, j] = np.log(np.clip(
-                np.where(finite, tgt_raw, global_alpha[j]),
-                alpha_floor, alpha_ceiling,
-            ))
+            kernel_params.append(
+                {
+                    "length_scale": float("nan"),
+                    "constant": float("nan"),
+                    "noise_level": float("nan"),
+                }
+            )
+            training_diagnostics.append(
+                {
+                    "n_train_cells": int(finite.sum()),
+                    "length_scale": None,
+                    "constant": None,
+                    "noise_level": None,
+                    "train_log_alpha_rmse": None,
+                }
+            )
+            log_alpha_targets[:, j] = np.log(
+                np.clip(
+                    np.where(finite, tgt_raw, global_alpha[j]),
+                    alpha_floor,
+                    alpha_ceiling,
+                )
+            )
             for c in all_cell_list:
                 alpha_per_cell_center[c][j] = float(global_alpha[j])
             continue
@@ -567,9 +582,13 @@ def gp_smoothed_per_cell_per_label_scale(  # noqa: PLR0913, PLR0915
 
         if len(all_cell_list) > 0:
             log_alpha_cells = gp.predict(all_centers) + global_log_alpha[j]
-            alpha_cells = np.exp(np.clip(
-                log_alpha_cells, np.log(alpha_floor), np.log(alpha_ceiling),
-            ))
+            alpha_cells = np.exp(
+                np.clip(
+                    log_alpha_cells,
+                    np.log(alpha_floor),
+                    np.log(alpha_ceiling),
+                )
+            )
             for c, a in zip(all_cell_list, alpha_cells):
                 alpha_per_cell_center[int(c)][j] = float(a)
 
@@ -578,24 +597,30 @@ def gp_smoothed_per_cell_per_label_scale(  # noqa: PLR0913, PLR0915
         const_val = float(theta["k1__k1__constant_value"])
         length_val = float(theta["k1__k2__length_scale"])
         noise_val = float(theta["k2__noise_level"])
-        kernel_params.append({"constant": const_val, "length_scale": length_val,
-                              "noise_level": noise_val})
+        kernel_params.append(
+            {"constant": const_val, "length_scale": length_val, "noise_level": noise_val}
+        )
 
         # Training RMSE (in log-α space).
         y_pred_train = gp.predict(X_train) + global_log_alpha[j]
         train_rmse = float(np.sqrt(np.mean((y_pred_train - y_train) ** 2)))
-        training_diagnostics.append({
-            "n_train_cells": int(finite.sum()),
-            "constant": const_val,
-            "length_scale": length_val,
-            "noise_level": noise_val,
-            "train_log_alpha_rmse": train_rmse,
-        })
+        training_diagnostics.append(
+            {
+                "n_train_cells": int(finite.sum()),
+                "constant": const_val,
+                "length_scale": length_val,
+                "noise_level": noise_val,
+                "train_log_alpha_rmse": train_rmse,
+            }
+        )
         # Fill per-cell log α target array (include all cells; NaN imputed).
-        log_alpha_targets[:, j] = np.log(np.clip(
-            np.where(np.isfinite(tgt_raw), tgt_raw, global_alpha[j]),
-            alpha_floor, alpha_ceiling,
-        ))
+        log_alpha_targets[:, j] = np.log(
+            np.clip(
+                np.where(np.isfinite(tgt_raw), tgt_raw, global_alpha[j]),
+                alpha_floor,
+                alpha_ceiling,
+            )
+        )
 
     # Broadcast per-star α from cell-center predictions. Stars in cells
     # without a valid center fall back to the global per-label α.
@@ -619,9 +644,11 @@ def gp_smoothed_per_cell_per_label_scale(  # noqa: PLR0913, PLR0915
         feature_mean=feat_mean.astype(np.float64),
         feature_scale=feat_scale.astype(np.float64),
         cell_centers=train_centers.astype(np.float64),
-        log_alpha_targets=log_alpha_targets[
-            [i for i, c in enumerate(train_cell_ids)]
-        ].astype(np.float64) if len(train_cell_ids) else np.zeros((0, n_labels)),
+        log_alpha_targets=log_alpha_targets[[i for i, c in enumerate(train_cell_ids)]].astype(
+            np.float64
+        )
+        if len(train_cell_ids)
+        else np.zeros((0, n_labels)),
         log_alpha_noise=log_alpha_noise.astype(np.float64),
         kernel_params=kernel_params,
         global_log_alpha=global_log_alpha.astype(np.float64),
@@ -654,7 +681,9 @@ def apply_gp_alpha(
     if features.ndim != 2:
         raise ValueError(f"features must be 2D, got {features.shape}")
     feats_std = (features - bundle.feature_mean) / np.where(
-        bundle.feature_scale > _EPS, bundle.feature_scale, 1.0,
+        bundle.feature_scale > _EPS,
+        bundle.feature_scale,
+        1.0,
     )
     row_ok = np.isfinite(feats_std).all(axis=1)
 
@@ -669,18 +698,23 @@ def apply_gp_alpha(
             out[:, j] = global_alpha[j]
             continue
         gp = _make_gp(
-            length_scale=kp["length_scale"], constant=kp["constant"],
+            length_scale=kp["length_scale"],
+            constant=kp["constant"],
             noise=kp["noise_level"],
         )
         y_train = bundle.log_alpha_targets[:, j] - bundle.global_log_alpha[j]
-        gp.alpha = bundle.log_alpha_noise ** 2
+        gp.alpha = bundle.log_alpha_noise**2
         gp.fit(bundle.cell_centers, y_train)
         alpha = np.full(n_stars, global_alpha[j], dtype=np.float64)
         if row_ok.any():
             log_alpha = gp.predict(feats_std[row_ok]) + bundle.global_log_alpha[j]
-            alpha_ok = np.exp(np.clip(
-                log_alpha, np.log(bundle.alpha_floor), np.log(bundle.alpha_ceiling),
-            ))
+            alpha_ok = np.exp(
+                np.clip(
+                    log_alpha,
+                    np.log(bundle.alpha_floor),
+                    np.log(bundle.alpha_ceiling),
+                )
+            )
             alpha[row_ok] = alpha_ok
         out[:, j] = alpha
 
@@ -688,6 +722,7 @@ def apply_gp_alpha(
 
 
 # --- Release-gate exclusion envelopes ----------------------------------------
+
 
 @dataclass
 class RegimeBEnvelope:
@@ -738,9 +773,11 @@ class RegimeBEnvelope:
         return ~self.mask(teff_pred, logg_pred, b_deg)
 
     def to_dict(self) -> dict[str, float]:
-        return {"b_deg_max": self.b_deg_max,
-                "teff_k_min": self.teff_k_min,
-                "logg_dex_max": self.logg_dex_max}
+        return {
+            "b_deg_max": self.b_deg_max,
+            "teff_k_min": self.teff_k_min,
+            "logg_dex_max": self.logg_dex_max,
+        }
 
     @classmethod
     def from_dict(cls, blob: dict[str, float]) -> "RegimeBEnvelope":
@@ -753,8 +790,11 @@ class RegimeBEnvelope:
 
 # --- Isotonic per-label ------------------------------------------------------
 
+
 def isotonic_per_label(
-    mu: np.ndarray, L: np.ndarray, y: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
+    y: np.ndarray,
 ) -> dict[int, dict[str, np.ndarray]]:
     """Fit per-label isotonic CDF remaps on standardised residuals.
 
@@ -784,8 +824,11 @@ def isotonic_per_label(
 
 # --- Coverage ----------------------------------------------------------------
 
+
 def coverage_at_levels(
-    mu: np.ndarray, L: np.ndarray, y: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
+    y: np.ndarray,
     levels: tuple[float, ...] = _DEFAULT_LEVELS,
 ) -> dict[str, dict[float, float | np.ndarray]]:
     """Empirical coverage for per-label and joint (Mahalanobis) intervals.
@@ -812,8 +855,11 @@ def coverage_at_levels(
 
 # --- Conformal ---------------------------------------------------------------
 
+
 def conformal_nonconformity_scores(
-    mu: np.ndarray, L: np.ndarray, y: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
+    y: np.ndarray,
 ) -> np.ndarray:
     """Split-conformal scores: Mahalanobis distance per star (``sqrt`` scale).
 
@@ -828,8 +874,11 @@ def conformal_nonconformity_scores(
 
 # --- Orchestration -----------------------------------------------------------
 
+
 def fit_calibration(  # noqa: PLR0913 — orchestrator with distinct knobs
-    mu: np.ndarray, L: np.ndarray, y: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
+    y: np.ndarray,
     *,
     cell_features: np.ndarray | None = None,
     cell_n_bins: tuple[int, ...] = (4, 4, 4),
@@ -860,7 +909,8 @@ def fit_calibration(  # noqa: PLR0913 — orchestrator with distinct knobs
 
 
 def apply_calibration(
-    mu: np.ndarray, L: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
     art: CalibrationArtifacts,
     *,
     cell_ids: np.ndarray | None = None,

@@ -8,6 +8,7 @@ evolution) were removed on 2026-04-22 when population classification moved
 to the Starfold repository. Historical renders live under
 ``reports/gallery/archive/``.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -32,10 +33,12 @@ def main() -> None:
         try:
             mod = importlib.import_module(m)
             mod.main()
-            print(f"[ok]  {m}  ({time.time()-t0:.1f}s)")
-        except Exception as exc:   # noqa: BLE001
+            print(f"[ok]  {m}  ({time.time() - t0:.1f}s)")
+        except Exception as exc:  # noqa: BLE001
             print(f"[FAIL]  {m}: {type(exc).__name__}: {exc}")
-            import traceback; traceback.print_exc()
+            import traceback
+
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

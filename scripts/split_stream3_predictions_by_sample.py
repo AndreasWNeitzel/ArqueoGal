@@ -72,7 +72,9 @@ def main() -> None:
         logger.warning(
             "join shrank predictions: %d → %d (loss=%d); one or more source_ids "
             "missing the sample column",
-            len(df_pred), len(df), len(df_pred) - len(df),
+            len(df_pred),
+            len(df),
+            len(df_pred) - len(df),
         )
 
     counts = df["sample"].value_counts().to_dict()
@@ -94,7 +96,10 @@ def main() -> None:
         pred_nan = float(arm["teff_pred"].isna().mean())
         logger.info(
             "  halt diagnostics: OOD=%.4f  RegimeB=%.4f  aux_missing=%.4f  pred_NaN=%.4f",
-            ood, rgb, aux, pred_nan,
+            ood,
+            rgb,
+            aux,
+            pred_nan,
         )
 
         sidecar = {

@@ -115,7 +115,9 @@ def _layout_from_input_dim(input_dim: int) -> FeatureLayout:
 
 
 def _predict_val(
-    ckpt_path: Path, parquet: Path, device: torch.device,
+    ckpt_path: Path,
+    parquet: Path,
+    device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray, LabelTiers]:
     """Return ``(mu_raw, y_raw, tiers)`` on the val partition, human-order."""
     blob = load_checkpoint(ckpt_path, map_location=device)
@@ -126,7 +128,10 @@ def _predict_val(
     tiers = LabelTiers.five_label()
 
     train_loader, val_loader, _split_ids, label_scaler = build_dataloaders(
-        cfg, layout, tiers, seed=blob.get("seed", 0),
+        cfg,
+        layout,
+        tiers,
+        seed=blob.get("seed", 0),
     )
     del train_loader
 
@@ -164,7 +169,9 @@ def _predict_val(
 
 
 def _validation_figure(
-    mu_raw: np.ndarray, y_raw: np.ndarray, tiers: LabelTiers,
+    mu_raw: np.ndarray,
+    y_raw: np.ndarray,
+    tiers: LabelTiers,
 ) -> tuple[plt.Figure, dict]:
     """2-row × 5-col: hexbin pred-vs-truth (row 1) + residual hist (row 2)."""
     fig, axes = plt.subplots(2, 5, figsize=(20, 8), dpi=150)
@@ -182,8 +189,7 @@ def _validation_figure(
 
         lo, hi = LABEL_RANGE[lbl]
         ax = axes[0, col]
-        ax.hexbin(truth, pred, gridsize=50, cmap="viridis", mincnt=1,
-                  extent=(lo, hi, lo, hi))
+        ax.hexbin(truth, pred, gridsize=50, cmap="viridis", mincnt=1, extent=(lo, hi, lo, hi))
         ax.plot([lo, hi], [lo, hi], "r--", lw=1.0, alpha=0.7)
         ax.set_xlim(lo, hi)
         ax.set_ylim(lo, hi)
@@ -193,13 +199,12 @@ def _validation_figure(
 
         ax = axes[1, col]
         r_lo, r_hi = RESIDUAL_RANGE[lbl]
-        ax.hist(residual, bins=80, range=(r_lo, r_hi),
-                density=True, color="steelblue", alpha=0.7)
+        ax.hist(residual, bins=80, range=(r_lo, r_hi), density=True, color="steelblue", alpha=0.7)
         ax.axvline(0.0, color="k", ls="--", lw=0.8, alpha=0.5)
         mean_r = float(np.mean(residual))
         median_r = float(np.median(residual))
         mae = float(np.mean(np.abs(residual)))
-        rmse = float(np.sqrt(np.mean(residual ** 2)))
+        rmse = float(np.sqrt(np.mean(residual**2)))
         sigma_r = float(np.std(residual))
         p16 = float(np.percentile(residual, 16))
         p84 = float(np.percentile(residual, 84))
@@ -210,9 +215,16 @@ def _validation_figure(
             f"RMSE={rmse:.3g}\n"
             f"σ={sigma_r:.3g}"
         )
-        ax.text(0.05, 0.95, txt, transform=ax.transAxes,
-                ha="left", va="top", fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.85))
+        ax.text(
+            0.05,
+            0.95,
+            txt,
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.85),
+        )
         ax.set_xlim(r_lo, r_hi)
         ax.set_xlabel(f"Δ{LABEL_PRETTY[lbl]}  (pred − truth)")
         ax.set_ylabel("density")
@@ -237,16 +249,17 @@ def _validation_figure(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ckpt", type=Path, required=True,
-                        help="Joint best-val checkpoint.")
+    parser.add_argument("--ckpt", type=Path, required=True, help="Joint best-val checkpoint.")
     parser.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--prefix", type=str, default="joint")
     parser.add_argument("--device", type=str, default=None)
     args = parser.parse_args()
 
-    device = torch.device(args.device) if args.device is not None else (
-        torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.device(args.device)
+        if args.device is not None
+        else (torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     )
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -271,7 +284,11 @@ def main() -> None:
         s = per[lbl]
         _LOG.info(
             "  %-15s  mean=%+.3g  MAE=%.3g  RMSE=%.3g  σ=%.3g",
-            lbl, s["mean_residual"], s["mae"], s["rmse"], s["sigma_residual"],
+            lbl,
+            s["mean_residual"],
+            s["mae"],
+            s["rmse"],
+            s["sigma_residual"],
         )
 
 

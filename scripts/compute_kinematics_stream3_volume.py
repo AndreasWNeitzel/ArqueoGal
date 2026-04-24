@@ -78,9 +78,14 @@ def _sha256(path: Path) -> str:
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=_REPO,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=_REPO,
+            )
+            .decode()
+            .strip()
+        )
     except Exception:
         return "nogit"
 
@@ -149,7 +154,12 @@ def _run_chunked(
         eta = (n - n_done) / max(rate, 1e-6)
         _LOG.info(
             "chunk %d: done=%d/%d (%.1f%%) rate=%.1f star/s eta=%.0f min",
-            len(results), n_done, n, 100 * n_done / n, rate, eta / 60,
+            len(results),
+            n_done,
+            n,
+            100 * n_done / n,
+            rate,
+            eta / 60,
         )
 
         # Periodic checkpoint — survive a kill without losing work.
@@ -159,8 +169,12 @@ def _run_chunked(
             _LOG.info("  checkpoint: %d rows to %s", len(partial), checkpoint_path.name)
             last_ckpt = n_done
 
-    return pd.concat(results, ignore_index=True) if results else pd.DataFrame(
-        columns=list(OUTPUT_COLS),
+    return (
+        pd.concat(results, ignore_index=True)
+        if results
+        else pd.DataFrame(
+            columns=list(OUTPUT_COLS),
+        )
     )
 
 
@@ -199,8 +213,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--chunk-size", type=int, default=5000)
     parser.add_argument("--checkpoint-every", type=int, default=20000)
     parser.add_argument("--output", type=Path, default=_OUT)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="load inputs, report row counts, and exit")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="load inputs, report row counts, and exit"
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -235,7 +250,10 @@ def main(argv: list[str] | None = None) -> int:
         checkpoint_path.unlink()
 
     input_shas = {
-        "volume_predictions": {"path": str(_VOL_PRED.relative_to(_REPO)), "sha256": _sha256(_VOL_PRED)},
+        "volume_predictions": {
+            "path": str(_VOL_PRED.relative_to(_REPO)),
+            "sha256": _sha256(_VOL_PRED),
+        },
         "gaia_main": {"path": str(_GAIA_MAIN.relative_to(_REPO)), "sha256": _sha256(_GAIA_MAIN)},
         "gaia_delta": {"path": str(_GAIA_DELTA.relative_to(_REPO)), "sha256": _sha256(_GAIA_DELTA)},
         "features": {"path": str(_FEATS.relative_to(_REPO)), "sha256": _sha256(_FEATS)},

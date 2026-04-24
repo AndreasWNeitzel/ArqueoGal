@@ -181,9 +181,7 @@ def main() -> None:
     # Counterpart stats for the report.
     n_tmass_match = int(combined.select(pl.col("j_mag").is_not_null().sum()).item())
     n_allwise_match = int(combined.select(pl.col("w1_mag").is_not_null().sum()).item())
-    n_ir_complete = int(
-        combined.select((~pl.col("ir_missing_flag")).sum()).item()
-    )
+    n_ir_complete = int(combined.select((~pl.col("ir_missing_flag")).sum()).item())
     n_ir_missing = int(combined.select(pl.col("ir_missing_flag").sum()).item())
     logger.info(
         "counterpart rates: 2MASS=%.3f%% AllWISE=%.3f%% IR-complete=%.3f%%",
@@ -210,15 +208,9 @@ def main() -> None:
     ids_sha = _sha256_of(args.source_id_parquet)
     out_sha = _sha256_of(args.output_parquet)
 
-    tmass_join = (
-        "gaiadr1.tmass_original_valid"
-        if service_flavor == "esa"
-        else "catalogs.tmass"
-    )
+    tmass_join = "gaiadr1.tmass_original_valid" if service_flavor == "esa" else "catalogs.tmass"
     allwise_join = (
-        "gaiadr1.allwise_original_valid"
-        if service_flavor == "esa"
-        else "catalogs.allwise"
+        "gaiadr1.allwise_original_valid" if service_flavor == "esa" else "catalogs.allwise"
     )
     tap_sources = [
         TapSource(

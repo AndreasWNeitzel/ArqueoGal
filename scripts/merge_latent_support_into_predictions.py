@@ -39,7 +39,8 @@ def _merge_one(target: Path, gate: pd.DataFrame) -> None:
         df = df.drop(columns=drop)
     merged = df.merge(
         gate[["source_id", *_NEW_COLS]],
-        on="source_id", how="left",
+        on="source_id",
+        how="left",
     )
     if len(merged) != before:
         raise RuntimeError(
@@ -61,7 +62,9 @@ def main() -> None:
     args = ap.parse_args()
 
     gate = pd.read_parquet(args.gate)
-    print(f"gate: {len(gate):,} rows, flag_rate={gate['latent_support_flag'].astype(bool).mean():.4%}")
+    print(
+        f"gate: {len(gate):,} rows, flag_rate={gate['latent_support_flag'].astype(bool).mean():.4%}"
+    )
     for t in args.targets:
         _merge_one(t, gate)
 

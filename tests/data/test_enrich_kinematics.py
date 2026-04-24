@@ -67,9 +67,7 @@ def test_happy_path_writes_parquet_and_sidecar(
     assert sidecar.is_file()
 
 
-def test_action_columns_added(
-    tmp_path: Path, patched_actions: dict[str, object]
-) -> None:
+def test_action_columns_added(tmp_path: Path, patched_actions: dict[str, object]) -> None:
     out_path = tmp_path / "stream_kin.parquet"
     df = _input_df([1, 2, 3])
     mod.enrich_kinematics_stream(df, output_path=out_path)
@@ -93,6 +91,7 @@ def test_left_join_preserves_unsolved_rows(
     tmp_path: Path, patched_actions: dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """compute_actions can drop NaN rows; output must still have all input rows."""
+
     def drop_first(df, *, config=None):  # noqa: ANN001
         return _fake_actions(df["source_id"].to_numpy()[1:])
 
@@ -132,9 +131,7 @@ def test_provenance_records_config_and_corrections(
     assert stored_cfg["ro_kpc"] == cfg.ro_kpc
 
 
-def test_provenance_row_counts(
-    tmp_path: Path, patched_actions: dict[str, object]
-) -> None:
+def test_provenance_row_counts(tmp_path: Path, patched_actions: dict[str, object]) -> None:
     out_path = tmp_path / "stream_kin.parquet"
     mod.enrich_kinematics_stream(_input_df([1, 2, 3, 4]), output_path=out_path)
     meta = json.loads(out_path.with_suffix("").with_suffix(".provenance.json").read_text())
@@ -153,18 +150,14 @@ def test_provenance_has_no_tap_or_http_sources(
     assert meta["sources"] == []
 
 
-def test_atomic_write_no_part_file_left(
-    tmp_path: Path, patched_actions: dict[str, object]
-) -> None:
+def test_atomic_write_no_part_file_left(tmp_path: Path, patched_actions: dict[str, object]) -> None:
     out_path = tmp_path / "stream_kin.parquet"
     mod.enrich_kinematics_stream(_input_df([1, 2]), output_path=out_path)
     leftover = list(tmp_path.glob("*.part"))
     assert not leftover
 
 
-def test_output_parent_is_created(
-    tmp_path: Path, patched_actions: dict[str, object]
-) -> None:
+def test_output_parent_is_created(tmp_path: Path, patched_actions: dict[str, object]) -> None:
     out_path = tmp_path / "nested" / "deep" / "kin.parquet"
     mod.enrich_kinematics_stream(_input_df([1, 2]), output_path=out_path)
     assert out_path.is_file()

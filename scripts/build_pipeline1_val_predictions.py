@@ -69,7 +69,8 @@ def _ensemble_predict(ensemble_dir: Path, parquet: Path, device: torch.device):
     cfg = _build_cfg_for_val_loader(
         parquet=parquet,
         pretrained_ckpt=Path(_pretrained_raw) if _pretrained_raw else None,
-        batch_size=1024, seed=split_seed,
+        batch_size=1024,
+        seed=split_seed,
     )
     _, val_loader, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
 
@@ -100,13 +101,13 @@ def _ensemble_predict(ensemble_dir: Path, parquet: Path, device: torch.device):
             )
 
     # ensemble moment-match in SCALED HUMAN coords
-    mus = np.stack(per_mu)                # (K, N, D) scaled
-    Sigmas = np.stack(per_L)              # (K, N, D, D) scaled
+    mus = np.stack(per_mu)  # (K, N, D) scaled
+    Sigmas = np.stack(per_L)  # (K, N, D, D) scaled
     mu_bar = mus.mean(axis=0)
     mean_sigma = Sigmas.mean(axis=0)
     diff = mus - mu_bar[None]
     between = np.einsum("kbi,kbj->bij", diff, diff) / mus.shape[0]
-    sigma_scaled = mean_sigma + between   # (N, D, D)
+    sigma_scaled = mean_sigma + between  # (N, D, D)
 
     # diagonals → aleatoric std (post-combine), epistemic std = sqrt(diag between)
     diag_total = np.maximum(np.einsum("bii->bi", sigma_scaled), 0.0)
@@ -164,9 +165,14 @@ def main() -> None:
     _LOG.info("val predictions: n=%d cols=%d", len(df), df.shape[1])
     for c in df.columns:
         x = df[c].to_numpy()
-        _LOG.info("  %-18s  mean=%+.4f  std=%.4f  p05=%+.4f  p95=%+.4f",
-                  c, np.nanmean(x), np.nanstd(x),
-                  np.nanpercentile(x, 5), np.nanpercentile(x, 95))
+        _LOG.info(
+            "  %-18s  mean=%+.4f  std=%.4f  p05=%+.4f  p95=%+.4f",
+            c,
+            np.nanmean(x),
+            np.nanstd(x),
+            np.nanpercentile(x, 5),
+            np.nanpercentile(x, 95),
+        )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     tmp = args.out.with_suffix(args.out.suffix + ".tmp")

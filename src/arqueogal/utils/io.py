@@ -46,7 +46,9 @@ def load_parquet(path: str | Path, columns: list[str] | None = None) -> Any:
 
 
 def save_parquet(
-    df: Any, path: str | Path, compression: str = "snappy",
+    df: Any,
+    path: str | Path,
+    compression: str = "snappy",
 ) -> Path:
     """Write ``df`` to ``path`` atomically (temp file → rename).
 
@@ -63,7 +65,8 @@ def save_parquet(
 
 
 def streaming_parquet_reader(
-    path: str | Path, batch_size: int,
+    path: str | Path,
+    batch_size: int,
 ) -> Iterator[Any]:
     """Yield pandas DataFrames of up to ``batch_size`` rows at a time."""
     import pyarrow.parquet as pq
@@ -105,7 +108,7 @@ def _strip_orig_mod_prefix(state_dict: dict[str, Any]) -> dict[str, Any]:
         return state_dict
     if not all(k.startswith(prefix) for k in state_dict):
         return state_dict
-    return {k[len(prefix):]: v for k, v in state_dict.items()}
+    return {k[len(prefix) :]: v for k, v in state_dict.items()}
 
 
 def load_checkpoint(
@@ -137,7 +140,9 @@ def load_checkpoint(
     map_location = device if device is not None else "cpu"
     try:
         state = torch.load(
-            path, map_location=map_location, weights_only=weights_only,
+            path,
+            map_location=map_location,
+            weights_only=weights_only,
         )
     except Exception as exc:  # noqa: BLE001 — fall-back path for legacy pickles
         if weights_only:
@@ -149,7 +154,9 @@ def load_checkpoint(
                 stacklevel=2,
             )
             state = torch.load(
-                path, map_location=map_location, weights_only=False,
+                path,
+                map_location=map_location,
+                weights_only=False,
             )
         else:
             raise
@@ -161,10 +168,7 @@ def load_checkpoint(
 
     version = state.get("version", 0)
     if version != CHECKPOINT_VERSION:
-        msg = (
-            f"checkpoint {path} version {version} != current "
-            f"{CHECKPOINT_VERSION}"
-        )
+        msg = f"checkpoint {path} version {version} != current {CHECKPOINT_VERSION}"
         if strict_version:
             raise ArqueoGalCheckpointError(msg)
         warnings.warn(msg, stacklevel=2)

@@ -90,8 +90,9 @@ def test_fetch_hon2021_default_mode_is_async(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(tap_mod, "run_async", fake_async)
     monkeypatch.setattr(
-        tap_mod, "run_sync", lambda *_a, **_kw: called.update({"sync": called["sync"] + 1})
-        or _fake_hon2021_table(0),
+        tap_mod,
+        "run_sync",
+        lambda *_a, **_kw: called.update({"sync": called["sync"] + 1}) or _fake_hon2021_table(0),
     )
     service = MagicMock(spec=TAPService)
 
@@ -140,9 +141,7 @@ def test_fetch_hon2021_rejects_unknown_mode() -> None:
 def test_fetch_hon2021_returns_empty_frame_when_tap_returns_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        tap_mod, "run_async", lambda *_a, **_kw: _fake_hon2021_table(0)
-    )
+    monkeypatch.setattr(tap_mod, "run_async", lambda *_a, **_kw: _fake_hon2021_table(0))
     service = MagicMock(spec=TAPService)
     df = fetch_hon2021(service)
     assert isinstance(df, pd.DataFrame)

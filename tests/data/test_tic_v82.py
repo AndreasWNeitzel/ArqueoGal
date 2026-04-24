@@ -66,6 +66,7 @@ def test_fetch_batches_and_concatenates(monkeypatch) -> None:
         chunk = [int(x) for x in after.split(",")]
         seen_batches.append(chunk)
         from astropy.table import Table
+
         return Table.from_pandas(_fake_tic_row_table(chunk))
 
     monkeypatch.setattr(tap_mod, "run_async", fake_run_async)
@@ -93,10 +94,12 @@ def test_fetch_empty_input_returns_empty_frame(monkeypatch) -> None:
 
 def test_fetch_writes_checkpoints(monkeypatch, tmp_path) -> None:
     """Checkpoint prefix is ``tic_v82`` per module design."""
+
     def fake_run_async(_svc, adql, **_kw):  # noqa: ANN001
         after = adql.split("TIC IN (")[1].split(")")[0]
         chunk = [int(x) for x in after.split(",")]
         from astropy.table import Table
+
         return Table.from_pandas(_fake_tic_row_table(chunk))
 
     monkeypatch.setattr(tap_mod, "run_async", fake_run_async)

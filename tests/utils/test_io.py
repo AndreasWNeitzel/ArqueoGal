@@ -74,8 +74,7 @@ def test_checkpoint_roundtrip(tmp_path: Path) -> None:
 
 
 def test_checkpoint_strip_orig_mod_prefix() -> None:
-    sd = {"_orig_mod.layer.weight": torch.zeros(2),
-          "_orig_mod.layer.bias": torch.zeros(1)}
+    sd = {"_orig_mod.layer.weight": torch.zeros(2), "_orig_mod.layer.bias": torch.zeros(1)}
     stripped = _strip_orig_mod_prefix(sd)
     assert set(stripped.keys()) == {"layer.weight", "layer.bias"}
 

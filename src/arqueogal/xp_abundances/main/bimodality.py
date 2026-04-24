@@ -97,10 +97,15 @@ class BimodalityGrid:
         m_idx = np.digitize(mh, self.mh_edges) - 1
 
         in_grid = (
-            np.isfinite(teff) & np.isfinite(logg) & np.isfinite(mh)
-            & (t_idx >= 0) & (t_idx < nT)
-            & (l_idx >= 0) & (l_idx < nL)
-            & (m_idx >= 0) & (m_idx < nM)
+            np.isfinite(teff)
+            & np.isfinite(logg)
+            & np.isfinite(mh)
+            & (t_idx >= 0)
+            & (t_idx < nT)
+            & (l_idx >= 0)
+            & (l_idx < nL)
+            & (m_idx >= 0)
+            & (m_idx < nM)
         )
         flag = np.zeros_like(in_grid)
 
@@ -129,10 +134,10 @@ class BimodalityGrid:
             "grid": {
                 "n_teff": int(len(self.teff_edges) - 1),
                 "n_logg": int(len(self.logg_edges) - 1),
-                "n_mh":   int(len(self.mh_edges) - 1),
+                "n_mh": int(len(self.mh_edges) - 1),
                 "teff_range": [float(self.teff_edges[0]), float(self.teff_edges[-1])],
                 "logg_range": [float(self.logg_edges[0]), float(self.logg_edges[-1])],
-                "mh_range":   [float(self.mh_edges[0]),   float(self.mh_edges[-1])],
+                "mh_range": [float(self.mh_edges[0]), float(self.mh_edges[-1])],
             },
             "criteria": {
                 "min_cell_n": int(self.min_cell_n),
@@ -141,10 +146,10 @@ class BimodalityGrid:
                 "bic_delta_min": float(self.bic_delta_min),
             },
             "counts": {
-                "cells_total":    int(self.is_bimodal.size),
+                "cells_total": int(self.is_bimodal.size),
                 "cells_evaluated": int((self.n_per_cell >= self.min_cell_n).sum()),
-                "cells_bimodal":   int(self.is_bimodal.sum()),
-                "train_stars":     int(self.n_per_cell.sum()),
+                "cells_bimodal": int(self.is_bimodal.sum()),
+                "train_stars": int(self.n_per_cell.sum()),
             },
         }
         if provenance is not None:
@@ -197,7 +202,9 @@ def _is_cell_bimodal(
     try:
         gm1 = GaussianMixture(n_components=1, random_state=random_state).fit(a)
         gm2 = GaussianMixture(
-            n_components=2, random_state=random_state, n_init=3,
+            n_components=2,
+            random_state=random_state,
+            n_init=3,
             reg_covar=1e-5,
         ).fit(a)
     except Exception as exc:  # noqa: BLE001 — GMM convergence failures get surfaced in stats
@@ -210,14 +217,14 @@ def _is_cell_bimodal(
     mean_sep = float(abs(mu1 - mu2))
     minor_w = float(min(w1, w2))
 
-    flag = (
-        bic2 + bic_delta_min < bic1
-        and minor_w >= min_minor_weight
-        and mean_sep >= min_mean_sep
-    )
+    flag = bic2 + bic_delta_min < bic1 and minor_w >= min_minor_weight and mean_sep >= min_mean_sep
     stats = {
-        "bic1": bic1, "bic2": bic2, "bic_delta": bic1 - bic2,
-        "weights": [w1, w2], "means": [mu1, mu2], "mean_sep": mean_sep,
+        "bic1": bic1,
+        "bic2": bic2,
+        "bic_delta": bic1 - bic2,
+        "weights": [w1, w2],
+        "means": [mu1, mu2],
+        "mean_sep": mean_sep,
     }
     return flag, stats
 
@@ -264,12 +271,9 @@ def fit_bimodality_grid(
 
     teff_edges = np.asarray(teff_edges, dtype=np.float64)
     logg_edges = np.asarray(logg_edges, dtype=np.float64)
-    mh_edges   = np.asarray(mh_edges,   dtype=np.float64)
+    mh_edges = np.asarray(mh_edges, dtype=np.float64)
 
-    finite = (
-        np.isfinite(teff) & np.isfinite(logg)
-        & np.isfinite(mh) & np.isfinite(alpha_m)
-    )
+    finite = np.isfinite(teff) & np.isfinite(logg) & np.isfinite(mh) & np.isfinite(alpha_m)
     teff, logg, mh, alpha_m = teff[finite], logg[finite], mh[finite], alpha_m[finite]
 
     t_idx = np.digitize(teff, teff_edges) - 1
@@ -283,7 +287,9 @@ def fit_bimodality_grid(
     n_cell = np.zeros((nT, nL, nM), dtype=np.int32)
     per_cell_gmm: dict[tuple[int, int, int], dict] = {}
 
-    in_grid = (t_idx >= 0) & (t_idx < nT) & (l_idx >= 0) & (l_idx < nL) & (m_idx >= 0) & (m_idx < nM)
+    in_grid = (
+        (t_idx >= 0) & (t_idx < nT) & (l_idx >= 0) & (l_idx < nL) & (m_idx >= 0) & (m_idx < nM)
+    )
     t_idx, l_idx, m_idx, alpha_m = t_idx[in_grid], l_idx[in_grid], m_idx[in_grid], alpha_m[in_grid]
 
     flat = t_idx * (nL * nM) + l_idx * nM + m_idx

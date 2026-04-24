@@ -45,8 +45,16 @@ pytestmark = pytest.mark.skipif(
 def test_artifact_loads_and_has_required_columns() -> None:
     df = pd.read_parquet(DEFAULT_ARTIFACT_PATH)
     assert len(df) > 0
-    for col in ("b_lo", "b_hi", "g_lo", "g_hi", "n_total", "n_flagged",
-                "flag_rate", "selection_prob"):
+    for col in (
+        "b_lo",
+        "b_hi",
+        "g_lo",
+        "g_hi",
+        "n_total",
+        "n_flagged",
+        "flag_rate",
+        "selection_prob",
+    ):
         assert col in df.columns, f"missing column: {col}"
 
 
@@ -111,7 +119,7 @@ def test_all_grid_cells_respect_floor() -> None:
 def test_plane_faint_scores_lower_than_cap_bright() -> None:
     # Plane + faint corner vs cap + bright corner: must differ in the right
     # direction and by a lot (Thread-1 established ~134x rate ratio globally).
-    b_plane = np.array([2.0])   # |b| ~ 2 deg
+    b_plane = np.array([2.0])  # |b| ~ 2 deg
     g_faint = np.array([17.0])
     b_cap = np.array([60.0])
     g_bright = np.array([10.0])
@@ -125,9 +133,7 @@ def test_sign_of_b_does_not_matter() -> None:
     b_pos = np.array([3.0, 25.0, -60.0, 60.0])
     b_neg = -b_pos
     g = np.full_like(b_pos, 16.0)
-    np.testing.assert_array_equal(
-        score_selection_prob(b_pos, g), score_selection_prob(b_neg, g)
-    )
+    np.testing.assert_array_equal(score_selection_prob(b_pos, g), score_selection_prob(b_neg, g))
 
 
 def test_out_of_range_inputs_are_clamped() -> None:
@@ -226,8 +232,7 @@ def test_ir_nan_teff_logg_falls_back_to_bg_marginal() -> None:
 
     df = pd.read_parquet(DEFAULT_IR_ARTIFACT_PATH)
     bg = df[df["grid"] == "bg"]
-    cell = bg[(bg["b_lo"] <= 3.0) & (bg["b_hi"] > 3.0)
-              & (bg["g_lo"] <= 16.0) & (bg["g_hi"] > 16.0)]
+    cell = bg[(bg["b_lo"] <= 3.0) & (bg["b_hi"] > 3.0) & (bg["g_lo"] <= 16.0) & (bg["g_hi"] > 16.0)]
     assert len(cell) == 1
     p_bg = float(cell["p_ir_complete"].iloc[0])
     np.testing.assert_allclose(p[1], np.clip(p_bg, SELECTION_PROB_FLOOR, SELECTION_PROB_CEIL))
@@ -254,13 +259,18 @@ def test_ir_full_nan_teff_logg_all_fall_back() -> None:
     bg = df[df["grid"] == "bg"].reset_index(drop=True)
     abs_b = np.abs(b)
     for i in range(n):
-        cell = bg[(bg["b_lo"] <= abs_b[i]) & (bg["b_hi"] > abs_b[i])
-                  & (bg["g_lo"] <= g[i]) & (bg["g_hi"] > g[i])]
+        cell = bg[
+            (bg["b_lo"] <= abs_b[i])
+            & (bg["b_hi"] > abs_b[i])
+            & (bg["g_lo"] <= g[i])
+            & (bg["g_hi"] > g[i])
+        ]
         if len(cell) != 1:
             # Edge row (rare with random uniforms); ignore.
             continue
-        expected = float(np.clip(cell["p_ir_complete"].iloc[0],
-                                 SELECTION_PROB_FLOOR, SELECTION_PROB_CEIL))
+        expected = float(
+            np.clip(cell["p_ir_complete"].iloc[0], SELECTION_PROB_FLOOR, SELECTION_PROB_CEIL)
+        )
         np.testing.assert_allclose(out_nan[i], expected)
 
 
@@ -284,7 +294,12 @@ def test_ir_sign_of_b_does_not_matter() -> None:
 def test_compound_product_of_components() -> None:
     b, g, t, lg = 3.0, 16.0, 4500.0, 2.3
     res = score_compound_selection_prob(
-        b, g, t, lg, parallax_over_error=12.0, av_missing=False,
+        b,
+        g,
+        t,
+        lg,
+        parallax_over_error=12.0,
+        av_missing=False,
     )
     # With parallax available and extinction present, compound = p_ye * p_ir.
     expected = res["p_ye_retained"] * res["p_ir_complete"]
@@ -293,15 +308,19 @@ def test_compound_product_of_components() -> None:
     c = res["components"]
     np.testing.assert_allclose(
         res["p_compound"],
-        np.clip(c["ye"] * c["ir"] * c["parallax"] * c["extinction"],
-                COMPOUND_PROB_FLOOR, 1.0),
+        np.clip(c["ye"] * c["ir"] * c["parallax"] * c["extinction"], COMPOUND_PROB_FLOOR, 1.0),
     )
 
 
 @ir_available
 def test_compound_av_missing_zeroes_output() -> None:
     res = score_compound_selection_prob(
-        30.0, 11.0, 4800.0, 2.5, parallax_over_error=20.0, av_missing=True,
+        30.0,
+        11.0,
+        4800.0,
+        2.5,
+        parallax_over_error=20.0,
+        av_missing=True,
     )
     assert res["p_compound"] == 0.0
     assert res["components"]["extinction"] == 0.0
@@ -314,7 +333,12 @@ def test_compound_av_missing_zeroes_output() -> None:
 @ir_available
 def test_compound_parallax_missing_zeroes_output() -> None:
     res = score_compound_selection_prob(
-        30.0, 11.0, 4800.0, 2.5, parallax_over_error=None, av_missing=False,
+        30.0,
+        11.0,
+        4800.0,
+        2.5,
+        parallax_over_error=None,
+        av_missing=False,
     )
     assert res["p_compound"] == 0.0
     assert res["components"]["parallax"] == 0.0
@@ -330,7 +354,12 @@ def test_compound_bounds_are_respected() -> None:
         t = float(rng.uniform(4000.0, 5500.0))
         lg = float(rng.uniform(1.0, 3.5))
         res = score_compound_selection_prob(
-            b, g, t, lg, parallax_over_error=True, av_missing=False,
+            b,
+            g,
+            t,
+            lg,
+            parallax_over_error=True,
+            av_missing=False,
         )
         assert 0.0 <= res["p_compound"] <= 1.0
         # With both gates on, the positive floor applies.
@@ -342,8 +371,12 @@ def test_compound_nan_teff_logg_still_bounded() -> None:
     # NaN Teff/log g must not blow up the compound; they just route IR to
     # the |b|×G marginal fallback.
     res = score_compound_selection_prob(
-        3.0, 16.0, float("nan"), float("nan"),
-        parallax_over_error=10.0, av_missing=False,
+        3.0,
+        16.0,
+        float("nan"),
+        float("nan"),
+        parallax_over_error=10.0,
+        av_missing=False,
     )
     assert 0.0 <= res["p_compound"] <= 1.0
     assert np.isfinite(res["p_ir_complete"])

@@ -89,8 +89,11 @@ DEFAULT_PCA_COMPONENTS_TEST5: Final[int] = 7
 
 # --- helpers ----------------------------------------------------------------
 
+
 def _collect_mu_y(
-    model: nn.Module, loader: DataLoader, device: torch.device,
+    model: nn.Module,
+    loader: DataLoader,
+    device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Helper: stack ``(mu, y, x)`` across a loader. Model must return ``(mu, L, h, z)``."""
     model.eval().to(device)
@@ -112,6 +115,7 @@ def _rmse(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 # --- §9.2 Test 1: LOOCO ------------------------------------------------------
+
 
 def leave_one_coeff_out(
     model: nn.Module,
@@ -155,6 +159,7 @@ def leave_one_coeff_out(
 
 # --- §9.2 Test 2: Permutation feature importance ----------------------------
 
+
 def permutation_feature_importance(
     model: nn.Module,
     loader: DataLoader,
@@ -197,6 +202,7 @@ def permutation_feature_importance(
 
 # --- §9.2 Test 4: Shuffled-spectrum null -------------------------------------
 
+
 def shuffled_spectrum_null(  # noqa: PLR0913 — per-test knobs are explicit by design
     model: nn.Module,
     loader: DataLoader,
@@ -219,9 +225,7 @@ def shuffled_spectrum_null(  # noqa: PLR0913 — per-test knobs are explicit by 
     if cell_ids is None:
         cell_ids = np.zeros(x_all.shape[0], dtype=np.int64)
     if cell_ids.shape[0] != x_all.shape[0]:
-        raise ValueError(
-            f"cell_ids length {cell_ids.shape[0]} != N={x_all.shape[0]}"
-        )
+        raise ValueError(f"cell_ids length {cell_ids.shape[0]} != N={x_all.shape[0]}")
 
     x_shuf = x_all.copy()
     for c in np.unique(cell_ids):
@@ -238,8 +242,12 @@ def shuffled_spectrum_null(  # noqa: PLR0913 — per-test knobs are explicit by 
 
 # --- §9.2 Test 5: Mutual information (KSG) ----------------------------------
 
+
 def mutual_information_ksg(
-    x: np.ndarray, y: np.ndarray, *, k: int = 5,
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    k: int = 5,
 ) -> float:
     """KSG Algorithm 1 mutual information estimator (Kraskov+2004).
 
@@ -260,20 +268,24 @@ def mutual_information_ksg(
     # Strictly less than eps per KSG Algorithm 1.
     tree_x = cKDTree(x)
     tree_y = cKDTree(y)
-    nx = np.array([
-        len(tree_x.query_ball_point(x[i], eps[i] - _EPS, p=np.inf))
-        for i in range(n)
-    ], dtype=np.float64)
-    ny = np.array([
-        len(tree_y.query_ball_point(y[i], eps[i] - _EPS, p=np.inf))
-        for i in range(n)
-    ], dtype=np.float64)
+    nx = np.array(
+        [len(tree_x.query_ball_point(x[i], eps[i] - _EPS, p=np.inf)) for i in range(n)],
+        dtype=np.float64,
+    )
+    ny = np.array(
+        [len(tree_y.query_ball_point(y[i], eps[i] - _EPS, p=np.inf)) for i in range(n)],
+        dtype=np.float64,
+    )
     mi = digamma(k) - np.mean(digamma(nx + 1) + digamma(ny + 1)) + digamma(n)
     return float(max(mi, 0.0))
 
 
 def conditional_mi_ksg(
-    x: np.ndarray, y: np.ndarray, z: np.ndarray, *, k: int = 5,
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray,
+    *,
+    k: int = 5,
 ) -> float:
     """Conditional MI ``I(X;Y | Z)`` via KSG (Frenzel & Pompe 2007).
 
@@ -295,22 +307,19 @@ def conditional_mi_ksg(
     tree_xyz = cKDTree(xyz)
     eps = tree_xyz.query(xyz, k=k + 1, p=np.inf)[0][:, -1]
     tree_xz, tree_yz, tree_z = cKDTree(xz), cKDTree(yz), cKDTree(z)
-    nz = np.array([
-        len(tree_z.query_ball_point(z[i], eps[i] - _EPS, p=np.inf))
-        for i in range(n)
-    ], dtype=np.float64)
-    nxz = np.array([
-        len(tree_xz.query_ball_point(xz[i], eps[i] - _EPS, p=np.inf))
-        for i in range(n)
-    ], dtype=np.float64)
-    nyz = np.array([
-        len(tree_yz.query_ball_point(yz[i], eps[i] - _EPS, p=np.inf))
-        for i in range(n)
-    ], dtype=np.float64)
-    cmi = (
-        digamma(k)
-        + np.mean(digamma(nz + 1) - digamma(nxz + 1) - digamma(nyz + 1))
+    nz = np.array(
+        [len(tree_z.query_ball_point(z[i], eps[i] - _EPS, p=np.inf)) for i in range(n)],
+        dtype=np.float64,
     )
+    nxz = np.array(
+        [len(tree_xz.query_ball_point(xz[i], eps[i] - _EPS, p=np.inf)) for i in range(n)],
+        dtype=np.float64,
+    )
+    nyz = np.array(
+        [len(tree_yz.query_ball_point(yz[i], eps[i] - _EPS, p=np.inf)) for i in range(n)],
+        dtype=np.float64,
+    )
+    cmi = digamma(k) + np.mean(digamma(nz + 1) - digamma(nxz + 1) - digamma(nyz + 1))
     return float(max(cmi, 0.0))
 
 
@@ -335,7 +344,7 @@ def _pca_project(x: np.ndarray, n_components: int) -> tuple[np.ndarray, float]:
         raise ValueError(f"x must be 2-D, got {x.shape}")
     Xc = x - x.mean(axis=0, keepdims=True)
     U, s, _Vt = np.linalg.svd(Xc.astype(np.float64), full_matrices=False)
-    var = (s ** 2) / max(Xc.shape[0] - 1, 1)
+    var = (s**2) / max(Xc.shape[0] - 1, 1)
     cum = np.cumsum(var) / var.sum()
     k = int(min(n_components, len(s)))
     proj = U[:, :k] * s[:k]
@@ -436,6 +445,7 @@ def test5_conditional_mi(  # noqa: PLR0913
 
 # --- §9.2 Test 6: Decorrelated sub-sample -----------------------------------
 
+
 def decorrelated_subsample(
     labels: np.ndarray,
     priors: np.ndarray,
@@ -468,16 +478,15 @@ def decorrelated_subsample(
 
     label_bins = np.clip(
         np.digitize(labels, np.quantile(labels, np.linspace(0, 1, n_bins + 1)[1:-1])),
-        0, n_bins - 1,
+        0,
+        n_bins - 1,
     )
 
     # Within each (prior-cell, label-bin) keep up to min-cell-size samples to
     # break the label↔prior correlation while preserving each joint-bin mass.
     keep: list[int] = []
     for jb in np.unique(codes):
-        per_label_counts = [
-            int((label_bins[codes == jb] == lb).sum()) for lb in range(n_bins)
-        ]
+        per_label_counts = [int((label_bins[codes == jb] == lb).sum()) for lb in range(n_bins)]
         if not per_label_counts or min(per_label_counts) == 0:
             continue
         target = min(per_label_counts)
@@ -488,6 +497,7 @@ def decorrelated_subsample(
 
 
 # --- §9.2 Orchestrator -------------------------------------------------------
+
 
 @dataclass
 class AuditReport:
@@ -545,7 +555,8 @@ def audit_report(  # noqa: PLR0913 — orchestrator with per-test knobs
 
     spectrum_indices = (
         np.asarray(spectrum_indices, dtype=np.int64)
-        if spectrum_indices is not None else np.asarray([], dtype=np.int64)
+        if spectrum_indices is not None
+        else np.asarray([], dtype=np.int64)
     )
     permutation_feature_indices = (
         np.asarray(permutation_feature_indices, dtype=np.int64)
@@ -555,28 +566,40 @@ def audit_report(  # noqa: PLR0913 — orchestrator with per-test knobs
 
     null_rmse = (
         shuffled_spectrum_null(
-            model, loader, spectrum_indices, cell_ids=cell_ids,
-            device=device, seed=seed,
-        )["null_rmse"] if spectrum_indices.size > 0
+            model,
+            loader,
+            spectrum_indices,
+            cell_ids=cell_ids,
+            device=device,
+            seed=seed,
+        )["null_rmse"]
+        if spectrum_indices.size > 0
         else np.full(len(label_names), np.nan, dtype=np.float64)
     )
 
     perm = permutation_feature_importance(
-        model, loader, permutation_feature_indices, device=device, seed=seed,
+        model,
+        loader,
+        permutation_feature_indices,
+        device=device,
+        seed=seed,
     )
 
     looco = (
         leave_one_coeff_out(
-            model, loader, coefficient_indices, device=device,
-        )["per_coeff_delta_rmse"] if coefficient_indices is not None
+            model,
+            loader,
+            coefficient_indices,
+            device=device,
+        )["per_coeff_delta_rmse"]
+        if coefficient_indices is not None
         else np.zeros((0, len(label_names)))
     )
 
     return AuditReport(
         label_names=label_names,
         feature_names=feature_names,
-        coefficient_indices=(tuple(coefficient_indices)
-                             if coefficient_indices is not None else ()),
+        coefficient_indices=(tuple(coefficient_indices) if coefficient_indices is not None else ()),
         baseline_rmse=baseline,
         shuffled_null_rmse=null_rmse,
         permutation_importance=perm["importance"],

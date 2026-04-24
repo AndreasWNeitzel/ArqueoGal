@@ -118,7 +118,10 @@ def _reproject_all(flux_matrix: np.ndarray) -> dict:
         sel = valid_idx[start:stop]
         logger.info(
             "reprojecting valid rows [%d, %d) / %d (of %d total)",
-            start, stop, valid_idx.size, n_total,
+            start,
+            stop,
+            valid_idx.size,
+            n_total,
         )
         out = reproject_ye_to_hermite(flux_matrix[sel])
         bp[sel] = out["bp_coeffs"]
@@ -190,9 +193,7 @@ def main() -> None:
     if not src.exists():
         raise SystemExit(f"missing {src}")
     if not decisions_path.exists():
-        raise SystemExit(
-            f"missing {decisions_path}; run scripts/analyze_hermite_pre_emit.py first"
-        )
+        raise SystemExit(f"missing {decisions_path}; run scripts/analyze_hermite_pre_emit.py first")
 
     logger.info("loading %s", src)
     df = pd.read_parquet(src)
@@ -207,7 +208,8 @@ def main() -> None:
 
     logger.info("stacking sampled flux to (N, 330) matrix")
     flux = np.stack(
-        [np.asarray(row, dtype=np.float32) for row in df["corrected_flux"]], axis=0,
+        [np.asarray(row, dtype=np.float32) for row in df["corrected_flux"]],
+        axis=0,
     )
     logger.info("flux matrix shape: %s", flux.shape)
 
@@ -217,7 +219,10 @@ def main() -> None:
 
     teff = df["teff_gspphot"].to_numpy(dtype=np.float64, na_value=np.nan)
     strat_flag, global_flag = _compute_flags(
-        rms=proj["rms"], valid=proj["valid"], teff=teff, thresholds=thresholds,
+        rms=proj["rms"],
+        valid=proj["valid"],
+        teff=teff,
+        thresholds=thresholds,
     )
     n_valid = int(proj["valid"].sum())
     n_high_strat = int(
@@ -230,8 +235,10 @@ def main() -> None:
         "flagging: n_valid=%d, n_residual_high_strat=%d (%.3f%%), "
         "n_residual_high_global=%d (%.3f%%)",
         n_valid,
-        n_high_strat, 100.0 * n_high_strat / max(n_valid, 1),
-        n_high_global, 100.0 * n_high_global / max(n_valid, 1),
+        n_high_strat,
+        100.0 * n_high_strat / max(n_valid, 1),
+        n_high_global,
+        100.0 * n_high_global / max(n_valid, 1),
     )
 
     # --- c0 normalization + z-scoring (DESIGN §XP Hermite coefficients) ---
@@ -252,17 +259,15 @@ def main() -> None:
     # Positive-c0 is a physical sanity check: c0 encodes absolute flux. Negative
     # or zero c0 indicates a degenerate fit; such rows fall out of the normal
     # population for the purposes of normalization and the log10 z-score.
-    c0_ok = (
-        normal_pop
-        & np.isfinite(bp_c0) & (bp_c0 > 0.0)
-        & np.isfinite(rp_c0) & (rp_c0 > 0.0)
-    )
+    c0_ok = normal_pop & np.isfinite(bp_c0) & (bp_c0 > 0.0) & np.isfinite(rp_c0) & (rp_c0 > 0.0)
     n_c0_ok = int(c0_ok.sum())
     n_c0_rejected_from_normal = int(normal_pop.sum() - n_c0_ok)
     logger.info(
         "normal-population: %d rows; of which c0>0 finite in both bands: %d "
         "(rejected %d for nonpositive/nonfinite c0)",
-        int(normal_pop.sum()), n_c0_ok, n_c0_rejected_from_normal,
+        int(normal_pop.sum()),
+        n_c0_ok,
+        n_c0_rejected_from_normal,
     )
 
     # Normalized shape coefficients: bp_coef_norm_{1..54} = bp_coef_{i} / bp_coef_0.
@@ -284,7 +289,11 @@ def main() -> None:
     logger.info(
         "frozen c0 z-score stats: BP mu=%.6f sigma=%.6f (log10 space) | "
         "RP mu=%.6f sigma=%.6f | n_reference=%d",
-        bp_mu, bp_sigma, rp_mu, rp_sigma, n_c0_ok,
+        bp_mu,
+        bp_sigma,
+        rp_mu,
+        rp_sigma,
+        n_c0_ok,
     )
 
     bp_c0_z = np.full(len(df), np.nan, dtype=np.float32)
@@ -350,13 +359,17 @@ def main() -> None:
             rp_norm_sigma[i] = 1.0
     logger.info(
         "BP σ range: min=%.3e max=%.3e  |  RP σ range: min=%.3e max=%.3e",
-        float(bp_norm_sigma[1:].min()), float(bp_norm_sigma[1:].max()),
-        float(rp_norm_sigma[1:].min()), float(rp_norm_sigma[1:].max()),
+        float(bp_norm_sigma[1:].min()),
+        float(bp_norm_sigma[1:].max()),
+        float(rp_norm_sigma[1:].min()),
+        float(rp_norm_sigma[1:].max()),
     )
     if tiny_sigma_bp or tiny_sigma_rp:
         logger.warning(
             "degenerate σ (<%g) substituted with 1.0: BP %s, RP %s",
-            sigma_floor, tiny_sigma_bp, tiny_sigma_rp,
+            sigma_floor,
+            tiny_sigma_bp,
+            tiny_sigma_rp,
         )
 
     bp_norm_z = np.full_like(bp_norm, np.nan, dtype=np.float32)

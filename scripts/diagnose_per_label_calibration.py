@@ -35,6 +35,7 @@ from arqueogal.xp_abundances.main.training import build_dataloaders, load_checkp
 
 # Reuse the heavy lifting from run_calibration.
 import sys as _sys
+
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_calibration import (  # noqa: E402
     _build_cfg_for_val_loader,
@@ -62,7 +63,9 @@ def main() -> None:
     args.report_dir.mkdir(parents=True, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    member_ckpts = sorted(args.ensemble.glob("member_seed*/xp_abundances_main_ensemble_seed*_best.pt"))
+    member_ckpts = sorted(
+        args.ensemble.glob("member_seed*/xp_abundances_main_ensemble_seed*_best.pt")
+    )
     if not member_ckpts:
         raise FileNotFoundError(f"no members under {args.ensemble}")
     _LOG.info("found %d members", len(member_ckpts))
@@ -76,8 +79,10 @@ def main() -> None:
     split_seed = int(first_cfg.get("split_seed", 0))
 
     cfg = _build_cfg_for_val_loader(
-        parquet=args.parquet, pretrained_ckpt=pretrained_ckpt,
-        batch_size=args.batch_size, seed=split_seed,
+        parquet=args.parquet,
+        pretrained_ckpt=pretrained_ckpt,
+        batch_size=args.batch_size,
+        seed=split_seed,
     )
     _, val_loader, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
     _LOG.info("val loader built, batches=%d", len(val_loader))
@@ -139,19 +144,21 @@ def main() -> None:
         rj = r[mask]
         zc = z_col[mask]
         yc = y_col[mask]
-        rows.append({
-            "label": name,
-            "n": int(mask.sum()),
-            "y_std": float(yc.std()),
-            "resid_mean": float(rj.mean()),
-            "resid_std": float(rj.std()),
-            "abs_bias_over_ystd": float(abs(rj.mean()) / (yc.std() + 1e-12)),
-            "z_mean": float(zc.mean()),
-            "z_std": float(zc.std()),
-            "cov68": float(np.mean(np.abs(zc) < 1.0)),
-            "cov95": float(np.mean(np.abs(zc) < 1.96)),
-            "rel_err": float(abs(zc.var() - 1.0)),
-        })
+        rows.append(
+            {
+                "label": name,
+                "n": int(mask.sum()),
+                "y_std": float(yc.std()),
+                "resid_mean": float(rj.mean()),
+                "resid_std": float(rj.std()),
+                "abs_bias_over_ystd": float(abs(rj.mean()) / (yc.std() + 1e-12)),
+                "z_mean": float(zc.mean()),
+                "z_std": float(zc.std()),
+                "cov68": float(np.mean(np.abs(zc) < 1.0)),
+                "cov95": float(np.mean(np.abs(zc) < 1.96)),
+                "rel_err": float(abs(zc.var() - 1.0)),
+            }
+        )
 
     # Pretty-print.
     def _fmt(v, width, prec=4):
@@ -161,7 +168,9 @@ def main() -> None:
 
     # Table 1: residuals.
     print("\n# Table 1 — per-label residual bias (raw units)")
-    print(f"{'label':<17} {'n':>7} {'y_std':>9} {'resid_mean':>12} {'resid_std':>10} {'|bias|/y_std':>13}")
+    print(
+        f"{'label':<17} {'n':>7} {'y_std':>9} {'resid_mean':>12} {'resid_std':>10} {'|bias|/y_std':>13}"
+    )
     for r in rows:
         if r.get("n", 0) < 8:
             print(f"{r['label']:<17} {r['n']:>7}  (insufficient data)")
@@ -173,7 +182,9 @@ def main() -> None:
         )
 
     # Table 2: z-statistic and coverage.
-    print("\n# Table 2 — per-label z-statistic and coverage (target: z_mean=0, z_std=1, cov68=0.68, cov95=0.95)")
+    print(
+        "\n# Table 2 — per-label z-statistic and coverage (target: z_mean=0, z_std=1, cov68=0.68, cov95=0.95)"
+    )
     print(f"{'label':<17} {'z_mean':>9} {'z_std':>9} {'cov68':>9} {'cov95':>9}")
     for r in rows:
         if r.get("n", 0) < 8:
@@ -185,7 +196,9 @@ def main() -> None:
         )
 
     # Table 3: reliability error sorted worst → best.
-    print("\n# Table 3 — per-label reliability error |Var(z) − 1| (target ≤ 0.10), sorted worst → best")
+    print(
+        "\n# Table 3 — per-label reliability error |Var(z) − 1| (target ≤ 0.10), sorted worst → best"
+    )
     print(f"{'label':<17} {'rel_err':>9}")
     sorted_rows = [r for r in rows if r.get("n", 0) >= 8]
     sorted_rows.sort(key=lambda r: -r["rel_err"])
@@ -214,19 +227,24 @@ def main() -> None:
     # Persist as JSON.
     out = args.report_dir / "per_label_calibration_diagnostic.json"
     with out.open("w") as f:
-        json.dump({
-            "ensemble_dir": str(args.ensemble),
-            "n_members": len(member_ckpts),
-            "n_val_stars": int(y_block.shape[0]),
-            "rows": rows,
-            "summary": {
-                "max_abs_bias_over_ystd": max_abs_bias,
-                "max_zstd_dev_from_1": max_zstd_dev,
-                "max_abs_zmean": max_zmean,
-                "failing_labels": bad_labels,
-                "passing_labels": good_labels,
+        json.dump(
+            {
+                "ensemble_dir": str(args.ensemble),
+                "n_members": len(member_ckpts),
+                "n_val_stars": int(y_block.shape[0]),
+                "rows": rows,
+                "summary": {
+                    "max_abs_bias_over_ystd": max_abs_bias,
+                    "max_zstd_dev_from_1": max_zstd_dev,
+                    "max_abs_zmean": max_zmean,
+                    "failing_labels": bad_labels,
+                    "passing_labels": good_labels,
+                },
             },
-        }, f, indent=2, default=str)
+            f,
+            indent=2,
+            default=str,
+        )
     _LOG.info("wrote %s", out)
 
 

@@ -88,7 +88,9 @@ def _rebuild_cfg_from_checkpoint(blob: dict) -> TrainingConfig:
 
 
 def _predict_val(
-    ckpt_path: Path, parquet: Path, device: torch.device,
+    ckpt_path: Path,
+    parquet: Path,
+    device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray, LabelTiers]:
     """Return ``(mu_raw, y_raw, tiers)`` on the val partition, in human (tier) order."""
     blob = load_checkpoint(ckpt_path, map_location=device)
@@ -111,7 +113,10 @@ def _predict_val(
     tiers = LabelTiers.five_label()
 
     train_loader, val_loader, _split_ids, label_scaler = build_dataloaders(
-        cfg, layout, tiers, seed=blob.get("seed", 0),
+        cfg,
+        layout,
+        tiers,
+        seed=blob.get("seed", 0),
     )
     del train_loader
 
@@ -149,7 +154,9 @@ def _predict_val(
 
 
 def _chemistry_figure(
-    mu_raw: np.ndarray, y_raw: np.ndarray, tiers: LabelTiers,
+    mu_raw: np.ndarray,
+    y_raw: np.ndarray,
+    tiers: LabelTiers,
 ) -> tuple[plt.Figure, dict]:
     """3-panel: APOGEE truth, XP-joint pred, residual vs [M/H]."""
     i_mh = tiers.all_labels.index("mh_apogee")
@@ -164,21 +171,18 @@ def _chemistry_figure(
 
     fig, axes = plt.subplots(1, 3, figsize=(17, 5), dpi=150)
 
-    axes[0].hist2d(mh_t, alpha_t, bins=120, range=(mh_range, alpha_range),
-                   cmap="magma", cmin=1)
+    axes[0].hist2d(mh_t, alpha_t, bins=120, range=(mh_range, alpha_range), cmap="magma", cmin=1)
     axes[0].set_xlabel("[M/H] (APOGEE truth)")
     axes[0].set_ylabel(r"[$\alpha$/M] (APOGEE truth)")
     axes[0].set_title(f"APOGEE truth — val ({len(mh_t):,} stars)")
 
-    axes[1].hist2d(mh_p, alpha_p, bins=120, range=(mh_range, alpha_range),
-                   cmap="magma", cmin=1)
+    axes[1].hist2d(mh_p, alpha_p, bins=120, range=(mh_range, alpha_range), cmap="magma", cmin=1)
     axes[1].set_xlabel("[M/H] (predicted)")
     axes[1].set_ylabel(r"[$\alpha$/M] (predicted)")
     axes[1].set_title("XP-joint prediction — same stars")
 
     residual = alpha_p - alpha_t
-    axes[2].hist2d(mh_t, residual, bins=120,
-                   range=(mh_range, (-0.3, 0.3)), cmap="coolwarm", cmin=1)
+    axes[2].hist2d(mh_t, residual, bins=120, range=(mh_range, (-0.3, 0.3)), cmap="coolwarm", cmin=1)
     axes[2].axhline(0.0, color="k", ls="--", lw=0.8, alpha=0.5)
     axes[2].set_xlabel("[M/H] (APOGEE truth)")
     axes[2].set_ylabel(r"[$\alpha$/M]$_\mathrm{pred} -$ [$\alpha$/M]$_\mathrm{truth}$")
@@ -197,16 +201,25 @@ def _chemistry_figure(
     for b in range(len(bin_edges) - 1):
         m = bin_idx == b
         if m.sum() < 10:
-            per_bin.append({"edge_lo": float(bin_edges[b]), "edge_hi": float(bin_edges[b + 1]),
-                            "n": int(m.sum()), "median_resid": None})
+            per_bin.append(
+                {
+                    "edge_lo": float(bin_edges[b]),
+                    "edge_hi": float(bin_edges[b + 1]),
+                    "n": int(m.sum()),
+                    "median_resid": None,
+                }
+            )
             continue
-        per_bin.append({
-            "edge_lo": float(bin_edges[b]), "edge_hi": float(bin_edges[b + 1]),
-            "n": int(m.sum()),
-            "median_resid": float(np.median(residual[m])),
-            "p16_resid": float(np.percentile(residual[m], 16)),
-            "p84_resid": float(np.percentile(residual[m], 84)),
-        })
+        per_bin.append(
+            {
+                "edge_lo": float(bin_edges[b]),
+                "edge_hi": float(bin_edges[b + 1]),
+                "n": int(m.sum()),
+                "median_resid": float(np.median(residual[m])),
+                "p16_resid": float(np.percentile(residual[m], 16)),
+                "p84_resid": float(np.percentile(residual[m], 84)),
+            }
+        )
 
     summary = {
         "n_val": len(mh_t),
@@ -222,16 +235,17 @@ def _chemistry_figure(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ckpt", type=Path, required=True,
-                        help="XP-joint best-val checkpoint.")
+    parser.add_argument("--ckpt", type=Path, required=True, help="XP-joint best-val checkpoint.")
     parser.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--prefix", type=str, default="xp_joint")
     parser.add_argument("--device", type=str, default=None)
     args = parser.parse_args()
 
-    device = torch.device(args.device) if args.device is not None else (
-        torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.device(args.device)
+        if args.device is not None
+        else (torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     )
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -249,8 +263,12 @@ def main() -> None:
     summary_path = args.out_dir / f"{args.prefix}_chemistry_summary.json"
     with summary_path.open("w") as f:
         json.dump(summary, f, indent=2)
-    _LOG.info("wrote figure to %s (n=%d, stripe frac=%.2f%%)",
-              png_path, summary["n_val"], summary["attractor_stripe_pred"]["fraction"] * 100)
+    _LOG.info(
+        "wrote figure to %s (n=%d, stripe frac=%.2f%%)",
+        png_path,
+        summary["n_val"],
+        summary["attractor_stripe_pred"]["fraction"] * 100,
+    )
 
 
 if __name__ == "__main__":

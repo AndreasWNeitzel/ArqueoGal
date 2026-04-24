@@ -139,15 +139,13 @@ def build_dataloaders(
     # the encoder can't learn from it. Extinction priors (av_edenhofer, etc.)
     # are allowed to be NaN — those rows represent stars outside a given map's
     # coverage — and we impute to 0 so the encoder sees "no prior signal".
-    n_xp = (
-        len(layout.bp_coef_cols) + len(layout.rp_coef_cols)
-        + len(layout.xp_scalar_cols)
-    )
+    n_xp = len(layout.bp_coef_cols) + len(layout.rp_coef_cols) + len(layout.xp_scalar_cols)
     xp_finite = np.isfinite(arrs["X"][:, :n_xp]).all(axis=1)
     if not xp_finite.all():
         _LOG.info(
             "dropping %d/%d rows with NaN in XP features",
-            int((~xp_finite).sum()), len(xp_finite),
+            int((~xp_finite).sum()),
+            len(xp_finite),
         )
         for k in ("X", "Y", "sigma_Y", "source_id"):
             if k in arrs:
@@ -168,9 +166,12 @@ def build_dataloaders(
         "fit label scaler on %d train stars — Teff mean=%.1f scale=%.1f, "
         "logg mean=%.2f scale=%.2f, [M/H] mean=%.2f scale=%.2f",
         int(train_mask.sum()),
-        float(label_scaler.mean[0]), float(label_scaler.scale[0]),
-        float(label_scaler.mean[1]), float(label_scaler.scale[1]),
-        float(label_scaler.mean[2]), float(label_scaler.scale[2]),
+        float(label_scaler.mean[0]),
+        float(label_scaler.scale[0]),
+        float(label_scaler.mean[1]),
+        float(label_scaler.scale[1]),
+        float(label_scaler.mean[2]),
+        float(label_scaler.scale[2]),
     )
     # ``transform`` is NaN-preserving; rescaled uncertainties scale by 1/s too
     # (only σ_Y is also divided, so its meaning relative to the standardised
@@ -180,7 +181,9 @@ def build_dataloaders(
     # per-star NLL let [α/M] regress to the disc mean at [M/H]<-0.5.
     if cfg.inverse_freq_weighting:
         train_weights = _compute_inverse_freq_weights(
-            arrs["Y"][train_mask], tiers=tiers, cfg=cfg,
+            arrs["Y"][train_mask],
+            tiers=tiers,
+            cfg=cfg,
         )
     else:
         train_weights = None
@@ -192,13 +195,18 @@ def build_dataloaders(
     stage_gpu = cfg.stage_dataset_on_gpu and torch.cuda.is_available()
     ds_device = "cuda" if stage_gpu else "cpu"
     train_ds = XpAbundanceDataset(
-        X=arrs["X"][train_mask], Y=arrs["Y"][train_mask],
-        sigma_Y=arrs["sigma_Y"][train_mask], source_id=arrs["source_id"][train_mask],
-        weights=train_weights, device=ds_device,
+        X=arrs["X"][train_mask],
+        Y=arrs["Y"][train_mask],
+        sigma_Y=arrs["sigma_Y"][train_mask],
+        source_id=arrs["source_id"][train_mask],
+        weights=train_weights,
+        device=ds_device,
     )
     val_ds = XpAbundanceDataset(
-        X=arrs["X"][val_mask], Y=arrs["Y"][val_mask],
-        sigma_Y=arrs["sigma_Y"][val_mask], source_id=arrs["source_id"][val_mask],
+        X=arrs["X"][val_mask],
+        Y=arrs["Y"][val_mask],
+        sigma_Y=arrs["sigma_Y"][val_mask],
+        source_id=arrs["source_id"][val_mask],
         device=ds_device,
     )
 
@@ -209,13 +217,20 @@ def build_dataloaders(
     loader_pin = (not stage_gpu) and torch.cuda.is_available()
     g = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(
-        train_ds, batch_size=cfg.batch_size, shuffle=True,
-        num_workers=loader_workers, pin_memory=loader_pin,
-        generator=g, drop_last=True,
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=loader_workers,
+        pin_memory=loader_pin,
+        generator=g,
+        drop_last=True,
     )
     val_loader = DataLoader(
-        val_ds, batch_size=cfg.batch_size, shuffle=False,
-        num_workers=loader_workers, pin_memory=loader_pin,
+        val_ds,
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=loader_workers,
+        pin_memory=loader_pin,
     )
     return train_loader, val_loader, split_ids, label_scaler
 
@@ -275,8 +290,7 @@ def _compute_inverse_freq_weights(
     n_finite = int(finite.sum())
     if n_finite == 0:
         raise RuntimeError(
-            "no finite [M/H] values in train partition — cannot compute "
-            "inverse-frequency weights",
+            "no finite [M/H] values in train partition — cannot compute inverse-frequency weights",
         )
     probs = counts / float(n_finite)
     inv_freq = np.where(counts > 0, 1.0 / np.maximum(probs, 1e-12), 1.0)
@@ -289,21 +303,26 @@ def _compute_inverse_freq_weights(
 
     # Per-bin diagnostics for the training log.
     edge_repr = [f"(-inf, {edges[0]:.2f})"]
-    edge_repr.extend(
-        f"[{edges[i]:.2f}, {edges[i + 1]:.2f})" for i in range(len(edges) - 1)
-    )
+    edge_repr.extend(f"[{edges[i]:.2f}, {edges[i + 1]:.2f})" for i in range(len(edges) - 1))
     edge_repr.append(f"[{edges[-1]:.2f}, +inf)")
     for k in range(n_bins):
         bin_mean_w = float(w[(bin_idx == k) & finite].mean()) if counts[k] > 0 else 1.0
         _LOG.info(
             "inverse-freq bin %d %s: n=%d (p=%.4f) → w_mean=%.3f",
-            k, edge_repr[k], counts[k], probs[k], bin_mean_w,
+            k,
+            edge_repr[k],
+            counts[k],
+            probs[k],
+            bin_mean_w,
         )
     _LOG.info(
-        "inverse-freq weights: n_finite=%d, n_nan=%d, clip=%.1f, "
-        "w range [%.3f, %.3f], mean=%.4f",
-        n_finite, len(w) - n_finite, cfg.inverse_freq_clip,
-        float(w.min()), float(w.max()), float(w.mean()),
+        "inverse-freq weights: n_finite=%d, n_nan=%d, clip=%.1f, w range [%.3f, %.3f], mean=%.4f",
+        n_finite,
+        len(w) - n_finite,
+        cfg.inverse_freq_clip,
+        float(w.min()),
+        float(w.max()),
+        float(w.mean()),
     )
     return w
 
@@ -338,7 +357,10 @@ def _block_layout_for(tiers: LabelTiers) -> CovarianceBlockLayout:
 
 
 def _build_model_and_temperature(
-    cfg: TrainingConfig, layout: FeatureLayout, tiers: LabelTiers, device: torch.device,
+    cfg: TrainingConfig,
+    layout: FeatureLayout,
+    tiers: LabelTiers,
+    device: torch.device,
 ) -> tuple[XpAbundanceModel, nn.Parameter, XpFeatureAdapter]:
     """Construct model + learnable temperature + adapter on ``device``.
 
@@ -371,8 +393,10 @@ def _build_model_and_temperature(
 
     if cfg.pretrained_encoder_ckpt is not None:
         _load_pretrained_weights(
-            model, cfg.pretrained_encoder_ckpt,
-            reload_head=cfg.reload_head_from_pretrained, device=device,
+            model,
+            cfg.pretrained_encoder_ckpt,
+            reload_head=cfg.reload_head_from_pretrained,
+            device=device,
         )
 
     return model, log_temp, adapter
@@ -392,12 +416,14 @@ def _load_pretrained_weights(
         model.head.load_state_dict(blob["regressor"])
     _LOG.info(
         "loaded pretrained encoder from %s (reload_head=%s)",
-        ckpt_path, reload_head,
+        ckpt_path,
+        reload_head,
     )
 
 
 def _clamped_temperature(
-    log_temp: torch.Tensor, bounds: tuple[float, float],
+    log_temp: torch.Tensor,
+    bounds: tuple[float, float],
 ) -> torch.Tensor:
     """Exponentiate + clamp to physically sensible range — in-graph."""
     return torch.exp(log_temp).clamp(min=bounds[0], max=bounds[1])
@@ -446,10 +472,7 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
     mu, L, h, z = model(x_adapted)
 
     if supcon_active:
-        y_for_supcon = (
-            y[:, : lw.supcon_label_n_first]
-            if lw.supcon_label_n_first is not None else y
-        )
+        y_for_supcon = y[:, : lw.supcon_label_n_first] if lw.supcon_label_n_first is not None else y
         if queue is not None:
             qz, qy = queue.get()
             # Label dims must agree: queue was sized for the full y; slice to
@@ -461,8 +484,12 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
         else:
             zk, yk = z, y_for_supcon
         supcon = supcon_soft_positive(
-            z, y_for_supcon, zk, yk,
-            temperature=tau, sigma=lw.supcon_sigma,
+            z,
+            y_for_supcon,
+            zk,
+            yk,
+            temperature=tau,
+            sigma=lw.supcon_sigma,
         )
     else:
         supcon = torch.zeros((), device=x.device)
@@ -472,7 +499,11 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
         finite = torch.isfinite(y_block)
         y_clean = torch.where(finite, y_block, mu.detach())
         nll = beta_nll_block_cholesky(
-            mu, L, y_clean, beta=lw.beta, mask=finite.float(),
+            mu,
+            L,
+            y_clean,
+            beta=lw.beta,
+            mask=finite.float(),
             sample_weights=weights,
         )
     else:
@@ -484,9 +515,13 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
         bt = torch.zeros((), device=x.device)
 
     total = lw.supcon * supcon + lw.beta_nll * nll + lw.barlow * bt
-    parts = {"loss": float(total.detach()), "supcon": float(supcon.detach()),
-             "nll": float(nll.detach()), "barlow": float(bt.detach()),
-             "tau": float(tau.detach())}
+    parts = {
+        "loss": float(total.detach()),
+        "supcon": float(supcon.detach()),
+        "nll": float(nll.detach()),
+        "barlow": float(bt.detach()),
+        "tau": float(tau.detach()),
+    }
     return total, parts, z.detach(), y.detach()
 
 
@@ -510,7 +545,11 @@ def train_one_epoch(  # noqa: PLR0913 — one-epoch dispatch has many collaborat
     use_amp = amp_dtype is not None and device.type == "cuda"
 
     sums: dict[str, float] = {
-        "loss": 0.0, "supcon": 0.0, "nll": 0.0, "barlow": 0.0, "tau": 0.0,
+        "loss": 0.0,
+        "supcon": 0.0,
+        "nll": 0.0,
+        "barlow": 0.0,
+        "tau": 0.0,
     }
     n = 0
     grad_norm_max = 0.0
@@ -526,24 +565,35 @@ def train_one_epoch(  # noqa: PLR0913 — one-epoch dispatch has many collaborat
         optimizer.zero_grad(set_to_none=True)
 
         with torch.amp.autocast(
-            device_type=device.type, dtype=amp_dtype, enabled=use_amp,
+            device_type=device.type,
+            dtype=amp_dtype,
+            enabled=use_amp,
         ):
             total, parts, z_det, y_det = _compute_losses(
-                model, log_temp, x, y, cfg, adapter, weights=w, queue=queue,
+                model,
+                log_temp,
+                x,
+                y,
+                cfg,
+                adapter,
+                weights=w,
+                queue=queue,
             )
 
         if scaler is not None and scaler.is_enabled():
             scaler.scale(total).backward()
             scaler.unscale_(optimizer)
             g = torch.nn.utils.clip_grad_norm_(
-                [*model.parameters(), log_temp], cfg.grad_clip_norm,
+                [*model.parameters(), log_temp],
+                cfg.grad_clip_norm,
             )
             scaler.step(optimizer)
             scaler.update()
         else:
             total.backward()
             g = torch.nn.utils.clip_grad_norm_(
-                [*model.parameters(), log_temp], cfg.grad_clip_norm,
+                [*model.parameters(), log_temp],
+                cfg.grad_clip_norm,
             )
             optimizer.step()
         scheduler.step()
@@ -589,7 +639,11 @@ def validate(
         raise ValueError("adapter is required; build via _build_model_and_temperature")
     model.eval()
     sums: dict[str, float] = {
-        "loss": 0.0, "supcon": 0.0, "nll": 0.0, "barlow": 0.0, "tau": 0.0,
+        "loss": 0.0,
+        "supcon": 0.0,
+        "nll": 0.0,
+        "barlow": 0.0,
+        "tau": 0.0,
     }
     n = 0
     with torch.no_grad():
@@ -627,7 +681,10 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
 
     if train_loader is None or val_loader is None:
         train_loader, val_loader, _split_ids, label_scaler = build_dataloaders(
-            cfg, layout, tiers, seed=seed,
+            cfg,
+            layout,
+            tiers,
+            seed=seed,
         )
     elif label_scaler is None:
         raise ValueError(
@@ -659,7 +716,10 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
         )
         _LOG.info(
             "momentum queue enabled: size=%d, D=%d, n_labels=%d, warm_start=%s",
-            cfg.queue_size, cfg.latent_dim, tiers.n_labels, cfg.queue_warm_start,
+            cfg.queue_size,
+            cfg.latent_dim,
+            tiers.n_labels,
+            cfg.queue_warm_start,
         )
 
     history: list[dict[str, float]] = []
@@ -672,17 +732,30 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
 
     for epoch in range(cfg.epochs):
         tr = train_one_epoch(
-            model, log_temp, train_loader, optimizer, scheduler, cfg, device, scaler,
-            adapter=adapter, queue=queue,
+            model,
+            log_temp,
+            train_loader,
+            optimizer,
+            scheduler,
+            cfg,
+            device,
+            scaler,
+            adapter=adapter,
+            queue=queue,
         )
         va = validate(model, log_temp, val_loader, cfg, device, adapter=adapter)
-        row = {"epoch": epoch, **{f"train_{k}": v for k, v in tr.items()},
-               **{f"val_{k}": v for k, v in va.items()}}
+        row = {
+            "epoch": epoch,
+            **{f"train_{k}": v for k, v in tr.items()},
+            **{f"val_{k}": v for k, v in va.items()},
+        }
         history.append(row)
         _LOG.info(
-            "epoch %d: train_loss=%.4f val_loss=%.4f tau=%.3f "
-            "grad_max=%.2f grad_mean=%.2f",
-            epoch, tr["loss"], va["loss"], va["tau"],
+            "epoch %d: train_loss=%.4f val_loss=%.4f tau=%.3f grad_max=%.2f grad_mean=%.2f",
+            epoch,
+            tr["loss"],
+            va["loss"],
+            va["tau"],
             tr.get("grad_norm_max", float("nan")),
             tr.get("grad_norm_mean", float("nan")),
         )
@@ -693,8 +766,13 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
             and math.isfinite(cfg.first_epoch_sanity_k)
         ):
             _first_epoch_sanity_check(
-                model, val_loader, adapter, label_scaler,
-                tiers=tiers, device=device, k=cfg.first_epoch_sanity_k,
+                model,
+                val_loader,
+                adapter,
+                label_scaler,
+                tiers=tiers,
+                device=device,
+                k=cfg.first_epoch_sanity_k,
             )
 
         min_delta = (
@@ -704,8 +782,7 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
         )
         if va["loss"] < best_vl - min_delta:
             best_vl, best_epoch, patience = va["loss"], epoch, 0
-            best_model_state = {k: v.detach().cpu().clone()
-                                for k, v in model.state_dict().items()}
+            best_model_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
             best_temp = log_temp.detach().cpu().clone()
         else:
             patience += 1
@@ -713,13 +790,18 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
                 _LOG.info("early stopping at epoch %d (best %d)", epoch, best_epoch)
                 break
 
-        if cfg.checkpoint_every_n_epochs > 0 and (
-            (epoch + 1) % cfg.checkpoint_every_n_epochs == 0
-        ):
+        if cfg.checkpoint_every_n_epochs > 0 and ((epoch + 1) % cfg.checkpoint_every_n_epochs == 0):
             cadence_paths.append(
                 _save_cadence_checkpoint(
-                    cfg, model, log_temp, layout, tiers, label_scaler,
-                    seed=seed, epoch=epoch, history=history,
+                    cfg,
+                    model,
+                    log_temp,
+                    layout,
+                    tiers,
+                    label_scaler,
+                    seed=seed,
+                    epoch=epoch,
+                    history=history,
                 ),
             )
 
@@ -793,18 +875,22 @@ def _first_epoch_sanity_check(  # noqa: PLR0913 — all collaborators are load-b
         mu_mean = float(mu_raw[mask, j].mean())
         dev = abs(mu_mean - y_mean)
         _LOG.info(
-            "first-epoch sanity %s: mean_pred=%.4g mean_truth=%.4g "
-            "std_truth=%.4g dev=%.4g", name, mu_mean, y_mean, y_std, dev,
+            "first-epoch sanity %s: mean_pred=%.4g mean_truth=%.4g std_truth=%.4g dev=%.4g",
+            name,
+            mu_mean,
+            y_mean,
+            y_std,
+            dev,
         )
         if y_std > 0 and dev > k * y_std:
             offenders.append(
-                f"{name}: |{mu_mean:.4g} - {y_mean:.4g}| = {dev:.4g} > "
-                f"{k:g}×{y_std:.4g}",
+                f"{name}: |{mu_mean:.4g} - {y_mean:.4g}| = {dev:.4g} > {k:g}×{y_std:.4g}",
             )
     if offenders:
         raise RuntimeError(
             f"first-epoch sanity check failed — mean prediction > {k:g}·std(truth) "
-            "from mean truth on:\n  " + "\n  ".join(offenders)
+            "from mean truth on:\n  "
+            + "\n  ".join(offenders)
             + "\nCheck the label scaler was fit on the train partition and "
             "that save_checkpoint stores it (not the zeros/ones placeholder).",
         )
@@ -812,7 +898,9 @@ def _first_epoch_sanity_check(  # noqa: PLR0913 — all collaborators are load-b
 
 
 def _build_optimizer(
-    model: XpAbundanceModel, log_temp: nn.Parameter, cfg: TrainingConfig,
+    model: XpAbundanceModel,
+    log_temp: nn.Parameter,
+    cfg: TrainingConfig,
 ) -> torch.optim.Optimizer:
     """Single or two-group AdamW depending on ``cfg.encoder_lr_ratio``.
 
@@ -830,15 +918,17 @@ def _build_optimizer(
     if cfg.encoder_lr_ratio == 1.0:
         return torch.optim.AdamW(
             [*encoder_params, *head_params],
-            lr=cfg.max_lr, weight_decay=cfg.weight_decay, fused=fused,
+            lr=cfg.max_lr,
+            weight_decay=cfg.weight_decay,
+            fused=fused,
         )
     return torch.optim.AdamW(
         [
-            {"params": encoder_params, "lr": cfg.max_lr * cfg.encoder_lr_ratio,
-             "name": "encoder"},
+            {"params": encoder_params, "lr": cfg.max_lr * cfg.encoder_lr_ratio, "name": "encoder"},
             {"params": head_params, "lr": cfg.max_lr, "name": "head"},
         ],
-        weight_decay=cfg.weight_decay, fused=fused,
+        weight_decay=cfg.weight_decay,
+        fused=fused,
     )
 
 
@@ -859,13 +949,17 @@ def _save_cadence_checkpoint(  # noqa: PLR0913 — each field is an independent 
     Cadence checkpoints are rollback points, not the best-val checkpoint the
     run ultimately returns. Caller decides what to keep after training.
     """
-    fname = (
-        f"{cfg.output_prefix}_seed{seed}_epoch{epoch:04d}.pt"
-    )
+    fname = f"{cfg.output_prefix}_seed{seed}_epoch{epoch:04d}.pt"
     path = cfg.output_dir / "cadence" / fname
     return save_checkpoint(
-        path, model=model, log_temp=log_temp, cfg=cfg,
-        layout=layout, tiers=tiers, label_scaler=label_scaler, seed=seed,
+        path,
+        model=model,
+        log_temp=log_temp,
+        cfg=cfg,
+        layout=layout,
+        tiers=tiers,
+        label_scaler=label_scaler,
+        seed=seed,
         training_metrics={"epoch": epoch, "history": history},
     )
 
@@ -921,8 +1015,11 @@ def save_checkpoint(  # noqa: PLR0913 — each field is an independent reload de
         "evol_stage_head": {},
         "label_scaler_mean": label_scaler.mean.astype(np.float32, copy=True),
         "label_scaler_scale": label_scaler.scale.astype(np.float32, copy=True),
-        "calibration": {"temperature_per_cell": {}, "isotonic_per_label": {},
-                        "conformal_scores": np.zeros(0, dtype=np.float32)},
+        "calibration": {
+            "temperature_per_cell": {},
+            "isotonic_per_label": {},
+            "conformal_scores": np.zeros(0, dtype=np.float32),
+        },
         "config_yaml": json.dumps(_config_to_jsonable(cfg)),
         "random_seed": seed,
         "git_sha": git_sha,
@@ -935,7 +1032,8 @@ def save_checkpoint(  # noqa: PLR0913 — each field is an independent reload de
 
 
 def load_checkpoint(
-    path: Path | str, map_location: torch.device | str | None = None,
+    path: Path | str,
+    map_location: torch.device | str | None = None,
 ) -> dict[str, Any]:
     """Load a v2 checkpoint; caller is responsible for constructing modules."""
     blob = cast(dict[str, Any], torch.load(path, map_location=map_location, weights_only=False))
@@ -986,9 +1084,11 @@ def train_ensemble(
             tiers=tiers,
             label_scaler=result["label_scaler"],
             seed=seed,
-            training_metrics={"best_val_loss": result["best_val_loss"],
-                              "best_epoch": result["best_epoch"],
-                              "history": result["history"]},
+            training_metrics={
+                "best_val_loss": result["best_val_loss"],
+                "best_epoch": result["best_epoch"],
+                "history": result["history"],
+            },
             git_sha=git_sha,
         )
         out_paths.append(path)

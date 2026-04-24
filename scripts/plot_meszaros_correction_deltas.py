@@ -31,7 +31,7 @@ PANEL_ELEMENTS: tuple[tuple[str, str], ...] = (
     ("mg_h_atm", "[Mg/H]"),
     ("al_h_atm", "[Al/H]"),
     ("ni_h_atm", "[Ni/H]"),
-    ("o_h_atm",  "[O/H]"),
+    ("o_h_atm", "[O/H]"),
 )
 
 
@@ -51,7 +51,9 @@ def main() -> None:
 
     set_aa_style(colorblind=True, font_size=9.0)
     fig, axes = plt.subplots(
-        2, 3, figsize=(AA_DOUBLE_COLUMN_IN, AA_DOUBLE_COLUMN_IN * 0.58),
+        2,
+        3,
+        figsize=(AA_DOUBLE_COLUMN_IN, AA_DOUBLE_COLUMN_IN * 0.58),
         sharex=True,
     )
     for ax, (col, label) in zip(axes.flat, PANEL_ELEMENTS):
@@ -61,8 +63,14 @@ def main() -> None:
         hb = ax.hexbin(teff, delta, gridsize=70, cmap="magma", bins="log", mincnt=1)
         a, b, _, _ = MESZAROS2025_COEFFS[col]
         xline = np.linspace(4000, 5500, 80)
-        ax.plot(xline, -(a * xline + b), "c-", lw=1.2, alpha=0.85,
-                label=rf"$-(a T_{{\mathrm{{eff}}}}+b)$, $a={a:.2e}$, $b={b:+.3f}$")
+        ax.plot(
+            xline,
+            -(a * xline + b),
+            "c-",
+            lw=1.2,
+            alpha=0.85,
+            label=rf"$-(a T_{{\mathrm{{eff}}}}+b)$, $a={a:.2e}$, $b={b:+.3f}$",
+        )
         ax.axhline(0.0, color="0.5", lw=0.6, ls="--")
         ax.set_title(rf"{label}  $\Delta$ applied")
         ax.set_ylabel(r"post $-$ pre [dex]")
@@ -74,7 +82,8 @@ def main() -> None:
 
     fig.suptitle(
         r"M\'esz\'aros+2025 Table 3 $\Delta$[X/M] applied (pre $\to$ post), "
-        f"354,890 DR19 giants", fontsize=10,
+        f"354,890 DR19 giants",
+        fontsize=10,
     )
     fig.tight_layout(rect=(0, 0, 1, 0.97))
 

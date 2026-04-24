@@ -174,15 +174,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENSEMBLE_DIR = (
     REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
 )
-DEFAULT_FROZEN_STATS = (
-    REPO_ROOT / "data/processed/pipeline1_features_stream1.provenance.json"
-)
-DEFAULT_OOD_TRAIN_PARQUET = (
-    REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
-)
-DEFAULT_MODE_AMBIGUOUS_GRID = (
-    REPO_ROOT / "data/processed/mode_ambiguous_grid.npz"
-)
+DEFAULT_FROZEN_STATS = REPO_ROOT / "data/processed/pipeline1_features_stream1.provenance.json"
+DEFAULT_OOD_TRAIN_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
+DEFAULT_MODE_AMBIGUOUS_GRID = REPO_ROOT / "data/processed/mode_ambiguous_grid.npz"
 
 LABEL_SHORT_NAMES: tuple[str, ...] = ("teff", "logg", "mh", "alpha_m", "mg_h")
 """Short per-label names used for Parquet column prefixes. Order must match
@@ -247,6 +241,7 @@ LABEL_TIERS: dict[str, str] = {
 
 
 # --- Utilities ----------------------------------------------------------------
+
 
 def _resolve_ensemble_checkpoints(ensemble_dir: Path) -> list[Path]:
     """Collect ensemble member ``*.pt`` files from either flat or nested layouts.
@@ -334,6 +329,7 @@ def _atomic_write_parquet(dest: Path, df: pd.DataFrame) -> None:
 
 # --- Input schema detection ---------------------------------------------------
 
+
 def _detect_input_schema(df_columns: set[str]) -> str:
     """Return ``"zscored"`` or ``"raw"``.
 
@@ -371,6 +367,7 @@ def _detect_input_schema(df_columns: set[str]) -> str:
 
 # --- Feature-matrix assembly --------------------------------------------------
 
+
 def _assemble_feature_matrix(
     df: pd.DataFrame,
     layout: FeatureLayout,
@@ -404,7 +401,11 @@ def _assemble_feature_matrix(
         bp_c0_log = df["bp_c0_log"].to_numpy(dtype=np.float64)
         rp_c0_log = df["rp_c0_log"].to_numpy(dtype=np.float64)
         bp_z, rp_z, bp_c0_z, rp_c0_z = apply_frozen_zscore(
-            bp_full, rp_full, bp_c0_log, rp_c0_log, stats,
+            bp_full,
+            rp_full,
+            bp_c0_log,
+            rp_c0_log,
+            stats,
         )
         # Re-index to the layout's requested subset (indices are 1-based).
         bp_index_map = {int(c.removeprefix("bp_coef_norm_")): k for k, c in enumerate(bp_all_cols)}
@@ -415,10 +416,7 @@ def _assemble_feature_matrix(
     else:
         bp_coef = df[bp_cols].to_numpy(dtype=np.float64)
         rp_coef = df[rp_cols].to_numpy(dtype=np.float64)
-        c0_scalars_z = {
-            name: df[name].to_numpy(dtype=np.float64)
-            for name in layout.xp_scalar_cols
-        }
+        c0_scalars_z = {name: df[name].to_numpy(dtype=np.float64) for name in layout.xp_scalar_cols}
 
     parts: list[np.ndarray] = [bp_coef, rp_coef]
     for name in layout.xp_scalar_cols:
@@ -431,14 +429,14 @@ def _assemble_feature_matrix(
     X = np.concatenate(parts, axis=1).astype(np.float32)
     if X.shape[1] != layout.input_dim:
         raise RuntimeError(
-            f"assembled feature matrix width {X.shape[1]} != "
-            f"layout.input_dim {layout.input_dim}",
+            f"assembled feature matrix width {X.shape[1]} != layout.input_dim {layout.input_dim}",
         )
     return X
 
 
 def _compute_aux_missingness_flags(
-    df: pd.DataFrame, layout: FeatureLayout,
+    df: pd.DataFrame,
+    layout: FeatureLayout,
 ) -> dict[str, np.ndarray]:
     """Compute the three aux-missingness flags from the INPUT DataFrame.
 
@@ -497,7 +495,8 @@ def _compute_aux_missingness_flags(
         with np.errstate(invalid="ignore", divide="ignore"):
             plx_over_err = np.where(
                 (plx_err > 0.0) & np.isfinite(plx) & np.isfinite(plx_err),
-                plx / plx_err, np.nan,
+                plx / plx_err,
+                np.nan,
             )
         low_snr = ~(np.abs(plx_over_err) >= PARALLAX_OVER_ERROR_MIN)
         parallax_missing = plx_nan | plx_err_nan | low_snr
@@ -558,14 +557,14 @@ def _xp_108d_block(
         bp_c0_log = df["bp_c0_log"].to_numpy(dtype=np.float64)
         rp_c0_log = df["rp_c0_log"].to_numpy(dtype=np.float64)
         bp_z, rp_z, _, _ = apply_frozen_zscore(
-            bp_full, rp_full, bp_c0_log, rp_c0_log, stats,
+            bp_full,
+            rp_full,
+            bp_c0_log,
+            rp_c0_log,
+            stats,
         )
-        bp_index_map = {
-            int(c.removeprefix("bp_coef_norm_")): k for k, c in enumerate(bp_all_cols)
-        }
-        rp_index_map = {
-            int(c.removeprefix("rp_coef_norm_")): k for k, c in enumerate(rp_all_cols)
-        }
+        bp_index_map = {int(c.removeprefix("bp_coef_norm_")): k for k, c in enumerate(bp_all_cols)}
+        rp_index_map = {int(c.removeprefix("rp_coef_norm_")): k for k, c in enumerate(rp_all_cols)}
         bp = bp_z[:, [bp_index_map[i] for i in layout.xp_bp_indices]].astype(np.float32)
         rp = rp_z[:, [rp_index_map[i] for i in layout.xp_rp_indices]].astype(np.float32)
     else:
@@ -575,6 +574,7 @@ def _xp_108d_block(
 
 
 # --- Ensemble batched inference ----------------------------------------------
+
 
 def _build_loader(X: np.ndarray, n_labels: int, batch_size: int) -> DataLoader:
     """Wrap ``X`` in an :class:`XpAbundanceDataset` + :class:`DataLoader`.
@@ -627,6 +627,7 @@ def _unscale_ensemble_output(
 
 # --- OOD scoring -------------------------------------------------------------
 
+
 def _fit_training_ood_bundle(
     training_parquet: Path,
     layout: FeatureLayout,
@@ -649,6 +650,7 @@ def _fit_training_ood_bundle(
 
 # --- Orchestration ------------------------------------------------------------
 
+
 def _verify_5label_ensemble(members: list[EnsembleMember]) -> None:
     """Guard against wrong-ensemble arguments.
 
@@ -659,8 +661,11 @@ def _verify_5label_ensemble(members: list[EnsembleMember]) -> None:
     first = members[0]
     blob = first.blob
     expected = (
-        "teff_apogee", "logg_apogee", "mh_apogee",
-        "alpha_m_apogee", "mg_h_apogee",
+        "teff_apogee",
+        "logg_apogee",
+        "mh_apogee",
+        "alpha_m_apogee",
+        "mg_h_apogee",
     )
     label_names = tuple(blob["label_names"])
     if label_names != expected:
@@ -700,7 +705,9 @@ def _regime_b_envelope(cfg_path: Path | None) -> RegimeBEnvelope:
 
 
 def _selection_prob(
-    df: pd.DataFrame, *, artifact_path: Path | None = None,
+    df: pd.DataFrame,
+    *,
+    artifact_path: Path | None = None,
 ) -> np.ndarray:
     """Pass through ``selection_prob`` if present, else score from (b_deg, g_mag)."""
     if "selection_prob" in df.columns:
@@ -829,7 +836,8 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     verify_basis_fingerprint(current_fp, stats)
     _LOG.info(
         "basis fingerprint OK (%s...); n_ref=%d",
-        stats.basis_fingerprint[:16], stats.n_reference_population,
+        stats.basis_fingerprint[:16],
+        stats.n_reference_population,
     )
 
     # --- read input -------------------------------------------------------
@@ -883,7 +891,9 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     # --- OOD flags --------------------------------------------------------
     xp_block_108d = _xp_108d_block(df, layout, schema=schema, stats=stats)
     bundle = _fit_training_ood_bundle(
-        ood_training_parquet, layout, p_threshold=0.99,
+        ood_training_parquet,
+        layout,
+        p_threshold=0.99,
     )
     mahal_scores = score_mahalanobis_ood(xp_block_108d, bundle)
     mahal_flags = flag_mahalanobis_ood(xp_block_108d, bundle)
@@ -894,7 +904,9 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     # from `pred` avoids re-running the ensemble just to collect per-member
     # σ diagonals that are equivalent information.
     epi_tot_ratio_per_label = pred.sigma_epistemic / np.clip(
-        np.sqrt(pred.sigma_epistemic ** 2 + pred.sigma_aleatoric ** 2), 1e-12, None,
+        np.sqrt(pred.sigma_epistemic**2 + pred.sigma_aleatoric**2),
+        1e-12,
+        None,
     )
     ens_ratio = epi_tot_ratio_per_label.mean(axis=1).astype(np.float64)
     ens_flags = (ens_ratio > ood_threshold).astype(bool)
@@ -902,7 +914,8 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     joint_flags = (status >= 1).astype(bool)  # either-or-red
     _LOG.info(
         "OOD: mahalanobis_rate=%.4f ensemble_rate=%.4f joint_rate=%.4f",
-        float(mahal_flags.mean()), float(ens_flags.mean()),
+        float(mahal_flags.mean()),
+        float(ens_flags.mean()),
         float(joint_flags.mean()),
     )
 
@@ -918,7 +931,9 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     regime_b_flag = envelope.mask(teff_pred, logg_pred, b_deg)
     _LOG.info(
         "Regime B: %d/%d (%.3f%%) inside envelope (excluded from Tier 1)",
-        int(regime_b_flag.sum()), n_rows, 100.0 * float(regime_b_flag.mean()),
+        int(regime_b_flag.sum()),
+        n_rows,
+        100.0 * float(regime_b_flag.mean()),
     )
 
     # --- mode-ambiguous (bimodal-target) flag -----------------------------
@@ -937,11 +952,12 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     in_grid_flag, in_grid = ambiguity_grid.query(teff_pred, logg_pred, mh_pred)
     mode_ambiguous_flag = in_grid_flag | (~in_grid)
     _LOG.info(
-        "mode-ambiguous: %d/%d (%.3f%%) flagged (%d in-grid bimodal + "
-        "%d out-of-grid)",
-        int(mode_ambiguous_flag.sum()), n_rows,
+        "mode-ambiguous: %d/%d (%.3f%%) flagged (%d in-grid bimodal + %d out-of-grid)",
+        int(mode_ambiguous_flag.sum()),
+        n_rows,
         100.0 * float(mode_ambiguous_flag.mean()),
-        int(in_grid_flag.sum()), int((~in_grid).sum()),
+        int(in_grid_flag.sum()),
+        int((~in_grid).sum()),
     )
 
     # --- selection_prob ---------------------------------------------------
@@ -971,12 +987,11 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     _LOG.info("wrote %s (%d rows, %d cols)", output_parquet, len(out_df), len(out_df.columns))
 
     # --- provenance -------------------------------------------------------
-    ensemble_member_shas = {
-        ckpt.name: _sha256_of_file(ckpt) for ckpt in ckpt_paths
-    }
+    ensemble_member_shas = {ckpt.name: _sha256_of_file(ckpt) for ckpt in ckpt_paths}
     provenance: dict[str, Any] = {
         "output_file": str(output_parquet.relative_to(REPO_ROOT))
-        if output_parquet.is_relative_to(REPO_ROOT) else str(output_parquet),
+        if output_parquet.is_relative_to(REPO_ROOT)
+        else str(output_parquet),
         "script": "scripts/run_pipeline1_inference.py",
         "timestamp_utc": dt.datetime.now(dt.UTC).isoformat(),
         "git_sha": _git_sha(),
@@ -1068,8 +1083,9 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
             ),
         },
         "selection_prob": {
-            "source": "input_passthrough" if "selection_prob" in df.columns
-                      else "scored_from_b_deg_g_mag",
+            "source": "input_passthrough"
+            if "selection_prob" in df.columns
+            else "scored_from_b_deg_g_mag",
             "mean": float(np.nanmean(selection_prob)),
             "median": float(np.nanmedian(selection_prob)),
             "p05": float(np.nanquantile(selection_prob, 0.05)),
@@ -1094,21 +1110,14 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
                     "extinction_cols": list(EXTINCTION_COLS),
                 },
                 "aux_missing_any": {
-                    "rule": (
-                        "ir_missing_flag OR parallax_missing_flag OR "
-                        "extinction_missing_flag"
-                    ),
+                    "rule": ("ir_missing_flag OR parallax_missing_flag OR extinction_missing_flag"),
                 },
             },
             "layout_resolution": {
-                "ir_cols_in_layout": [
-                    c for c in IR_COLS if c in layout.aux_cols
-                ],
+                "ir_cols_in_layout": [c for c in IR_COLS if c in layout.aux_cols],
                 "parallax_in_layout": PARALLAX_COL in layout.aux_cols,
                 "parallax_error_in_layout": PARALLAX_ERROR_COL in layout.aux_cols,
-                "extinction_cols_in_layout": [
-                    c for c in EXTINCTION_COLS if c in layout.aux_cols
-                ],
+                "extinction_cols_in_layout": [c for c in EXTINCTION_COLS if c in layout.aux_cols],
             },
             "flag_rates": {
                 "ir_missing_flag": float(aux_missing_flags["ir_missing_flag"].mean()),
@@ -1156,8 +1165,7 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
             "the upper triangle (i ≤ j) of the ensemble total covariance "
             "(aleatoric + epistemic) after per-member calibration and "
             "moment matching, then un-scaled by the checkpoint's LabelScaler. "
-            "cov_i_i equals sigma_i**2. Label block order: "
-            + ", ".join(LABEL_SHORT_NAMES) + ". "
+            "cov_i_i equals sigma_i**2. Label block order: " + ", ".join(LABEL_SHORT_NAMES) + ". "
             "Tier assignments follow Option 2: all 5 labels are T1 release "
             "quality; log g carries the T1-caveat flag noting spectra are a "
             "secondary information source (see prior_augmented_release_notes)."
@@ -1179,26 +1187,41 @@ def main() -> None:
     parser.add_argument("--frozen-stats", type=Path, default=DEFAULT_FROZEN_STATS)
     parser.add_argument("--output-parquet", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=4096)
-    parser.add_argument("--device", type=str, default="auto",
-                        help="auto | cpu | cuda | cuda:0 | ...")
-    parser.add_argument("--ood-threshold", type=float, default=0.5,
-                        help="epistemic/total σ ratio cutoff for the ensemble "
-                             "disagreement flag")
-    parser.add_argument("--regime-b-config", type=Path, default=None,
-                        help="Optional JSON config for RegimeBEnvelope; if "
-                             "omitted the 5-label halt-cell defaults apply")
-    parser.add_argument("--ood-training-parquet", type=Path,
-                        default=DEFAULT_OOD_TRAIN_PARQUET,
-                        help="Parquet used to refit the training-set "
-                             "Mahalanobis OOD bundle at inference time")
-    parser.add_argument("--mode-ambiguous-grid", type=Path,
-                        default=DEFAULT_MODE_AMBIGUOUS_GRID,
-                        help="Precomputed (Teff, log g, [M/H]) bimodality "
-                             "grid .npz — see scripts/build_mode_ambiguous_mask.py")
-    parser.add_argument("--selection-artifact",
-                        type=Path, default=None,
-                        help="Optional override for the selection-function v1 "
-                             "Parquet artefact path")
+    parser.add_argument(
+        "--device", type=str, default="auto", help="auto | cpu | cuda | cuda:0 | ..."
+    )
+    parser.add_argument(
+        "--ood-threshold",
+        type=float,
+        default=0.5,
+        help="epistemic/total σ ratio cutoff for the ensemble disagreement flag",
+    )
+    parser.add_argument(
+        "--regime-b-config",
+        type=Path,
+        default=None,
+        help="Optional JSON config for RegimeBEnvelope; if "
+        "omitted the 5-label halt-cell defaults apply",
+    )
+    parser.add_argument(
+        "--ood-training-parquet",
+        type=Path,
+        default=DEFAULT_OOD_TRAIN_PARQUET,
+        help="Parquet used to refit the training-set Mahalanobis OOD bundle at inference time",
+    )
+    parser.add_argument(
+        "--mode-ambiguous-grid",
+        type=Path,
+        default=DEFAULT_MODE_AMBIGUOUS_GRID,
+        help="Precomputed (Teff, log g, [M/H]) bimodality "
+        "grid .npz — see scripts/build_mode_ambiguous_mask.py",
+    )
+    parser.add_argument(
+        "--selection-artifact",
+        type=Path,
+        default=None,
+        help="Optional override for the selection-function v1 Parquet artefact path",
+    )
     args = parser.parse_args()
 
     device = _resolve_device(args.device)

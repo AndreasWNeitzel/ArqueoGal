@@ -136,14 +136,20 @@ def resolve_dr2_to_dr3(
     df = df.loc[mask_ang & mask_mag].copy()
     logger.info(
         "resolve_dr2_to_dr3: %d/%d rows passed cuts (angular_distance<%s mas, |Δmag|<%s)",
-        len(df), n_raw, max_angular_distance_mas, max_mag_diff,
+        len(df),
+        n_raw,
+        max_angular_distance_mas,
+        max_mag_diff,
     )
 
     if df.empty:
         return pd.DataFrame(
             columns=[
-                "dr2_source_id", "dr3_source_id",
-                "angular_distance", "magnitude_difference", "n_candidates",
+                "dr2_source_id",
+                "dr3_source_id",
+                "angular_distance",
+                "magnitude_difference",
+                "n_candidates",
             ]
         )
 
@@ -164,8 +170,11 @@ def resolve_dr2_to_dr3(
     df = df.merge(candidate_counts, on="dr2_source_id", how="left")
     return df[
         [
-            "dr2_source_id", "dr3_source_id",
-            "angular_distance", "magnitude_difference", "n_candidates",
+            "dr2_source_id",
+            "dr3_source_id",
+            "angular_distance",
+            "magnitude_difference",
+            "n_candidates",
         ]
     ]
 
@@ -187,7 +196,8 @@ def crossmatch_dr2_to_dr3(  # noqa: PLR0913 — keyword-only tuning knobs with s
     :func:`resolve_dr2_to_dr3` with the default §4.3 cuts.
     """
     raw = fetch_dr2_neighbourhood(
-        service, dr2_source_ids,
+        service,
+        dr2_source_ids,
         batch_size=batch_size,
         checkpoint_dir=checkpoint_dir,
         mode=mode,

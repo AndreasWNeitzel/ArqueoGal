@@ -69,8 +69,9 @@ def main() -> None:
     n = len(df)
     logger.info("delta A_V subset: %d rows (union ∩ ye_ok)", n)
     if n != len(ye_ok):
-        logger.warning("mismatch: %d Ye-OK vs %d in union — %d missing",
-                       len(ye_ok), n, len(ye_ok) - n)
+        logger.warning(
+            "mismatch: %d Ye-OK vs %d in union — %d missing", len(ye_ok), n, len(ye_ok) - n
+        )
 
     d_pc = df["distance_pc"].to_numpy(dtype=np.float64)
     valid_d = np.isfinite(d_pc) & (d_pc > 0)
@@ -79,8 +80,10 @@ def main() -> None:
     far_mask = valid_d & (d_kpc >= NEAR_BOUNDARY_KPC)
     logger.info(
         "distance bins: %d near (<%.2f kpc), %d far (≥%.2f kpc), %d no-distance",
-        int(near_mask.sum()), NEAR_BOUNDARY_KPC,
-        int(far_mask.sum()), NEAR_BOUNDARY_KPC,
+        int(near_mask.sum()),
+        NEAR_BOUNDARY_KPC,
+        int(far_mask.sum()),
+        NEAR_BOUNDARY_KPC,
         int((~valid_d).sum()),
     )
 
@@ -124,13 +127,15 @@ def main() -> None:
         av_los[far_mask] = av_sfd[far_mask]
         source[far_mask] = 2
 
-    out_df = pd.DataFrame({
-        "source_id": df["source_id"].to_numpy(),
-        "av_edenhofer": av_eden,
-        "av_sfd_path": av_sfd,
-        "av_los": av_los,
-        "av_los_source": source,
-    })
+    out_df = pd.DataFrame(
+        {
+            "source_id": df["source_id"].to_numpy(),
+            "av_edenhofer": av_eden,
+            "av_sfd_path": av_sfd,
+            "av_los": av_los,
+            "av_los_source": source,
+        }
+    )
     _write_parquet_atomic(out_df, out)
     size_mb = out.stat().st_size / 1024**2
     logger.info("wrote %s (%.1f MB)", out, size_mb)
@@ -138,8 +143,7 @@ def main() -> None:
     n_eden = int((source == 0).sum())
     n_sfd = int((source == 2).sum())
     n_nan = int((source == -1).sum())
-    logger.info("composition: %d Edenhofer, %d SFD-fallback, %d no-coverage",
-                n_eden, n_sfd, n_nan)
+    logger.info("composition: %d Edenhofer, %d SFD-fallback, %d no-coverage", n_eden, n_sfd, n_nan)
 
     prov = Provenance(
         output_file=str(out.relative_to(repo)),

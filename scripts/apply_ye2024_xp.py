@@ -81,9 +81,7 @@ def main() -> None:
     logger.info("loading Stream 1 + Stream 3 coords")
     s1_coords = pd.read_parquet(s1_path, columns=["source_id", "ra", "dec"])
     s3_coords = pd.read_parquet(s3_path, columns=["source_id", "ra", "dec"])
-    coords = pd.concat([s1_coords, s3_coords], ignore_index=True).drop_duplicates(
-        "source_id"
-    )
+    coords = pd.concat([s1_coords, s3_coords], ignore_index=True).drop_duplicates("source_id")
     logger.info("  coords: %d unique source_ids", len(coords))
 
     # Inner join to drop any XP rows not present in either stream's coord set
@@ -133,7 +131,9 @@ def main() -> None:
         )
         logger.info(
             "  wrote %s (%d rows); running flags: %s",
-            ckpt.name, len(out), flag_totals,
+            ckpt.name,
+            len(out),
+            flag_totals,
         )
 
     logger.info("concatenating %d checkpoints", n_mega)

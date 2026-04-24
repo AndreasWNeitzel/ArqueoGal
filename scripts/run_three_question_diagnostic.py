@@ -58,14 +58,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("three_question_diagnostic")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_ENSEMBLE = (
-    REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
-)
+DEFAULT_ENSEMBLE = REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
 DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
 DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/audit"
-DEFAULT_BASELINE_DIR = (
-    REPO_ROOT / "models/main/xp_abundances/aux_only_baseline_20260419"
-)
+DEFAULT_BASELINE_DIR = REPO_ROOT / "models/main/xp_abundances/aux_only_baseline_20260419"
 
 # Labels in scope for this diagnostic (block-order indices).
 TARGET_LABELS = ("teff_apogee", "logg_apogee")
@@ -101,7 +97,8 @@ class EnsembleMeanWrapper(nn.Module):
         self.n_labels = len(scaler_block.label_names)
 
     def forward(
-        self, x: torch.Tensor,
+        self,
+        x: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         xa = self.adapter(x)
         mus_scaled: list[torch.Tensor] = []
@@ -112,7 +109,9 @@ class EnsembleMeanWrapper(nn.Module):
         mu_unscaled = mu_mean_scaled * self._scale + self._mean
         batch = x.shape[0]
         L_identity = torch.eye(
-            self.n_labels, device=x.device, dtype=x.dtype,
+            self.n_labels,
+            device=x.device,
+            dtype=x.dtype,
         ).expand(batch, -1, -1)
         return mu_unscaled, L_identity, x, x
 
@@ -170,7 +169,9 @@ def _reconstruct_model(
 
 
 def _build_cfg_for_val_loader(
-    parquet: Path, split_seed: int, batch_size: int,
+    parquet: Path,
+    split_seed: int,
+    batch_size: int,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -191,11 +192,21 @@ def _build_cfg_for_val_loader(
 def _feature_family_indices(layout: FeatureLayout) -> dict[str, list[int]]:
     i = 0
     families: dict[str, list[int]] = {}
-    n_bp = len(layout.bp_coef_cols); families["bp_shape"] = list(range(i, i + n_bp)); i += n_bp
-    n_rp = len(layout.rp_coef_cols); families["rp_shape"] = list(range(i, i + n_rp)); i += n_rp
-    n_c0 = len(layout.xp_scalar_cols); families["xp_c0"] = list(range(i, i + n_c0)); i += n_c0
-    n_res = len(layout.residual_cols); families["residual"] = list(range(i, i + n_res)); i += n_res
-    n_aux = len(layout.aux_cols); families["aux"] = list(range(i, i + n_aux)); i += n_aux
+    n_bp = len(layout.bp_coef_cols)
+    families["bp_shape"] = list(range(i, i + n_bp))
+    i += n_bp
+    n_rp = len(layout.rp_coef_cols)
+    families["rp_shape"] = list(range(i, i + n_rp))
+    i += n_rp
+    n_c0 = len(layout.xp_scalar_cols)
+    families["xp_c0"] = list(range(i, i + n_c0))
+    i += n_c0
+    n_res = len(layout.residual_cols)
+    families["residual"] = list(range(i, i + n_res))
+    i += n_res
+    n_aux = len(layout.aux_cols)
+    families["aux"] = list(range(i, i + n_aux))
+    i += n_aux
     assert i == layout.input_dim, (i, layout.input_dim)
     return families
 
@@ -237,7 +248,8 @@ def _nan_rmse_single(pred: np.ndarray, truth: np.ndarray) -> float:
 
 
 def _collect_val_arrays(
-    loader: _RawLoaderWrapper, layout: FeatureLayout,
+    loader: _RawLoaderWrapper,
+    layout: FeatureLayout,
 ) -> tuple[np.ndarray, np.ndarray]:
     xs: list[np.ndarray] = []
     ys: list[np.ndarray] = []
@@ -251,7 +263,9 @@ def _collect_val_arrays(
 
 
 def _collect_baseline_mu(
-    model: nn.Module, loader: _RawLoaderWrapper, device: torch.device,
+    model: nn.Module,
+    loader: _RawLoaderWrapper,
+    device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray]:
     model.eval()
     mus: list[np.ndarray] = []
@@ -268,7 +282,8 @@ def _collect_baseline_mu(
 
 
 def _pca_xp_summary(
-    X_val_xp: np.ndarray, variance_threshold: float = 0.95,
+    X_val_xp: np.ndarray,
+    variance_threshold: float = 0.95,
 ) -> tuple[np.ndarray, int, float]:
     """Return PCA projection of the XP block retaining ``variance_threshold`` var.
 
@@ -288,7 +303,7 @@ def _pca_xp_summary(
     Xc = X_val_xp - X_val_xp.mean(axis=0, keepdims=True)
     # Use economy SVD — N is typically > D so we do full_matrices=False.
     U, s, _Vt = np.linalg.svd(Xc.astype(np.float64), full_matrices=False)
-    var = (s ** 2) / max(Xc.shape[0] - 1, 1)
+    var = (s**2) / max(Xc.shape[0] - 1, 1)
     cum = np.cumsum(var) / var.sum()
     k = int(np.searchsorted(cum, variance_threshold) + 1)
     k = max(k, 2)  # guard against threshold-satisfied-by-one-component pathology
@@ -297,7 +312,8 @@ def _pca_xp_summary(
 
 
 def _aux_conditioning(
-    parquet_path: Path, source_ids: np.ndarray,
+    parquet_path: Path,
+    source_ids: np.ndarray,
 ) -> tuple[np.ndarray, tuple[str, ...]]:
     cond_cols = ("source_id", "bp_rp", "g_mag", "parallax", "av_sfd")
     df = pd.read_parquet(parquet_path, columns=list(cond_cols))
@@ -325,9 +341,7 @@ def _cmi_for_labels(
     seed: int = 0,
 ) -> dict[str, float]:
     rng = np.random.default_rng(seed)
-    finite_row = (
-        np.isfinite(xp_summary).all(axis=1) & np.isfinite(Z).all(axis=1)
-    )
+    finite_row = np.isfinite(xp_summary).all(axis=1) & np.isfinite(Z).all(axis=1)
     out: dict[str, float] = {}
     for j in target_indices:
         name = label_names[j]
@@ -341,7 +355,10 @@ def _cmi_for_labels(
             idx = rng.choice(idx, size=max_samples, replace=False)
         try:
             cmi = conditional_mi_ksg(
-                xp_summary[idx], y[idx], Z[idx], k=k,
+                xp_summary[idx],
+                y[idx],
+                Z[idx],
+                k=k,
             )
         except ValueError as exc:
             _LOG.warning("CMI failed for %s: %s", name, exc)
@@ -396,8 +413,13 @@ class AuxOnlyMLP(nn.Module):
     we need for a head-to-head RMSE comparison.
     """
 
-    def __init__(self, input_dim: int, n_labels: int, hidden: tuple[int, int] = (256, 128),
-                 dropout: float = 0.10) -> None:
+    def __init__(
+        self,
+        input_dim: int,
+        n_labels: int,
+        hidden: tuple[int, int] = (256, 128),
+        dropout: float = 0.10,
+    ) -> None:
         super().__init__()
         layers: list[nn.Module] = []
         prev = input_dim
@@ -438,7 +460,11 @@ def _train_aux_only_baseline(  # noqa: PLR0913
     tr_ds = TensorDataset(X_tr, Y_tr)
     g = torch.Generator().manual_seed(seed)
     tr_loader = DataLoader(
-        tr_ds, batch_size=batch_size, shuffle=True, drop_last=True, generator=g,
+        tr_ds,
+        batch_size=batch_size,
+        shuffle=True,
+        drop_last=True,
+        generator=g,
     )
 
     best_val = float("inf")
@@ -474,7 +500,9 @@ def _train_aux_only_baseline(  # noqa: PLR0913
         history.append({"epoch": epoch, "train_loss": tr_sum / max(tr_n, 1), "val_loss": va_loss})
         _LOG.info(
             "aux-only baseline epoch %d: train=%.4f val=%.4f",
-            epoch, tr_sum / max(tr_n, 1), va_loss,
+            epoch,
+            tr_sum / max(tr_n, 1),
+            va_loss,
         )
         if va_loss < best_val - 1e-5:
             best_val = va_loss
@@ -536,10 +564,15 @@ def main() -> None:
     split_seed = int(json.loads(first_blob["config_yaml"]).get("split_seed", 0))
 
     cfg = _build_cfg_for_val_loader(
-        parquet=args.parquet, split_seed=split_seed, batch_size=args.batch_size,
+        parquet=args.parquet,
+        split_seed=split_seed,
+        batch_size=args.batch_size,
     )
     train_loader, val_loader, _split_ids, scaler_human = build_dataloaders(
-        cfg, layout, tiers, seed=split_seed,
+        cfg,
+        layout,
+        tiers,
+        seed=split_seed,
     )
     scaler_block = scaler_human.reorder_to(block_layout.label_order_block)
 
@@ -551,8 +584,10 @@ def main() -> None:
         members.append(_reconstruct_model(blob, layout, block_layout, device))
     adapter = XpFeatureAdapter(layout, use_c0_scalars=True).to(device)
     wrapper = EnsembleMeanWrapper(
-        members=members, adapter=adapter,
-        scaler_block=scaler_block, block_layout=block_layout,
+        members=members,
+        adapter=adapter,
+        scaler_block=scaler_block,
+        block_layout=block_layout,
     ).to(device)
     wrapper.eval()
 
@@ -565,8 +600,10 @@ def main() -> None:
     # Compute ensemble baseline mu on val.
     mu0, _y_raw = _collect_baseline_mu(wrapper, raw_val, device)
     base_rmse = _nan_rmse(mu0, Y_val)
-    _LOG.info("full-model val RMSE per label: %s",
-              dict(zip(ckpt_label_names, np.round(base_rmse, 4).tolist())))
+    _LOG.info(
+        "full-model val RMSE per label: %s",
+        dict(zip(ckpt_label_names, np.round(base_rmse, 4).tolist())),
+    )
 
     target_indices = [ckpt_label_names.index(n) for n in TARGET_LABELS]
 
@@ -584,26 +621,44 @@ def main() -> None:
     Z_cond, cond_names = _aux_conditioning(args.parquet, val_source_ids)
 
     # Also recompute the 2-D summary for direct apples-to-apples sanity.
-    xp_2d = np.column_stack([
-        np.abs(X_val[:, families["bp_shape"]]).sum(axis=1),
-        np.abs(X_val[:, families["rp_shape"]]).sum(axis=1),
-    ]).astype(np.float64)
+    xp_2d = np.column_stack(
+        [
+            np.abs(X_val[:, families["bp_shape"]]).sum(axis=1),
+            np.abs(X_val[:, families["rp_shape"]]).sum(axis=1),
+        ]
+    ).astype(np.float64)
 
     cmi_2d = _cmi_for_labels(
-        xp_2d, Y_val, Z_cond, list(ckpt_label_names), target_indices,
-        max_samples=args.mi_max_samples, k=8, seed=0,
+        xp_2d,
+        Y_val,
+        Z_cond,
+        list(ckpt_label_names),
+        target_indices,
+        max_samples=args.mi_max_samples,
+        k=8,
+        seed=0,
     )
     cmi_pca = _cmi_for_labels(
-        xp_pca, Y_val, Z_cond, list(ckpt_label_names), target_indices,
-        max_samples=args.mi_max_samples, k=8, seed=0,
+        xp_pca,
+        Y_val,
+        Z_cond,
+        list(ckpt_label_names),
+        target_indices,
+        max_samples=args.mi_max_samples,
+        k=8,
+        seed=0,
     )
 
     # --- Q2: full-feature permutation importance --------------------------------
 
-    _LOG.info("Q2: full-feature permutation importance (%d features)",
-              layout.input_dim)
+    _LOG.info("Q2: full-feature permutation importance (%d features)", layout.input_dim)
     perm_imp = _full_permutation_importance(
-        wrapper, X_val, Y_val, mu0, device, seed=0,
+        wrapper,
+        X_val,
+        Y_val,
+        mu0,
+        device,
+        seed=0,
     )  # (n_features, n_labels)
 
     q2_per_label: dict[str, Any] = {}
@@ -614,13 +669,15 @@ def main() -> None:
         rows: list[dict[str, Any]] = []
         for rank, fidx in enumerate(order, 1):
             group = _feature_group(layout, int(fidx))
-            rows.append({
-                "rank": rank,
-                "feature_idx": int(fidx),
-                "feature_name": feature_names[int(fidx)],
-                "group": group,
-                "delta_rmse": float(imp[int(fidx)]),
-            })
+            rows.append(
+                {
+                    "rank": rank,
+                    "feature_idx": int(fidx),
+                    "feature_name": feature_names[int(fidx)],
+                    "group": group,
+                    "delta_rmse": float(imp[int(fidx)]),
+                }
+            )
         top10 = rows[:10]
         group_totals = {
             "xp_sum_delta": float(sum(r["delta_rmse"] for r in rows if r["group"] == "xp")),
@@ -649,16 +706,22 @@ def main() -> None:
 
     # Aux-only = residual + aux families (NO bp_shape, NO rp_shape, NO xp_c0).
     aux_only_indices = np.asarray(
-        families["residual"] + families["aux"], dtype=np.int64,
+        families["residual"] + families["aux"],
+        dtype=np.int64,
     )
     X_train_aux = X_train_all[:, aux_only_indices]
     X_val_aux = X_val_all[:, aux_only_indices]
     _LOG.info("aux-only input_dim = %d", X_train_aux.shape[1])
 
     baseline_model, history = _train_aux_only_baseline(
-        X_train_aux, Y_train_scaled, X_val_aux, Y_val_scaled,
-        device=device, epochs=args.baseline_epochs,
-        patience=args.baseline_patience, seed=0,
+        X_train_aux,
+        Y_train_scaled,
+        X_val_aux,
+        Y_val_scaled,
+        device=device,
+        epochs=args.baseline_epochs,
+        patience=args.baseline_patience,
+        seed=0,
     )
 
     # Compute val RMSE on raw-unit labels for direct comparison with the
@@ -708,7 +771,7 @@ def main() -> None:
     prov = {
         "artifact": "aux_only_baseline_seed0.pt",
         "purpose": "§9.2 three-question diagnostic — Q3 head-to-head RMSE "
-                   "vs full 5-label ensemble for Teff and log g.",
+        "vs full 5-label ensemble for Teff and log g.",
         "reference_ensemble": str(args.ensemble),
         "parquet": str(args.parquet),
         "split_seed": split_seed,
@@ -729,7 +792,7 @@ def main() -> None:
         },
         "timestamp": dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "notes": "Diagnostic artefact only — NOT a release model. No Cholesky "
-                 "covariance head, no calibration, no ensemble.",
+        "covariance head, no calibration, no ensemble.",
     }
     with (args.baseline_dir / "aux_only_baseline_seed0.provenance.json").open("w") as f:
         json.dump(prov, f, indent=2)
@@ -739,10 +802,7 @@ def main() -> None:
     existing_audit = json.loads(
         (args.report_dir / "audit_payload.json").read_text(),
     )
-    existing_cmi = {
-        name: float(existing_audit["per_label"][name]["cmi"])
-        for name in TARGET_LABELS
-    }
+    existing_cmi = {name: float(existing_audit["per_label"][name]["cmi"]) for name in TARGET_LABELS}
 
     # --- Assemble JSON payload ---------------------------------------------------
 
@@ -772,9 +832,7 @@ def main() -> None:
         "Q3_aux_only_baseline": {
             "per_label": q3_per_label,
             "baseline_checkpoint": str(ckpt_path),
-            "aux_only_feature_names": [
-                feature_names[i] for i in aux_only_indices.tolist()
-            ],
+            "aux_only_feature_names": [feature_names[i] for i in aux_only_indices.tolist()],
             "aux_only_input_dim": int(X_train_aux.shape[1]),
             "baseline_epochs_run": len(history),
             "baseline_final_val_loss": float(history[-1]["val_loss"]) if history else float("nan"),
@@ -821,15 +879,16 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
     lines.append(
         f"Original audit used a 2-D XP summary (|BP|-sum, |RP|-sum). Here we "
         f"recompute CMI with a PCA summary of the 108 BP+RP normalised "
-        f"coefficients retaining {q1['pca_variance_threshold']*100:.0f}% variance "
+        f"coefficients retaining {q1['pca_variance_threshold'] * 100:.0f}% variance "
         f"(→ {q1['pca_components']} components, cumulative variance "
-        f"{q1['pca_variance_retained']*100:.2f}%). Conditioning set, estimator "
+        f"{q1['pca_variance_retained'] * 100:.2f}%). Conditioning set, estimator "
         f"(KSG k={q1['cmi_estimator_k']}) and subsample cap ({q1['max_samples']}) "
         f"match the production audit.",
     )
     lines.append("")
-    lines.append("| label | CMI (original 2-D, from payload) | CMI (2-D, rerun) "
-                 "| CMI (PCA summary) |")
+    lines.append(
+        "| label | CMI (original 2-D, from payload) | CMI (2-D, rerun) | CMI (PCA summary) |"
+    )
     lines.append("|---|---|---|---|")
     for name in payload["target_labels"]:
         lines.append(
@@ -954,7 +1013,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
             f"- Q2 top-10 composition: {xp_in_top10} XP features / "
             f"{10 - xp_in_top10} aux. "
             f"XP family Σ(ΔRMSE) = {_fmt(xp_sum)} "
-            f"({xp_share*100:.1f}% of combined total {_fmt(xp_sum + aux_sum)}).",
+            f"({xp_share * 100:.1f}% of combined total {_fmt(xp_sum + aux_sum)}).",
         )
         lines.append(
             f"- Q3 aux-only / full RMSE ratio = {_fmt(ratio)} "
@@ -972,8 +1031,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
         f"- Existing audit: `reports/pipeline1/audit/audit_payload.json`",
     )
     lines.append(
-        f"- This diagnostic (JSON): "
-        f"`reports/pipeline1/audit/three_question_diagnostic.json`",
+        f"- This diagnostic (JSON): `reports/pipeline1/audit/three_question_diagnostic.json`",
     )
     lines.append(
         f"- Aux-only baseline: `{q3['baseline_checkpoint']}` + `.provenance.json`",

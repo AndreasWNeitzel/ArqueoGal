@@ -89,7 +89,9 @@ def _tiny_model() -> tuple[XpAbundanceModel, XpFeatureAdapter, FeatureLayout]:
     layout = FeatureLayout()
     cfg = ModelConfig(
         input_dim=layout.input_dim,
-        trunk_hidden=(32, 16), latent_dim=8, head_hidden=16,
+        trunk_hidden=(32, 16),
+        latent_dim=8,
+        head_hidden=16,
     )
     model = XpAbundanceModel(cfg)
     adapter = XpFeatureAdapter(layout, use_c0_scalars=False)
@@ -114,9 +116,15 @@ def test_compute_halfway_embedding_shape_and_n_finite(monkeypatch) -> None:
     labels = {"teff_apogee": teff, "mh_apogee": mh, "logg_apogee": logg}
 
     he = compute_halfway_embedding(
-        model, adapter, X, labels,
+        model,
+        adapter,
+        X,
+        labels,
         device=torch.device("cpu"),
-        n_neighbors=5, min_dist=0.1, umap_seed=0, batch_size=16,
+        n_neighbors=5,
+        min_dist=0.1,
+        umap_seed=0,
+        batch_size=16,
     )
 
     assert isinstance(he, HalfwayEmbedding)
@@ -142,12 +150,22 @@ def test_compute_halfway_embedding_batching_is_invariant(monkeypatch) -> None:
     }
 
     he_big = compute_halfway_embedding(
-        model, adapter, X, labels,
-        device=torch.device("cpu"), batch_size=N, n_neighbors=5,
+        model,
+        adapter,
+        X,
+        labels,
+        device=torch.device("cpu"),
+        batch_size=N,
+        n_neighbors=5,
     )
     he_small = compute_halfway_embedding(
-        model, adapter, X, labels,
-        device=torch.device("cpu"), batch_size=7, n_neighbors=5,
+        model,
+        adapter,
+        X,
+        labels,
+        device=torch.device("cpu"),
+        batch_size=7,
+        n_neighbors=5,
     )
     np.testing.assert_allclose(he_big.embedding, he_small.embedding, atol=1e-6)
 
@@ -179,8 +197,13 @@ def test_compute_halfway_embedding_uses_h_not_z(monkeypatch) -> None:
     assert z.pow(2).sum(dim=-1).sqrt().max().item() <= 1.0 + 1e-5  # unit norm
 
     he = compute_halfway_embedding(
-        model, adapter, X, labels,
-        device=torch.device("cpu"), batch_size=N, n_neighbors=5,
+        model,
+        adapter,
+        X,
+        labels,
+        device=torch.device("cpu"),
+        batch_size=N,
+        n_neighbors=5,
     )
     # Stub projects first two columns of H; equality proves h (not z) was passed.
     np.testing.assert_allclose(he.embedding, h.numpy()[:, :2], atol=1e-5)
@@ -201,8 +224,13 @@ def test_compute_halfway_embedding_keeps_labels_verbatim(monkeypatch) -> None:
     }
 
     he = compute_halfway_embedding(
-        model, adapter, X, labels,
-        device=torch.device("cpu"), batch_size=N, n_neighbors=5,
+        model,
+        adapter,
+        X,
+        labels,
+        device=torch.device("cpu"),
+        batch_size=N,
+        n_neighbors=5,
     )
     for k, v in labels.items():
         np.testing.assert_array_equal(he.labels[k], v)
@@ -222,7 +250,9 @@ def _make_he(n: int = 12) -> HalfwayEmbedding:
     # Inject NaN so the "finite subset" plot path is exercised.
     labels["teff_apogee"][0] = np.nan
     return HalfwayEmbedding(
-        embedding=emb, labels=labels, n_stars=n,
+        embedding=emb,
+        labels=labels,
+        n_stars=n,
         n_finite={k: int(np.isfinite(v).sum()) for k, v in labels.items()},
     )
 
@@ -263,6 +293,4 @@ def test_save_halfway_plots_returns_three_tier1_paths(tmp_path: Path) -> None:
     paths = save_halfway_plots(he, tmp_path)
     assert len(paths) == 3
     # Contract: one file per label key in ``he.labels``.
-    assert {p.name for p in paths} == {
-        f"halfway_umap_{k}.png" for k in he.labels
-    }
+    assert {p.name for p in paths} == {f"halfway_umap_{k}.png" for k in he.labels}

@@ -69,21 +69,39 @@ SFD_TO_AV = 2.742
 COMPOUND_FLOOR = SELECTION_PROB_FLOOR * SELECTION_PROB_FLOOR  # 1e-4 bulk match
 
 _IR_COLS = [
-    "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
-    "e_j_mag", "e_h_mag", "e_k_mag", "e_w1_mag", "e_w2_mag",
+    "j_mag",
+    "h_mag",
+    "k_mag",
+    "w1_mag",
+    "w2_mag",
+    "e_j_mag",
+    "e_h_mag",
+    "e_k_mag",
+    "e_w1_mag",
+    "e_w2_mag",
     "ir_missing_flag",
 ]
 
 _GAIA_KEEP = [
     "source_id",
-    "parallax", "parallax_error", "parallax_corr",
-    "ra_parallax_corr", "dec_parallax_corr",
-    "parallax_pmra_corr", "parallax_pmdec_corr",
+    "parallax",
+    "parallax_error",
+    "parallax_corr",
+    "ra_parallax_corr",
+    "dec_parallax_corr",
+    "parallax_pmra_corr",
+    "parallax_pmdec_corr",
     "ruwe",
-    "phot_g_mean_mag_corr", "phot_bp_mean_mag", "phot_rp_mean_mag",
-    "bp_rp", "bp_g", "g_rp",
+    "phot_g_mean_mag_corr",
+    "phot_bp_mean_mag",
+    "phot_rp_mean_mag",
+    "bp_rp",
+    "bp_g",
+    "g_rp",
     "teff_gspphot",
-    "ag_gspphot", "ag_gspphot_lower", "ag_gspphot_upper",
+    "ag_gspphot",
+    "ag_gspphot_lower",
+    "ag_gspphot_upper",
 ]
 
 
@@ -106,8 +124,9 @@ def _load_bj21_for_sources(chunk_dir: Path, source_ids: np.ndarray) -> pd.DataFr
     files = sorted(chunk_dir.glob("chunk_*.parquet"))
     logger.info("concatenating %d BJ21 chunks", len(files))
     full = pd.concat((pd.read_parquet(f) for f in files), ignore_index=True)
-    logger.info("  BJ21 pool: %d rows; filtering to %d requested source_ids",
-                len(full), len(source_ids))
+    logger.info(
+        "  BJ21 pool: %d rows; filtering to %d requested source_ids", len(full), len(source_ids)
+    )
     wanted = pd.Index(pd.unique(source_ids.astype("int64")))
     hit = full[full["source_id"].isin(wanted)].copy()
     logger.info("  BJ21 hits: %d / %d", len(hit), len(wanted))
@@ -116,9 +135,11 @@ def _load_bj21_for_sources(chunk_dir: Path, source_ids: np.ndarray) -> pd.DataFr
 
 def _query_sfd(ra: np.ndarray, dec: np.ndarray) -> np.ndarray:
     from dustmaps.config import config as dm_config
+
     repo = Path(__file__).resolve().parents[1]
     dm_config["data_dir"] = str(repo / "data" / "external" / "dustmaps")
     from dustmaps.sfd import SFDQuery
+
     sfd = SFDQuery()
     coords = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
     ebv = np.asarray(sfd(coords), dtype=np.float64)
@@ -126,13 +147,15 @@ def _query_sfd(ra: np.ndarray, dec: np.ndarray) -> np.ndarray:
 
 
 def _query_lallement(
-    ra: np.ndarray, dec: np.ndarray, distance_pc: np.ndarray,
+    ra: np.ndarray,
+    dec: np.ndarray,
+    distance_pc: np.ndarray,
 ) -> np.ndarray:
     if not LALLEMENT_CUBE_PATH.exists():
-        logger.warning("Lallement cube missing at %s — av_lallement all-NaN",
-                       LALLEMENT_CUBE_PATH)
+        logger.warning("Lallement cube missing at %s — av_lallement all-NaN", LALLEMENT_CUBE_PATH)
         return np.full(len(ra), np.nan, dtype=np.float32)
     from arqueogal.data.dust_maps import lallement2022_query, load_lallement2022_cube
+
     cube = load_lallement2022_cube(LALLEMENT_CUBE_PATH)
     av = lallement2022_query(
         ra_deg=ra.astype(np.float64),
@@ -154,11 +177,14 @@ def _compute_selection_prob(
     parallax_snr_min: float = 5.0,
 ) -> dict[str, np.ndarray]:
     p_ye = score_selection_prob(
-        b_deg.astype(np.float64), g_mag.astype(np.float64),
+        b_deg.astype(np.float64),
+        g_mag.astype(np.float64),
     )
     p_ir = score_ir_completeness(
-        b_deg.astype(np.float64), g_mag.astype(np.float64),
-        teff.astype(np.float64), logg.astype(np.float64),
+        b_deg.astype(np.float64),
+        g_mag.astype(np.float64),
+        teff.astype(np.float64),
+        logg.astype(np.float64),
     )
     p_parallax = (
         np.isfinite(parallax_over_error) & (parallax_over_error >= parallax_snr_min)
@@ -167,7 +193,9 @@ def _compute_selection_prob(
     product = p_ye * p_ir * p_parallax * p_extinction
     hard_zero = (p_parallax == 0.0) | (p_extinction == 0.0)
     p_compound = np.where(
-        hard_zero, 0.0, np.clip(product, COMPOUND_FLOOR, SELECTION_PROB_CEIL),
+        hard_zero,
+        0.0,
+        np.clip(product, COMPOUND_FLOOR, SELECTION_PROB_CEIL),
     )
     return {
         "p_ye_retained": p_ye.astype(np.float32),
@@ -192,8 +220,17 @@ def main() -> None:
     bj21_dir = repo / "data" / "interim" / "bj21_andrae_chunks"
     out_path = repo / "data" / "processed" / "pipeline1_features_stream3.parquet"
 
-    for p in (union_path, gaia_existing, gaia_delta, ir_existing, ir_delta,
-              xp_existing, xp_delta, ye_ok_existing, ye_ok_delta):
+    for p in (
+        union_path,
+        gaia_existing,
+        gaia_delta,
+        ir_existing,
+        ir_delta,
+        xp_existing,
+        xp_delta,
+        ye_ok_existing,
+        ye_ok_delta,
+    ):
         if not p.exists():
             raise SystemExit(f"missing input: {p}")
 
@@ -206,27 +243,33 @@ def main() -> None:
     ye_ok_ids_ex = pd.read_parquet(ye_ok_existing)["source_id"].astype("int64")
     ye_ok_ids_de = pd.read_parquet(ye_ok_delta)["source_id"].astype("int64")
     ye_ok_ids = pd.concat([ye_ok_ids_ex, ye_ok_ids_de]).drop_duplicates()
-    logger.info("  Ye-OK union: %d (existing %d + delta %d)",
-                len(ye_ok_ids), len(ye_ok_ids_ex), len(ye_ok_ids_de))
+    logger.info(
+        "  Ye-OK union: %d (existing %d + delta %d)",
+        len(ye_ok_ids),
+        len(ye_ok_ids_ex),
+        len(ye_ok_ids_de),
+    )
 
     logger.info("filtering union to Ye-OK only")
     n_pre_ye = len(union)
     union = union[union["source_id"].isin(ye_ok_ids)].reset_index(drop=True)
-    logger.info("  %d rows after Ye-OK filter (dropped %d)",
-                len(union), n_pre_ye - len(union))
+    logger.info("  %d rows after Ye-OK filter (dropped %d)", len(union), n_pre_ye - len(union))
 
     logger.info("loading Gaia corrected (existing + delta)")
     g_ex = pd.read_parquet(gaia_existing)[_GAIA_KEEP]
     g_de = pd.read_parquet(gaia_delta)[_GAIA_KEEP]
     logger.info("  existing %d + delta %d = %d", len(g_ex), len(g_de), len(g_ex) + len(g_de))
     gaia = pd.concat([g_ex, g_de], ignore_index=True).drop_duplicates(
-        subset="source_id", keep="first",
+        subset="source_id",
+        keep="first",
     )
-    gaia = gaia.rename(columns={
-        "phot_g_mean_mag_corr": "g_mag",
-        "phot_bp_mean_mag": "bp_mag",
-        "phot_rp_mean_mag": "rp_mag",
-    })
+    gaia = gaia.rename(
+        columns={
+            "phot_g_mean_mag_corr": "g_mag",
+            "phot_bp_mean_mag": "bp_mag",
+            "phot_rp_mean_mag": "rp_mag",
+        }
+    )
     gaia["parallax_raw"] = gaia["parallax"]
     gaia["parallax"] = gaia["parallax_corr"]
     logger.info("  gaia union rows: %d unique source_ids", len(gaia))
@@ -239,7 +282,8 @@ def main() -> None:
     ir_ex = pd.read_parquet(ir_existing)[["source_id", *_IR_COLS]]
     ir_de = pd.read_parquet(ir_delta)[["source_id", *_IR_COLS]]
     ir = pd.concat([ir_ex, ir_de], ignore_index=True).drop_duplicates(
-        subset="source_id", keep="first",
+        subset="source_id",
+        keep="first",
     )
     logger.info("  IR union rows: %d", len(ir))
     df = df.merge(ir, on="source_id", how="left")
@@ -251,7 +295,8 @@ def main() -> None:
     xp_ex = xp_ex[xp_ex["ye2024_flag"] == 0]
     xp_de = xp_de[xp_de["ye2024_flag"] == 0]
     xp = pd.concat([xp_ex, xp_de], ignore_index=True).drop_duplicates(
-        subset="source_id", keep="first",
+        subset="source_id",
+        keep="first",
     )
     logger.info("  XP Ye-OK union rows: %d", len(xp))
     df = df.merge(xp, on="source_id", how="inner")
@@ -272,14 +317,15 @@ def main() -> None:
     if n_fill:
         df.loc[use_fallback, "r_med_photogeo"] = dist_pc[use_fallback].astype(np.float32)
         # r_lo / r_hi left NaN; inference treats them as aux-missing.
-        logger.info("  filled %d r_med_photogeo entries from union distance_pc",
-                    n_fill)
+        logger.info("  filled %d r_med_photogeo entries from union distance_pc", n_fill)
 
     ra = df["ra_deg"].to_numpy(dtype=np.float64)
     dec = df["dec_deg"].to_numpy(dtype=np.float64)
     distance = df["r_med_photogeo"].to_numpy(dtype=np.float64)
     distance_for_lallement = np.where(
-        np.isfinite(distance), distance, df["distance_pc"].to_numpy(dtype=np.float64),
+        np.isfinite(distance),
+        distance,
+        df["distance_pc"].to_numpy(dtype=np.float64),
     )
 
     logger.info("computing av_sfd via SFDQuery for %d stars", len(df))
@@ -295,10 +341,10 @@ def main() -> None:
     logger.info("av_edenhofer: NaN (cube evicted 2026-04-18; nan_to_num at inference)")
     df["av_edenhofer"] = np.full(len(df), np.nan, dtype=np.float32)
 
-    logger.info("computing §8.3 nbhd-median A_V (radius=%d pc)",
-                int(NEIGHBORHOOD_RADIUS_PC))
+    logger.info("computing §8.3 nbhd-median A_V (radius=%d pc)", int(NEIGHBORHOOD_RADIUS_PC))
     nbhd = neighborhood_av_features(
-        ra_deg=ra, dec_deg=dec,
+        ra_deg=ra,
+        dec_deg=dec,
         distance_pc=distance_for_lallement,
         ag_gspphot=df["ag_gspphot"].to_numpy(dtype=np.float64),
         radius_pc=NEIGHBORHOOD_RADIUS_PC,
@@ -307,8 +353,9 @@ def main() -> None:
     df["av_nbhd_median"] = nbhd.av_nbhd_median
     df["av_nbhd_std"] = nbhd.av_nbhd_std
     df["n_neighbors_75pc"] = nbhd.n_neighbors
-    logger.info("  valid nbhd-median: %d / %d",
-                int(np.isfinite(nbhd.av_nbhd_median).sum()), len(df))
+    logger.info(
+        "  valid nbhd-median: %d / %d", int(np.isfinite(nbhd.av_nbhd_median).sum()), len(df)
+    )
 
     logger.info("computing compound selection_prob v1.1")
     plx = df["parallax"].to_numpy(dtype=np.float64)
@@ -316,7 +363,8 @@ def main() -> None:
     with np.errstate(invalid="ignore", divide="ignore"):
         plx_snr = np.where(
             np.isfinite(plx) & np.isfinite(plx_err) & (plx_err > 0.0),
-            plx / plx_err, np.nan,
+            plx / plx_err,
+            np.nan,
         )
     av_missing = (
         ~np.isfinite(df["av_sfd"].to_numpy())
@@ -333,38 +381,75 @@ def main() -> None:
     )
     for k, v in sel.items():
         df[k] = v
-    logger.info("  selection_prob: min=%.4f mean=%.4f max=%.4f",
-                float(df["selection_prob"].min()),
-                float(df["selection_prob"].mean()),
-                float(df["selection_prob"].max()))
+    logger.info(
+        "  selection_prob: min=%.4f mean=%.4f max=%.4f",
+        float(df["selection_prob"].min()),
+        float(df["selection_prob"].mean()),
+        float(df["selection_prob"].max()),
+    )
 
     keep = [
         # Identifiers / audit
-        "source_id", "sample", "ra_deg", "dec_deg", "b_deg",
+        "source_id",
+        "sample",
+        "ra_deg",
+        "dec_deg",
+        "b_deg",
         # Andrae Teff/logg/[M/H] (selection inputs, not targets)
-        "teff_andrae", "logg_andrae", "mh_andrae",
+        "teff_andrae",
+        "logg_andrae",
+        "mh_andrae",
         # Gaia photometry (Riello-corrected g, raw bp/rp)
-        "g_mag", "bp_mag", "rp_mag", "bp_rp", "bp_g", "g_rp",
+        "g_mag",
+        "bp_mag",
+        "rp_mag",
+        "bp_rp",
+        "bp_g",
+        "g_rp",
         # Gaia astrometry (Lindegren-corrected parallax)
-        "parallax", "parallax_error", "parallax_corr", "parallax_raw", "ruwe",
+        "parallax",
+        "parallax_error",
+        "parallax_corr",
+        "parallax_raw",
+        "ruwe",
         # BJ21 photogeometric triple
-        "r_med_photogeo", "r_lo_photogeo", "r_hi_photogeo",
+        "r_med_photogeo",
+        "r_lo_photogeo",
+        "r_hi_photogeo",
         "distance_pc",
         # IR photometry
-        "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
-        "e_j_mag", "e_h_mag", "e_k_mag", "e_w1_mag", "e_w2_mag",
+        "j_mag",
+        "h_mag",
+        "k_mag",
+        "w1_mag",
+        "w2_mag",
+        "e_j_mag",
+        "e_h_mag",
+        "e_k_mag",
+        "e_w1_mag",
+        "e_w2_mag",
         "ir_missing_flag",
         # Extinction priors
-        "av_edenhofer", "av_sfd", "av_lallement",
-        "av_nbhd_median", "av_nbhd_std", "n_neighbors_75pc",
-        "ag_gspphot", "ag_gspphot_lower", "ag_gspphot_upper",
+        "av_edenhofer",
+        "av_sfd",
+        "av_lallement",
+        "av_nbhd_median",
+        "av_nbhd_std",
+        "n_neighbors_75pc",
+        "ag_gspphot",
+        "ag_gspphot_lower",
+        "ag_gspphot_upper",
         # Aux: teff_gspphot for stage-B Hermite flag stratification
         "teff_gspphot",
         # Selection function
-        "selection_prob", "p_ye_retained", "p_ir_complete",
-        "p_parallax", "p_extinction",
+        "selection_prob",
+        "p_ye_retained",
+        "p_ir_complete",
+        "p_parallax",
+        "p_extinction",
         # Sampled flux — replaced by Hermite coefficients in stage B
-        "corrected_flux", "ye2024_flag",
+        "corrected_flux",
+        "ye2024_flag",
     ]
     missing = [c for c in keep if c not in df.columns]
     if missing:
@@ -373,8 +458,7 @@ def main() -> None:
 
     sample_counts = features["sample"].value_counts().to_dict()
     logger.info("sample composition: %s", sample_counts)
-    logger.info("writing %s (%d rows × %d cols)",
-                out_path, len(features), len(features.columns))
+    logger.info("writing %s (%d rows × %d cols)", out_path, len(features), len(features.columns))
     _write_parquet_atomic(features, out_path)
     size_mb = out_path.stat().st_size / 1024**2
     logger.info("  %.1f MB on disk", size_mb)
@@ -422,11 +506,13 @@ def main() -> None:
         ),
     ]
     if LALLEMENT_CUBE_PATH.exists():
-        sources.append(LocalSource(
-            name="Lallement+2022 3D extinction cube",
-            path=str(LALLEMENT_CUBE_PATH),
-            sha256=_sha256_of(LALLEMENT_CUBE_PATH),
-        ))
+        sources.append(
+            LocalSource(
+                name="Lallement+2022 3D extinction cube",
+                path=str(LALLEMENT_CUBE_PATH),
+                sha256=_sha256_of(LALLEMENT_CUBE_PATH),
+            )
+        )
 
     prov = Provenance(
         output_file=str(out_path.relative_to(repo)),

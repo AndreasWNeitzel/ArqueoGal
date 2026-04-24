@@ -55,16 +55,18 @@ OUT_DIR = REPO / "reports/pipeline1/run_a"
 # condition holds — the cell is "not clean-core".
 # Clean-core: well-sampled thin-disk RGB, the regime XP→abundances
 # literature (Andrae+2023, Rix+2022) consistently handles well.
-PATH_TEFF_HOT = 6000.0        # Teff > this → XP noise-dominated (research_brief §6.1)
-PATH_TEFF_COOL = 4000.0       # Teff < this → cool-giant molecular blanketing issues
-PATH_LOGG_UPPER = 3.5         # logg > this → subgiant/dwarf contamination
-PATH_LOGG_LOWER = 1.0         # logg < this → extended AGB / tip-RGB
-PATH_MH_POOR = -1.0           # [M/H] < this → halo regime, sparse training
-PATH_MH_RICH = 0.4            # [M/H] > this → metal-rich tail, sparse
+PATH_TEFF_HOT = 6000.0  # Teff > this → XP noise-dominated (research_brief §6.1)
+PATH_TEFF_COOL = 4000.0  # Teff < this → cool-giant molecular blanketing issues
+PATH_LOGG_UPPER = 3.5  # logg > this → subgiant/dwarf contamination
+PATH_LOGG_LOWER = 1.0  # logg < this → extended AGB / tip-RGB
+PATH_MH_POOR = -1.0  # [M/H] < this → halo regime, sparse training
+PATH_MH_RICH = 0.4  # [M/H] > this → metal-rich tail, sparse
 
 
 def _cell_center_and_flag(
-    code: int, n_bins: list[int], edges: list[list[float]],
+    code: int,
+    n_bins: list[int],
+    edges: list[list[float]],
 ) -> tuple[tuple[float, float, float], list[str]]:
     """Decode cell index to (Teff, logg, [M/H]) bin center + pathology flags."""
     # Encoding in bin_by_cells: codes = codes * nb + idx, iterating j 0..2.
@@ -81,8 +83,16 @@ def _cell_center_and_flag(
         # single inner edge as a one-sided proxy (outer bins are unbounded).
         if len(edges_j) == 0:
             return float("nan")
-        lo = edges_j[i - 1] if i > 0 else edges_j[0] - (edges_j[-1] - edges_j[0]) / (len(edges_j) + 1)
-        hi = edges_j[i] if i < len(edges_j) else edges_j[-1] + (edges_j[-1] - edges_j[0]) / (len(edges_j) + 1)
+        lo = (
+            edges_j[i - 1]
+            if i > 0
+            else edges_j[0] - (edges_j[-1] - edges_j[0]) / (len(edges_j) + 1)
+        )
+        hi = (
+            edges_j[i]
+            if i < len(edges_j)
+            else edges_j[-1] + (edges_j[-1] - edges_j[0]) / (len(edges_j) + 1)
+        )
         return 0.5 * (lo + hi)
 
     teff_c = bin_center(idx[0], edges[0])
@@ -116,8 +126,10 @@ def main() -> None:
     first_cfg = json.loads(first["config_yaml"])
     split_seed = int(first_cfg.get("split_seed", 0))
     cfg = _build_cfg_for_val_loader(
-        parquet=PARQUET, pretrained_ckpt=Path(first_cfg["pretrained_encoder_ckpt"]),
-        batch_size=1024, seed=split_seed,
+        parquet=PARQUET,
+        pretrained_ckpt=Path(first_cfg["pretrained_encoder_ckpt"]),
+        batch_size=1024,
+        seed=split_seed,
     )
     _, val_loader, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
     block_layout = default_pipeline1_layout()
@@ -161,24 +173,28 @@ def main() -> None:
         z_cell = z[mask]  # (n_c, 21)
         bias = z_cell.mean(axis=0)  # (21,)
         (teff_c, logg_c, mh_c), flags = _cell_center_and_flag(
-            int(c), cell_def["n_bins"], cell_def["edges_per_col"],
+            int(c),
+            cell_def["n_bins"],
+            cell_def["edges_per_col"],
         )
         # Also record the worst label name.
         j_worst = int(np.argmax(np.abs(bias)))
-        rows.append({
-            "cell_id": int(c),
-            "n": n_c,
-            "teff_center": float(teff_c),
-            "logg_center": float(logg_c),
-            "mh_center": float(mh_c),
-            "max_abs_bias": float(np.abs(bias).max()),
-            "mean_abs_bias": float(np.abs(bias).mean()),
-            "worst_label": names[j_worst],
-            "worst_bias": float(bias[j_worst]),
-            "bias_per_label": [float(b) for b in bias],
-            "is_pathological": bool(len(flags) > 0),
-            "pathology_flags": flags,
-        })
+        rows.append(
+            {
+                "cell_id": int(c),
+                "n": n_c,
+                "teff_center": float(teff_c),
+                "logg_center": float(logg_c),
+                "mh_center": float(mh_c),
+                "max_abs_bias": float(np.abs(bias).max()),
+                "mean_abs_bias": float(np.abs(bias).mean()),
+                "worst_label": names[j_worst],
+                "worst_bias": float(bias[j_worst]),
+                "bias_per_label": [float(b) for b in bias],
+                "is_pathological": bool(len(flags) > 0),
+                "pathology_flags": flags,
+            }
+        )
 
     rows.sort(key=lambda r: -r["max_abs_bias"])
 
@@ -198,14 +214,21 @@ def main() -> None:
     clean = [r for r in rows if not r["is_pathological"]]
     patho = [r for r in rows if r["is_pathological"]]
     print("\n# Tabulation by cell class")
-    print(f"{'class':<18} {'n_cells':>8} {'stars':>8} {'median max|b|':>14} {'p90 max|b|':>12} {'max max|b|':>12}")
+    print(
+        f"{'class':<18} {'n_cells':>8} {'stars':>8} {'median max|b|':>14} {'p90 max|b|':>12} {'max max|b|':>12}"
+    )
 
     def _stats(cs):
         if not cs:
             return (0, 0, 0.0, 0.0, 0.0)
         m = np.array([r["max_abs_bias"] for r in cs])
-        return (len(cs), sum(r["n"] for r in cs),
-                float(np.median(m)), float(np.quantile(m, 0.90)), float(m.max()))
+        return (
+            len(cs),
+            sum(r["n"] for r in cs),
+            float(np.median(m)),
+            float(np.quantile(m, 0.90)),
+            float(m.max()),
+        )
 
     for label, subset in [("clean-core", clean), ("pathological", patho)]:
         n_c, s, med, p90, mx = _stats(subset)
@@ -215,11 +238,14 @@ def main() -> None:
     bad = [r for r in rows if r["max_abs_bias"] > 1.0]
     bad_clean = [r for r in bad if not r["is_pathological"]]
     bad_patho = [r for r in bad if r["is_pathological"]]
-    print(f"\n# Cells with max |bias| > 1σ: {len(bad)} total "
-          f"({len(bad_clean)} clean-core, {len(bad_patho)} pathological)")
+    print(
+        f"\n# Cells with max |bias| > 1σ: {len(bad)} total "
+        f"({len(bad_clean)} clean-core, {len(bad_patho)} pathological)"
+    )
 
     # Per-flag breakdown.
     from collections import Counter
+
     flag_ct: Counter[str] = Counter()
     for r in rows:
         for f in r["pathology_flags"]:
@@ -241,21 +267,27 @@ def main() -> None:
     ax.axhline(1.0, color="k", linestyle="--", linewidth=0.8, label="bias = 1σ")
     # Expected noise floor for sample mean of z with var 1: std = 1/√n.
     n_grid = np.linspace(max(xs.min(), 10), xs.max(), 100)
-    ax.plot(n_grid, 3.0 / np.sqrt(n_grid), color="gray", linestyle=":",
-            label="3/√n (3σ sampling noise at var(z)=1)")
+    ax.plot(
+        n_grid,
+        3.0 / np.sqrt(n_grid),
+        color="gray",
+        linestyle=":",
+        label="3/√n (3σ sampling noise at var(z)=1)",
+    )
     ax.set_xscale("log")
     ax.set_xlabel("n stars in cell")
     ax.set_ylabel("max |mean(z | cell)| across labels")
     ax.set_title("Per-cell bias vs cell star count")
-    ax.legend(handles=[
-        plt.Line2D([], [], marker="o", color="tab:blue", linestyle="",
-                   label="clean-core cell"),
-        plt.Line2D([], [], marker="o", color="tab:red", linestyle="",
-                   label="pathological cell"),
-        plt.Line2D([], [], color="gray", linestyle=":",
-                   label="3/√n sampling-noise line"),
-        plt.Line2D([], [], color="k", linestyle="--", label="bias = 1σ"),
-    ])
+    ax.legend(
+        handles=[
+            plt.Line2D([], [], marker="o", color="tab:blue", linestyle="", label="clean-core cell"),
+            plt.Line2D(
+                [], [], marker="o", color="tab:red", linestyle="", label="pathological cell"
+            ),
+            plt.Line2D([], [], color="gray", linestyle=":", label="3/√n sampling-noise line"),
+            plt.Line2D([], [], color="k", linestyle="--", label="bias = 1σ"),
+        ]
+    )
     fig.tight_layout()
     fig_path = OUT_DIR / "bias_vs_ncell.png"
     fig.savefig(fig_path, dpi=120)
@@ -268,8 +300,10 @@ def main() -> None:
     else:
         rho = float("nan")
     print(f"\n# Pearson r(log10(n_cell), max|bias|) = {rho:+.3f}")
-    print("  (strongly negative ⇒ small cells are the noise source; "
-          "near zero ⇒ bias is real systematic behavior)")
+    print(
+        "  (strongly negative ⇒ small cells are the noise source; "
+        "near zero ⇒ bias is real systematic behavior)"
+    )
 
     # Summary verdict hint.
     if len(bad_clean) == 0:
@@ -282,17 +316,22 @@ def main() -> None:
 
     out_path = OUT_DIR / "bias_location_diagnostic.json"
     with out_path.open("w") as f:
-        json.dump({
-            "cell_definition": cell_def,
-            "rows": rows,
-            "pathology_flag_counts_all": dict(flag_ct),
-            "pathology_flag_counts_bad_1sigma": dict(flag_bad),
-            "n_bad_1sigma_total": len(bad),
-            "n_bad_1sigma_clean_core": len(bad_clean),
-            "n_bad_1sigma_pathological": len(bad_patho),
-            "pearson_log10_n_vs_max_bias": rho,
-            "verdict_hint": verdict,
-        }, f, indent=2, default=str)
+        json.dump(
+            {
+                "cell_definition": cell_def,
+                "rows": rows,
+                "pathology_flag_counts_all": dict(flag_ct),
+                "pathology_flag_counts_bad_1sigma": dict(flag_bad),
+                "n_bad_1sigma_total": len(bad),
+                "n_bad_1sigma_clean_core": len(bad_clean),
+                "n_bad_1sigma_pathological": len(bad_patho),
+                "pearson_log10_n_vs_max_bias": rho,
+                "verdict_hint": verdict,
+            },
+            f,
+            indent=2,
+            default=str,
+        )
     _LOG.info("wrote %s", out_path)
 
 

@@ -115,9 +115,12 @@ def main() -> None:
 
     logger.info("loading %s", INPUT_PARQUET)
     df = pd.read_parquet(INPUT_PARQUET, columns=["b_deg", "g_mag", "ye2024_flag"])
-    logger.info("loaded %d rows; %d flagged (%.2f%%)",
-                len(df), int((df["ye2024_flag"] == 1).sum()),
-                100.0 * float((df["ye2024_flag"] == 1).mean()))
+    logger.info(
+        "loaded %d rows; %d flagged (%.2f%%)",
+        len(df),
+        int((df["ye2024_flag"] == 1).sum()),
+        100.0 * float((df["ye2024_flag"] == 1).mean()),
+    )
 
     grid = build_grid(df)
     _atomic_write_parquet(grid, OUTPUT_PARQUET)

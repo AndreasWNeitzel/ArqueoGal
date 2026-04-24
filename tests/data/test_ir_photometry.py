@@ -126,10 +126,7 @@ def _make_fake_upload_fetch(
             chunk = ids[i : i + batch_size]
             if chunk_records is not None:
                 chunk_records.append(list(chunk))
-            rows = [
-                row_builder(sid, match=(sid not in missing))
-                for sid in chunk
-            ]
+            rows = [row_builder(sid, match=(sid not in missing)) for sid in chunk]
             frames.append(pd.DataFrame(rows))
         if not frames:
             return pd.DataFrame()

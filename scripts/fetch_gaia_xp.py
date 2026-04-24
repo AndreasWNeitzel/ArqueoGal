@@ -95,7 +95,10 @@ def main() -> None:
     n_batches = (n_src + XP_BATCH_SIZE - 1) // XP_BATCH_SIZE
     logger.info(
         "Stream 1 has_xp: %d, Stream 3 has_xp: %d, union: %d (dedup by %d)",
-        len(s1_xp), len(s3_xp), n_src, len(s1_xp) + len(s3_xp) - n_src,
+        len(s1_xp),
+        len(s3_xp),
+        n_src,
+        len(s1_xp) + len(s3_xp) - n_src,
     )
     logger.info("XP fetch: %d batches of %d via AIP UPLOAD", n_batches, XP_BATCH_SIZE)
 

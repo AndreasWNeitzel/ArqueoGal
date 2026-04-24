@@ -30,12 +30,21 @@ logger = logging.getLogger("plot_extraction_diagnostics")
 
 def _load_apogee(path: Path) -> pd.DataFrame:
     cols = [
-        "ra_deg", "dec_deg",
-        "teff", "logg", "m_h_atm", "alpha_m_atm",
-        "g_mag", "bp_mag", "rp_mag",
+        "ra_deg",
+        "dec_deg",
+        "teff",
+        "logg",
+        "m_h_atm",
+        "alpha_m_atm",
+        "g_mag",
+        "bp_mag",
+        "rp_mag",
         "r_med_photogeo",
-        "ebv", "ebv_edenhofer_2023", "ebv_bayestar_2019",
-        "ebv_zhang_2023", "ebv_sfd",
+        "ebv",
+        "ebv_edenhofer_2023",
+        "ebv_bayestar_2019",
+        "ebv_zhang_2023",
+        "ebv_sfd",
     ]
     df = pd.read_parquet(path, columns=cols)
     logger.info("APOGEE interim rows: %d", len(df))
@@ -97,23 +106,23 @@ def _panel_distance(ax, r_photogeo_pc) -> None:
     ax.set_ylabel("N stars")
     ax.set_title(f"Bailer-Jones+2021 distance (n={len(r_kpc):,})")
     ax.axvline(1.25, color="0.5", lw=0.6, ls="--")
-    ax.text(1.25 * 1.05, ax.get_ylim()[1] * 0.85,
-            "Edenhofer\nhorizon", color="0.4", fontsize=7)
+    ax.text(1.25 * 1.05, ax.get_ylim()[1] * 0.85, "Edenhofer\nhorizon", color="0.4", fontsize=7)
 
 
 def _panel_dust(ax, df: pd.DataFrame) -> None:
     bins = np.linspace(0.0, 2.0, 80)
     for col, color, label in (
         ("ebv_edenhofer_2023", WONG_PALETTE[1], "Edenhofer+2023 (3D, <1.25 kpc)"),
-        ("ebv_bayestar_2019",  WONG_PALETTE[2], "Bayestar+2019 (3D all-sky)"),
-        ("ebv_zhang_2023",     WONG_PALETTE[3], "Zhang+2023 (XP-based 3D)"),
-        ("ebv_sfd",            WONG_PALETTE[5], "SFD (2D upper limit)"),
+        ("ebv_bayestar_2019", WONG_PALETTE[2], "Bayestar+2019 (3D all-sky)"),
+        ("ebv_zhang_2023", WONG_PALETTE[3], "Zhang+2023 (XP-based 3D)"),
+        ("ebv_sfd", WONG_PALETTE[5], "SFD (2D upper limit)"),
     ):
         x = df[col].to_numpy()
         x = x[np.isfinite(x)]
         frac = len(x) / len(df)
-        ax.hist(x, bins=bins, histtype="step", color=color, lw=1.2,
-                label=f"{label}  [{frac:.1%} cov]")
+        ax.hist(
+            x, bins=bins, histtype="step", color=color, lw=1.2, label=f"{label}  [{frac:.1%} cov]"
+        )
     ax.set_yscale("log")
     ax.set_xlabel(r"$E(B-V)$ [mag]")
     ax.set_ylabel("N stars")

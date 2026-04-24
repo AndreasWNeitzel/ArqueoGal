@@ -101,14 +101,15 @@ class FrozenZScoreStats:
     def __post_init__(self) -> None:
         expected = XP_COEFF_LEN - 1
         for name in (
-            "coef_norm_bp_mean", "coef_norm_bp_sigma",
-            "coef_norm_rp_mean", "coef_norm_rp_sigma",
+            "coef_norm_bp_mean",
+            "coef_norm_bp_sigma",
+            "coef_norm_rp_mean",
+            "coef_norm_rp_sigma",
         ):
             arr = getattr(self, name)
             if arr.shape != (expected,):
                 raise ValueError(
-                    f"FrozenZScoreStats.{name}: expected shape ({expected},), "
-                    f"got {arr.shape}"
+                    f"FrozenZScoreStats.{name}: expected shape ({expected},), got {arr.shape}"
                 )
 
 
@@ -197,7 +198,10 @@ def load_frozen_zscore_stats(provenance_path: str | Path) -> FrozenZScoreStats:
 
 
 def _unpack_coef_band(
-    block: dict, band: str, *, path: Path,
+    block: dict,
+    band: str,
+    *,
+    path: Path,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Extract (mu, sigma) arrays of length XP_COEFF_LEN - 1 for one band."""
     band_block = block.get(band)
@@ -208,17 +212,14 @@ def _unpack_coef_band(
     for i in range(1, XP_COEFF_LEN):
         key = str(i)
         if key not in band_block:
-            raise KeyError(
-                f"{path}: coef_norm_zscore_frozen.{band} missing coefficient {key}"
-            )
+            raise KeyError(f"{path}: coef_norm_zscore_frozen.{band} missing coefficient {key}")
         entry = band_block[key]
         try:
             mu[i - 1] = float(entry["mu"])
             sigma[i - 1] = float(entry["sigma"])
         except (KeyError, TypeError) as exc:
             raise KeyError(
-                f"{path}: coef_norm_zscore_frozen.{band}.{key} missing "
-                f"{{mu, sigma}} ({exc})"
+                f"{path}: coef_norm_zscore_frozen.{band}.{key} missing {{mu, sigma}} ({exc})"
             ) from exc
     return mu, sigma
 
@@ -284,22 +285,38 @@ def apply_frozen_zscore(
     ``(x - mu) / sigma`` element-wise using the frozen ``stats``.
     """
     bp_norm_z = _apply_coef_zscore(
-        bp_coef_norm, stats.coef_norm_bp_mean, stats.coef_norm_bp_sigma, band="bp",
+        bp_coef_norm,
+        stats.coef_norm_bp_mean,
+        stats.coef_norm_bp_sigma,
+        band="bp",
     )
     rp_norm_z = _apply_coef_zscore(
-        rp_coef_norm, stats.coef_norm_rp_mean, stats.coef_norm_rp_sigma, band="rp",
+        rp_coef_norm,
+        stats.coef_norm_rp_mean,
+        stats.coef_norm_rp_sigma,
+        band="rp",
     )
     bp_c0_z = _apply_scalar_zscore(
-        bp_c0_log, stats.c0_bp_mean_log10, stats.c0_bp_sigma_log10, name="bp_c0_log",
+        bp_c0_log,
+        stats.c0_bp_mean_log10,
+        stats.c0_bp_sigma_log10,
+        name="bp_c0_log",
     )
     rp_c0_z = _apply_scalar_zscore(
-        rp_c0_log, stats.c0_rp_mean_log10, stats.c0_rp_sigma_log10, name="rp_c0_log",
+        rp_c0_log,
+        stats.c0_rp_mean_log10,
+        stats.c0_rp_sigma_log10,
+        name="rp_c0_log",
     )
     return bp_norm_z, rp_norm_z, bp_c0_z, rp_c0_z
 
 
 def _apply_coef_zscore(
-    ratios: np.ndarray, mu: np.ndarray, sigma: np.ndarray, *, band: str,
+    ratios: np.ndarray,
+    mu: np.ndarray,
+    sigma: np.ndarray,
+    *,
+    band: str,
 ) -> np.ndarray:
     """Apply (x - mu) / sigma across coefficients 1..54.
 
@@ -309,9 +326,7 @@ def _apply_coef_zscore(
     """
     arr = np.asarray(ratios, dtype=np.float64)
     if arr.ndim != 2:
-        raise ValueError(
-            f"{band}_coef_norm must be 2-D; got shape {arr.shape}"
-        )
+        raise ValueError(f"{band}_coef_norm must be 2-D; got shape {arr.shape}")
     n_ratios = XP_COEFF_LEN - 1
     if arr.shape[1] == n_ratios:
         out = (arr - mu) / sigma
@@ -327,7 +342,11 @@ def _apply_coef_zscore(
 
 
 def _apply_scalar_zscore(
-    x: np.ndarray, mu: float, sigma: float, *, name: str,
+    x: np.ndarray,
+    mu: float,
+    sigma: float,
+    *,
+    name: str,
 ) -> np.ndarray:
     """Apply (x - mu) / sigma to a 1-D array."""
     if sigma <= 0:

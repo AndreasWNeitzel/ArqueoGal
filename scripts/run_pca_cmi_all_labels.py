@@ -43,9 +43,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("pca_cmi_all_labels")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_ENSEMBLE = (
-    REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
-)
+DEFAULT_ENSEMBLE = REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
 DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
 DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/audit"
 
@@ -59,7 +57,9 @@ ALL_LABELS = (
 
 
 def _build_cfg_for_val_loader(
-    parquet: Path, split_seed: int, batch_size: int,
+    parquet: Path,
+    split_seed: int,
+    batch_size: int,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -80,22 +80,33 @@ def _build_cfg_for_val_loader(
 def _feature_family_indices(layout: FeatureLayout) -> dict[str, list[int]]:
     i = 0
     families: dict[str, list[int]] = {}
-    n_bp = len(layout.bp_coef_cols); families["bp_shape"] = list(range(i, i + n_bp)); i += n_bp
-    n_rp = len(layout.rp_coef_cols); families["rp_shape"] = list(range(i, i + n_rp)); i += n_rp
-    n_c0 = len(layout.xp_scalar_cols); families["xp_c0"] = list(range(i, i + n_c0)); i += n_c0
-    n_res = len(layout.residual_cols); families["residual"] = list(range(i, i + n_res)); i += n_res
-    n_aux = len(layout.aux_cols); families["aux"] = list(range(i, i + n_aux)); i += n_aux
+    n_bp = len(layout.bp_coef_cols)
+    families["bp_shape"] = list(range(i, i + n_bp))
+    i += n_bp
+    n_rp = len(layout.rp_coef_cols)
+    families["rp_shape"] = list(range(i, i + n_rp))
+    i += n_rp
+    n_c0 = len(layout.xp_scalar_cols)
+    families["xp_c0"] = list(range(i, i + n_c0))
+    i += n_c0
+    n_res = len(layout.residual_cols)
+    families["residual"] = list(range(i, i + n_res))
+    i += n_res
+    n_aux = len(layout.aux_cols)
+    families["aux"] = list(range(i, i + n_aux))
+    i += n_aux
     assert i == layout.input_dim, (i, layout.input_dim)
     return families
 
 
 def _pca_xp_summary(
-    X_val_xp: np.ndarray, variance_threshold: float = 0.95,
+    X_val_xp: np.ndarray,
+    variance_threshold: float = 0.95,
 ) -> tuple[np.ndarray, int, float]:
     """Return PCA projection of the XP block retaining ``variance_threshold`` var."""
     Xc = X_val_xp - X_val_xp.mean(axis=0, keepdims=True)
     U, s, _Vt = np.linalg.svd(Xc.astype(np.float64), full_matrices=False)
-    var = (s ** 2) / max(Xc.shape[0] - 1, 1)
+    var = (s**2) / max(Xc.shape[0] - 1, 1)
     cum = np.cumsum(var) / var.sum()
     k = int(np.searchsorted(cum, variance_threshold) + 1)
     k = max(k, 2)
@@ -104,7 +115,8 @@ def _pca_xp_summary(
 
 
 def _aux_conditioning(
-    parquet_path: Path, source_ids: np.ndarray,
+    parquet_path: Path,
+    source_ids: np.ndarray,
 ) -> tuple[np.ndarray, tuple[str, ...]]:
     import pandas as pd
 
@@ -134,9 +146,7 @@ def _cmi_for_labels(
     seed: int = 0,
 ) -> dict[str, float]:
     rng = np.random.default_rng(seed)
-    finite_row = (
-        np.isfinite(xp_summary).all(axis=1) & np.isfinite(Z).all(axis=1)
-    )
+    finite_row = np.isfinite(xp_summary).all(axis=1) & np.isfinite(Z).all(axis=1)
     out: dict[str, float] = {}
     for j in target_indices:
         name = label_names[j]
@@ -150,7 +160,10 @@ def _cmi_for_labels(
             idx = rng.choice(idx, size=max_samples, replace=False)
         try:
             cmi = conditional_mi_ksg(
-                xp_summary[idx], y[idx], Z[idx], k=k,
+                xp_summary[idx],
+                y[idx],
+                Z[idx],
+                k=k,
             )
         except ValueError as exc:
             _LOG.warning("CMI failed for %s: %s", name, exc)
@@ -199,10 +212,15 @@ def main() -> None:
     split_seed = int(json.loads(first_blob["config_yaml"]).get("split_seed", 0))
 
     cfg = _build_cfg_for_val_loader(
-        parquet=args.parquet, split_seed=split_seed, batch_size=args.batch_size,
+        parquet=args.parquet,
+        split_seed=split_seed,
+        batch_size=args.batch_size,
     )
     _train_loader, val_loader, _split_ids, scaler_human = build_dataloaders(
-        cfg, layout, tiers, seed=split_seed,
+        cfg,
+        layout,
+        tiers,
+        seed=split_seed,
     )
 
     # Collect X_val and Y_val (raw-unit, block-order) --------------------------
@@ -219,35 +237,48 @@ def main() -> None:
     X_val_xp = X_val[:, xp_idx].astype(np.float64)
     xp_pca, k_pca, var_at_k = _pca_xp_summary(X_val_xp, args.pca_variance)
     _LOG.info(
-        "PCA: k=%d components, cumulative variance at k = %.4f", k_pca, var_at_k,
+        "PCA: k=%d components, cumulative variance at k = %.4f",
+        k_pca,
+        var_at_k,
     )
 
-    xp_2d = np.column_stack([
-        np.abs(X_val[:, families["bp_shape"]]).sum(axis=1),
-        np.abs(X_val[:, families["rp_shape"]]).sum(axis=1),
-    ]).astype(np.float64)
+    xp_2d = np.column_stack(
+        [
+            np.abs(X_val[:, families["bp_shape"]]).sum(axis=1),
+            np.abs(X_val[:, families["rp_shape"]]).sum(axis=1),
+        ]
+    ).astype(np.float64)
 
     val_source_ids = np.asarray(val_loader.dataset.source_id)
     Z_cond, cond_names = _aux_conditioning(args.parquet, val_source_ids)
 
     target_indices = [ckpt_label_names.index(n) for n in ALL_LABELS]
     cmi_2d = _cmi_for_labels(
-        xp_2d, Y_val, Z_cond, list(ckpt_label_names), target_indices,
-        max_samples=args.mi_max_samples, k=8, seed=0,
+        xp_2d,
+        Y_val,
+        Z_cond,
+        list(ckpt_label_names),
+        target_indices,
+        max_samples=args.mi_max_samples,
+        k=8,
+        seed=0,
     )
     cmi_pca = _cmi_for_labels(
-        xp_pca, Y_val, Z_cond, list(ckpt_label_names), target_indices,
-        max_samples=args.mi_max_samples, k=8, seed=0,
+        xp_pca,
+        Y_val,
+        Z_cond,
+        list(ckpt_label_names),
+        target_indices,
+        max_samples=args.mi_max_samples,
+        k=8,
+        seed=0,
     )
 
     # Load existing 2-D CMI from audit_payload for the full cross-check table.
     existing_audit = json.loads(
         (args.report_dir / "audit_payload.json").read_text(),
     )
-    existing_cmi = {
-        name: float(existing_audit["per_label"][name]["cmi"])
-        for name in ALL_LABELS
-    }
+    existing_cmi = {name: float(existing_audit["per_label"][name]["cmi"]) for name in ALL_LABELS}
 
     payload = {
         "timestamp": dt.datetime.now(dt.UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
@@ -303,7 +334,7 @@ def _append_markdown_table(path: Path, payload: dict[str, Any]) -> None:
         f"_Appended {payload['timestamp']} · "
         f"Same val split (seed {payload['split_seed']}, N_val={payload['n_val']}), "
         f"same PCA basis ({payload['pca_components']} components, "
-        f"{payload['pca_variance_retained']*100:.2f}% variance), same KSG "
+        f"{payload['pca_variance_retained'] * 100:.2f}% variance), same KSG "
         f"(k={payload['cmi_estimator_k']}, {payload['max_samples']}-sample cap)._",
     )
     lines.append("")
@@ -313,8 +344,7 @@ def _append_markdown_table(path: Path, payload: dict[str, Any]) -> None:
     )
     lines.append("")
     lines.append(
-        "| label | CMI (2-D, original audit) | CMI (2-D, rerun) | "
-        "CMI (PCA summary) | PCA / 2-D |",
+        "| label | CMI (2-D, original audit) | CMI (2-D, rerun) | CMI (PCA summary) | PCA / 2-D |",
     )
     lines.append("|---|---|---|---|---|")
     for name in payload["target_labels"]:

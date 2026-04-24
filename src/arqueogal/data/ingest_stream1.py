@@ -141,7 +141,9 @@ def ingest_stream1(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     n_merged = len(merged)
     logger.info(
         "Stream 1: merged %d rows (APOGEE post-cut %d × Gaia %d)",
-        n_merged, len(corrected), len(enriched),
+        n_merged,
+        len(corrected),
+        len(enriched),
     )
 
     logger.info("Stream 1: Lindegren+2021 parallax zero-point")

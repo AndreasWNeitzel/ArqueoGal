@@ -63,12 +63,17 @@ SFD_TO_AV = 2.742
 # Teff bin edges (K). NaN / Teff < first edge both fall into the "no_teff" bin.
 TEFF_BIN_EDGES: tuple[float, ...] = (4000.0, 4500.0, 5000.0, 5500.0, 6000.0)
 TEFF_BIN_LABELS: tuple[str, ...] = (
-    "lt_4000", "4000_4500", "4500_5000", "5000_5500", "5500_6000", "ge_6000",
+    "lt_4000",
+    "4000_4500",
+    "4500_5000",
+    "5000_5500",
+    "5500_6000",
+    "ge_6000",
 )
 
 # Noise-floor truncation from the smoke test on 1490 stars.
-N_BP_INFORMATIVE = 20   # keep modes 0..19
-N_RP_INFORMATIVE = 23   # keep modes 0..22
+N_BP_INFORMATIVE = 20  # keep modes 0..19
+N_RP_INFORMATIVE = 23  # keep modes 0..22
 
 
 def _parse_args() -> argparse.Namespace:
@@ -85,7 +90,9 @@ def _parse_args() -> argparse.Namespace:
     )
     p.add_argument("--chunk-size", type=int, default=50_000)
     p.add_argument(
-        "--pca-sample-size", type=int, default=50_000,
+        "--pca-sample-size",
+        type=int,
+        default=50_000,
         help="PCA subsample size for speed (full 315k is unneeded for PC directions).",
     )
     p.add_argument("--seed", type=int, default=20260418)
@@ -100,7 +107,8 @@ def _teff_bin(teff: np.ndarray) -> np.ndarray:
 
 
 def _reproject_full(
-    df: pd.DataFrame, chunk_size: int,
+    df: pd.DataFrame,
+    chunk_size: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Reproject every flag=0 row in chunks.
 
@@ -117,9 +125,7 @@ def _reproject_full(
     for lo in range(0, n, chunk_size):
         hi = min(lo + chunk_size, n)
         logger.info("reprojecting rows [%d, %d) / %d", lo, hi, n)
-        flux = np.stack(
-            [np.asarray(f, dtype=np.float32) for f in df["corrected_flux"].iloc[lo:hi]]
-        )
+        flux = np.stack([np.asarray(f, dtype=np.float32) for f in df["corrected_flux"].iloc[lo:hi]])
         assert flux.shape == (hi - lo, YE2024_N_OUTPUT)
         out = reproject_ye_to_hermite(flux)
         residuals[lo:hi] = out["reprojection_residual_rms"]
@@ -129,7 +135,8 @@ def _reproject_full(
 
 
 def _teff_stratified_thresholds(
-    residuals: np.ndarray, teff: np.ndarray,
+    residuals: np.ndarray,
+    teff: np.ndarray,
 ) -> dict:
     """p99 on normal (residual < catastrophic) per Teff bin + global fallback."""
     normal = residuals < YE_CATASTROPHIC_RESIDUAL
@@ -141,7 +148,11 @@ def _teff_stratified_thresholds(
         sub = residuals[mask]
         if sub.size == 0:
             per_bin[label] = {
-                "n": 0, "p50": None, "p95": None, "p99": None, "p99_9": None,
+                "n": 0,
+                "p50": None,
+                "p95": None,
+                "p99": None,
+                "p99_9": None,
             }
             continue
         per_bin[label] = {
@@ -178,7 +189,8 @@ def _teff_stratified_thresholds(
 
 
 def _contingency(
-    df_full: pd.DataFrame, residuals_flag0: np.ndarray,
+    df_full: pd.DataFrame,
+    residuals_flag0: np.ndarray,
 ) -> dict:
     """2x2 table of (NO_SYNTH_PHOT) × (Hermite catastrophic) with population overlay.
 
@@ -190,7 +202,7 @@ def _contingency(
     resid_full = np.full(len(df_full), np.nan, dtype=np.float32)
     resid_full[flag == 0] = residuals_flag0
 
-    no_synth = flag == 1                             # pre-Hermite Ye failure
+    no_synth = flag == 1  # pre-Hermite Ye failure
     hermite_cat = (flag == 0) & (resid_full >= YE_CATASTROPHIC_RESIDUAL)
     normal = (flag == 0) & (resid_full < YE_CATASTROPHIC_RESIDUAL)
 
@@ -200,9 +212,7 @@ def _contingency(
         "both_by_flag": 0,  # structurally zero: flag=1 rows have NaN flux
         "normal": int(normal.sum()),
         "total": int(len(df_full)),
-        "hermite_catastrophic_rate_of_flag0": float(
-            hermite_cat.sum() / max(1, (flag == 0).sum())
-        ),
+        "hermite_catastrophic_rate_of_flag0": float(hermite_cat.sum() / max(1, (flag == 0).sum())),
     }
 
     # Population overlay: are NO_SYNTH_PHOT and HERMITE_CAT similar in (Teff, G, [Fe/H])?
@@ -210,16 +220,11 @@ def _contingency(
         sub = df_full.loc[mask]
         return {
             "n": int(mask.sum()),
-            "teff_median": (
-                float(np.nanmedian(sub["teff_gspphot"])) if mask.sum() else None
-            ),
+            "teff_median": (float(np.nanmedian(sub["teff_gspphot"])) if mask.sum() else None),
             "g_median": float(np.nanmedian(sub["g_mag"])) if mask.sum() else None,
-            "fe_h_median": (
-                float(np.nanmedian(sub["fe_h_atm"])) if mask.sum() else None
-            ),
+            "fe_h_median": (float(np.nanmedian(sub["fe_h_atm"])) if mask.sum() else None),
             "av_sfd_median": (
-                float(np.nanmedian(SFD_TO_AV * sub["ebv_sfd"]))
-                if mask.sum() else None
+                float(np.nanmedian(SFD_TO_AV * sub["ebv_sfd"])) if mask.sum() else None
             ),
         }
 
@@ -234,7 +239,9 @@ def _contingency(
 
 
 def _plot_population_overlay(
-    df_full: pd.DataFrame, residuals_flag0: np.ndarray, out_path: Path,
+    df_full: pd.DataFrame,
+    residuals_flag0: np.ndarray,
+    out_path: Path,
 ) -> None:
     set_aa_style()
     flag = df_full["ye2024_flag"].to_numpy()
@@ -261,35 +268,49 @@ def _plot_population_overlay(
             data_hc = data_hc * SFD_TO_AV
         bins = np.linspace(*xlim, 40)
         ax.hist(
-            np.clip(data_norm, *xlim), bins=bins, density=True,
-            histtype="step", color="0.4", label=f"normal ({normal.sum()})", lw=1.2,
+            np.clip(data_norm, *xlim),
+            bins=bins,
+            density=True,
+            histtype="step",
+            color="0.4",
+            label=f"normal ({normal.sum()})",
+            lw=1.2,
         )
         ax.hist(
-            np.clip(data_ns, *xlim), bins=bins, density=True,
-            histtype="step", color=WONG_PALETTE[2],
-            label=f"NO_SYNTH_PHOT ({no_synth.sum()})", lw=1.2,
+            np.clip(data_ns, *xlim),
+            bins=bins,
+            density=True,
+            histtype="step",
+            color=WONG_PALETTE[2],
+            label=f"NO_SYNTH_PHOT ({no_synth.sum()})",
+            lw=1.2,
         )
         ax.hist(
-            np.clip(data_hc, *xlim), bins=bins, density=True,
-            histtype="step", color=WONG_PALETTE[1],
-            label=f"Hermite cat ({hermite_cat.sum()})", lw=1.2,
+            np.clip(data_hc, *xlim),
+            bins=bins,
+            density=True,
+            histtype="step",
+            color=WONG_PALETTE[1],
+            label=f"Hermite cat ({hermite_cat.sum()})",
+            lw=1.2,
         )
         ax.set_xlabel(label)
         ax.set_xlim(*xlim)
         if ax is axes[0]:
             ax.set_ylabel("normalised density")
     axes[0].legend(fontsize=7, loc="upper right")
-    fig.suptitle(
-        "Failure-population overlay: NO_SYNTH_PHOT vs Hermite-catastrophic vs normal"
-    )
+    fig.suptitle("Failure-population overlay: NO_SYNTH_PHOT vs Hermite-catastrophic vs normal")
     fig.tight_layout()
     save_figure(fig, out_path)
     plt.close(fig)
 
 
 def _pca_compare(
-    bp_c: np.ndarray, rp_c: np.ndarray, residuals: np.ndarray,
-    sample_size: int, seed: int,
+    bp_c: np.ndarray,
+    rp_c: np.ndarray,
+    residuals: np.ndarray,
+    sample_size: int,
+    seed: int,
 ) -> dict:
     """Compare PC1/PC2 explained variance for 110-D vs 43-D truncated coefficient vectors."""
     keep = residuals < YE_CATASTROPHIC_RESIDUAL
@@ -303,7 +324,8 @@ def _pca_compare(
         rp_k = rp_k[pick]
     full_110 = np.concatenate([bp_k, rp_k], axis=1)
     trunc_43 = np.concatenate(
-        [bp_k[:, :N_BP_INFORMATIVE], rp_k[:, :N_RP_INFORMATIVE]], axis=1,
+        [bp_k[:, :N_BP_INFORMATIVE], rp_k[:, :N_RP_INFORMATIVE]],
+        axis=1,
     )
 
     def _robust_pca(X: np.ndarray) -> np.ndarray:
@@ -445,8 +467,13 @@ def _write_summary(out_dir: Path, thresholds: dict, contingency: dict, pca: dict
 
 
 def _plot_pca_compare(
-    bp_c: np.ndarray, rp_c: np.ndarray, residuals: np.ndarray,
-    df: pd.DataFrame, sample_size: int, seed: int, out_path: Path,
+    bp_c: np.ndarray,
+    rp_c: np.ndarray,
+    residuals: np.ndarray,
+    df: pd.DataFrame,
+    sample_size: int,
+    seed: int,
+    out_path: Path,
 ) -> None:
     set_aa_style()
     keep = residuals < YE_CATASTROPHIC_RESIDUAL
@@ -462,7 +489,8 @@ def _plot_pca_compare(
 
     full = np.concatenate([bp_k, rp_k], axis=1)
     trunc = np.concatenate(
-        [bp_k[:, :N_BP_INFORMATIVE], rp_k[:, :N_RP_INFORMATIVE]], axis=1,
+        [bp_k[:, :N_BP_INFORMATIVE], rp_k[:, :N_RP_INFORMATIVE]],
+        axis=1,
     )
 
     def _robust(X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -480,8 +508,10 @@ def _plot_pca_compare(
     fig, axes = plt.subplots(1, 2, figsize=(AA_DOUBLE_COLUMN_IN, 4.0))
     for ax, (pcs, ev, title) in zip(
         axes,
-        [(pcs_full, ev_full, "110-D full basis"),
-         (pcs_trunc, ev_trunc, f"{N_BP_INFORMATIVE + N_RP_INFORMATIVE}-D truncated")],
+        [
+            (pcs_full, ev_full, "110-D full basis"),
+            (pcs_trunc, ev_trunc, f"{N_BP_INFORMATIVE + N_RP_INFORMATIVE}-D truncated"),
+        ],
     ):
         sc = ax.scatter(pcs[:, 0], pcs[:, 1], c=teff, s=3, cmap="inferno", linewidths=0)
         ax.set_xlabel(f"PC1 ({ev[0]:.1%})")
@@ -501,9 +531,14 @@ def main() -> None:
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     cols = [
-        "source_id", "corrected_flux", "ye2024_flag",
-        "g_mag", "teff_gspphot", "logg_gspphot",
-        "fe_h_atm", "ebv_sfd",
+        "source_id",
+        "corrected_flux",
+        "ye2024_flag",
+        "g_mag",
+        "teff_gspphot",
+        "logg_gspphot",
+        "fe_h_atm",
+        "ebv_sfd",
     ]
     df_full = pd.read_parquet(args.features, columns=cols)
     logger.info("Loaded %d total rows", len(df_full))
@@ -518,11 +553,18 @@ def main() -> None:
     pca_stats = _pca_compare(bp_c, rp_c, residuals, args.pca_sample_size, args.seed)
 
     _plot_population_overlay(
-        df_full, residuals, args.out_dir / "failure_population_overlay.png",
+        df_full,
+        residuals,
+        args.out_dir / "failure_population_overlay.png",
     )
     _plot_pca_compare(
-        bp_c, rp_c, residuals, df_ok,
-        args.pca_sample_size, args.seed, args.out_dir / "pca_compare.png",
+        bp_c,
+        rp_c,
+        residuals,
+        df_ok,
+        args.pca_sample_size,
+        args.seed,
+        args.out_dir / "pca_compare.png",
     )
     _write_summary(args.out_dir, thresholds, contingency, pca_stats)
     logger.info("Done. Outputs under %s", args.out_dir)

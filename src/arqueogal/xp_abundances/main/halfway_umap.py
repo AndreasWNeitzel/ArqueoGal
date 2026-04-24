@@ -75,7 +75,9 @@ def compute_halfway_embedding(  # noqa: PLR0913 — the UMAP knobs stay explicit
     h_chunks: list[np.ndarray] = []
     with torch.no_grad():
         for start in range(0, len(X), batch_size):
-            x_batch = torch.as_tensor(X[start : start + batch_size], dtype=torch.float32, device=device)
+            x_batch = torch.as_tensor(
+                X[start : start + batch_size], dtype=torch.float32, device=device
+            )
             x_adapted = adapter(x_batch)
             h, _z = model.encoder(x_adapted)
             h_chunks.append(h.cpu().numpy())
@@ -91,7 +93,10 @@ def compute_halfway_embedding(  # noqa: PLR0913 — the UMAP knobs stay explicit
 
     n_finite = {k: int(np.isfinite(v).sum()) for k, v in labels.items()}
     return HalfwayEmbedding(
-        embedding=emb, labels=labels, n_stars=len(X), n_finite=n_finite,
+        embedding=emb,
+        labels=labels,
+        n_stars=len(X),
+        n_finite=n_finite,
     )
 
 
@@ -126,15 +131,18 @@ def save_halfway_plots(
         fig, ax = plt.subplots(figsize=(7, 6), dpi=150)
         finite = np.isfinite(values)
         sc = ax.scatter(
-            he.embedding[finite, 0], he.embedding[finite, 1],
-            c=values[finite], cmap=cmap_for.get(col, "viridis"),
-            s=3, alpha=0.7, linewidths=0,
+            he.embedding[finite, 0],
+            he.embedding[finite, 1],
+            c=values[finite],
+            cmap=cmap_for.get(col, "viridis"),
+            s=3,
+            alpha=0.7,
+            linewidths=0,
         )
         ax.set_xlabel("UMAP-1")
         ax.set_ylabel("UMAP-2")
         ax.set_title(
-            f"Halfway trunk UMAP — coloured by {col} "
-            f"({finite.sum():,}/{he.n_stars:,} stars)",
+            f"Halfway trunk UMAP — coloured by {col} ({finite.sum():,}/{he.n_stars:,} stars)",
         )
         cbar = fig.colorbar(sc, ax=ax)
         cbar.set_label(label_texts.get(col, col))

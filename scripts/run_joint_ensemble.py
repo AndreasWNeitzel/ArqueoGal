@@ -87,10 +87,14 @@ DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/run_a"
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "nogit"
 
@@ -101,9 +105,17 @@ def _cfg_hash(cfg: TrainingConfig) -> str:
 
 
 def build_joint_config(
-    *, parquet: Path, output_dir: Path, epochs: int, batch_size: int,
-    queue_size: int, barlow_weight: float, barlow_lam: float,
-    seeds: tuple[int, ...], max_lr: float, pct_start: float,
+    *,
+    parquet: Path,
+    output_dir: Path,
+    epochs: int,
+    batch_size: int,
+    queue_size: int,
+    barlow_weight: float,
+    barlow_lam: float,
+    seeds: tuple[int, ...],
+    max_lr: float,
+    pct_start: float,
     grad_abort_threshold: float,
 ) -> TrainingConfig:
     return TrainingConfig(
@@ -151,27 +163,43 @@ def main() -> None:
     parser.add_argument("--queue-size", type=int, default=8192)
     parser.add_argument("--barlow-weight", type=float, default=1.0)
     parser.add_argument("--barlow-lam", type=float, default=0.005)
-    parser.add_argument("--max-lr", type=float, default=1e-3,
-                        help="OneCycleLR peak. Default 1e-3 for production-139D. "
-                             "The XP-only 110-D smoke used 2e-3 with no grad blow-up; "
-                             "the extra residuals + aux features destabilize SupCon "
-                             "under 2e-3 within the first 5 epochs.")
-    parser.add_argument("--pct-start", type=float, default=0.3,
-                        help="OneCycleLR warmup fraction. Default 0.3 for 139-D "
-                             "(vs 0.15 in the XP-only smoke) — longer warmup lets "
-                             "the queue fill before the LR peaks.")
-    parser.add_argument("--grad-abort-threshold", type=float, default=5000.0,
-                        help="Pre-clip grad-norm ceiling. SupCon's log-sum-exp "
-                             "over queue+batch at τ~0.1 is inherently "
-                             "high-dynamic-range; the 500.0 canary used in the "
-                             "β=0 fine-tune is miscalibrated for joint-loss "
-                             "training — parameter updates are bounded by "
-                             "grad_clip_norm=1.0 regardless. Pass `inf` to disable.")
+    parser.add_argument(
+        "--max-lr",
+        type=float,
+        default=1e-3,
+        help="OneCycleLR peak. Default 1e-3 for production-139D. "
+        "The XP-only 110-D smoke used 2e-3 with no grad blow-up; "
+        "the extra residuals + aux features destabilize SupCon "
+        "under 2e-3 within the first 5 epochs.",
+    )
+    parser.add_argument(
+        "--pct-start",
+        type=float,
+        default=0.3,
+        help="OneCycleLR warmup fraction. Default 0.3 for 139-D "
+        "(vs 0.15 in the XP-only smoke) — longer warmup lets "
+        "the queue fill before the LR peaks.",
+    )
+    parser.add_argument(
+        "--grad-abort-threshold",
+        type=float,
+        default=5000.0,
+        help="Pre-clip grad-norm ceiling. SupCon's log-sum-exp "
+        "over queue+batch at τ~0.1 is inherently "
+        "high-dynamic-range; the 500.0 canary used in the "
+        "β=0 fine-tune is miscalibrated for joint-loss "
+        "training — parameter updates are bounded by "
+        "grad_clip_norm=1.0 regardless. Pass `inf` to disable.",
+    )
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])
-    parser.add_argument("--tier-set", choices=["five", "two"], default="five",
-                        help="Label-tier set to train on. 'five' is the production "
-                             "{Teff, logg, [M/H], [α/M], [Mg/H]} head; 'two' is the "
-                             "TESS_ML-matched {[M/H], [α/M]} capacity-dilution test.")
+    parser.add_argument(
+        "--tier-set",
+        choices=["five", "two"],
+        default="five",
+        help="Label-tier set to train on. 'five' is the production "
+        "{Teff, logg, [M/H], [α/M], [Mg/H]} head; 'two' is the "
+        "TESS_ML-matched {[M/H], [α/M]} capacity-dilution test.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -183,11 +211,16 @@ def main() -> None:
     args.report_dir.mkdir(parents=True, exist_ok=True)
 
     tmp_cfg = build_joint_config(
-        parquet=args.parquet, output_dir=args.model_dir / "pending",
-        epochs=args.epochs, batch_size=args.batch_size,
+        parquet=args.parquet,
+        output_dir=args.model_dir / "pending",
+        epochs=args.epochs,
+        batch_size=args.batch_size,
         queue_size=args.queue_size,
-        barlow_weight=args.barlow_weight, barlow_lam=args.barlow_lam,
-        seeds=seeds, max_lr=args.max_lr, pct_start=args.pct_start,
+        barlow_weight=args.barlow_weight,
+        barlow_lam=args.barlow_lam,
+        seeds=seeds,
+        max_lr=args.max_lr,
+        pct_start=args.pct_start,
         grad_abort_threshold=args.grad_abort_threshold,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
@@ -195,11 +228,16 @@ def main() -> None:
     ensemble_dir.mkdir(parents=True, exist_ok=True)
 
     cfg = build_joint_config(
-        parquet=args.parquet, output_dir=ensemble_dir,
-        epochs=args.epochs, batch_size=args.batch_size,
+        parquet=args.parquet,
+        output_dir=ensemble_dir,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
         queue_size=args.queue_size,
-        barlow_weight=args.barlow_weight, barlow_lam=args.barlow_lam,
-        seeds=seeds, max_lr=args.max_lr, pct_start=args.pct_start,
+        barlow_weight=args.barlow_weight,
+        barlow_lam=args.barlow_lam,
+        seeds=seeds,
+        max_lr=args.max_lr,
+        pct_start=args.pct_start,
         grad_abort_threshold=args.grad_abort_threshold,
     )
 
@@ -228,8 +266,14 @@ def main() -> None:
         json.dump(payload, f, indent=2, default=str)
     _LOG.info(
         "ensemble_dir=%s cfg_hash=%s sha=%s input_dim=%d labels=%s seeds=%s queue=%d barlow=%s",
-        ensemble_dir, cfg_hash, sha7, layout.input_dim, tiers.all_labels,
-        seeds, args.queue_size, args.barlow_weight,
+        ensemble_dir,
+        cfg_hash,
+        sha7,
+        layout.input_dim,
+        tiers.all_labels,
+        seeds,
+        args.queue_size,
+        args.barlow_weight,
     )
 
     if args.dry_run:
@@ -247,8 +291,11 @@ def main() -> None:
         member_dir.mkdir(parents=True, exist_ok=True)
         best_path = save_checkpoint(
             member_dir / f"{cfg.output_prefix}_seed{seed}_best.pt",
-            model=result["model"], log_temp=result["log_temp"],
-            cfg=cfg, layout=layout, tiers=tiers,
+            model=result["model"],
+            log_temp=result["log_temp"],
+            cfg=cfg,
+            layout=layout,
+            tiers=tiers,
             label_scaler=result["label_scaler"],
             seed=seed,
             training_metrics={
@@ -259,16 +306,20 @@ def main() -> None:
             },
             git_sha=sha,
         )
-        members.append({
-            "seed": seed,
-            "ckpt": str(best_path),
-            "best_val_loss": float(result["best_val_loss"]),
-            "best_epoch": int(result["best_epoch"]),
-            "history": result["history"],
-        })
+        members.append(
+            {
+                "seed": seed,
+                "ckpt": str(best_path),
+                "best_val_loss": float(result["best_val_loss"]),
+                "best_epoch": int(result["best_epoch"]),
+                "history": result["history"],
+            }
+        )
         _LOG.info(
             "member seed=%d: best_val_loss=%.4f at epoch %d",
-            seed, result["best_val_loss"], result["best_epoch"],
+            seed,
+            result["best_val_loss"],
+            result["best_epoch"],
         )
 
     summary = {
@@ -279,15 +330,18 @@ def main() -> None:
         "members": members,
         "val_loss_mean": float(sum(m["best_val_loss"] for m in members) / len(members)),
         "val_loss_spread": float(
-            max(m["best_val_loss"] for m in members)
-            - min(m["best_val_loss"] for m in members),
-        ) if len(members) > 1 else 0.0,
+            max(m["best_val_loss"] for m in members) - min(m["best_val_loss"] for m in members),
+        )
+        if len(members) > 1
+        else 0.0,
     }
     with (args.report_dir / "joint_ensemble_history.json").open("w") as f:
         json.dump(summary, f, indent=2, default=str)
     _LOG.info(
         "joint ensemble done: mean val loss=%.4f, spread=%.4f, %d members",
-        summary["val_loss_mean"], summary["val_loss_spread"], len(members),
+        summary["val_loss_mean"],
+        summary["val_loss_spread"],
+        len(members),
     )
 
 

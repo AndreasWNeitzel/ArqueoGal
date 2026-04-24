@@ -18,6 +18,7 @@ This keeps the flagship rendering identical to the stage versions — we
 do not duplicate the plotting logic. If the stage version is ever
 updated, re-running batch 7 inherits the change.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -46,6 +47,7 @@ PAPER_DPI = 300
 # anchor in docs/plan/06_methods_paper.md. `caption` is the paper-ready
 # caption (authored here, not inherited from stage READMEs).
 # -----------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class Flagship:
@@ -215,6 +217,7 @@ def _paper_save_fig_factory(figure_name: str):
     The upstream caller passes its own path; we ignore its stem and use our
     `figure_name` instead. We still respect the `tight` kwarg.
     """
+
     def paper_save_fig(fig, path: Path, *, tight: bool = True) -> None:
         mpl.rcParams["text.usetex"] = False
         OUT.mkdir(parents=True, exist_ok=True)
@@ -225,10 +228,11 @@ def _paper_save_fig_factory(figure_name: str):
         fig.savefig(png, bbox_inches="tight", facecolor="white", dpi=PAPER_DPI)
         fig.savefig(pdf, bbox_inches="tight", facecolor="white")
         plt.close(fig)
-        _EMITTED.setdefault(figure_name, []).extend([
-            str(png.relative_to(ROOT)), str(pdf.relative_to(ROOT))
-        ])
+        _EMITTED.setdefault(figure_name, []).extend(
+            [str(png.relative_to(ROOT)), str(pdf.relative_to(ROOT))]
+        )
         print(f"[paper] wrote {png.relative_to(ROOT)}  +  {pdf.relative_to(ROOT)}")
+
     return paper_save_fig
 
 
@@ -236,10 +240,12 @@ def _paper_save_fig_factory(figure_name: str):
 # Main
 # -----------------------------------------------------------------------------
 
+
 def _prepare_args(mod, spec: Flagship) -> tuple:
     """A couple of stage-01 plot fns take a pre-loaded data dict. Load it here."""
     if spec.source_script == "plot_01_gaia_xp_raw" and spec.source_function in (
-        "sed_atlas_by_hrd", "example_stars"
+        "sed_atlas_by_hrd",
+        "example_stars",
     ):
         data = mod._load_xp_subset(n_target=10_000)
         return (data,)
@@ -249,7 +255,7 @@ def _prepare_args(mod, spec: Flagship) -> tuple:
 def _call_flagship(spec: Flagship) -> tuple[bool, str]:
     try:
         mod = importlib.import_module(spec.source_script)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         return False, f"import {spec.source_script}: {type(exc).__name__}: {exc}"
     fn = getattr(mod, spec.source_function, None)
     if fn is None:
@@ -266,7 +272,7 @@ def _call_flagship(spec: Flagship) -> tuple[bool, str]:
     try:
         args = _prepare_args(mod, spec)
         fn(*args)
-    except Exception as exc:   # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         return False, f"{type(exc).__name__}: {exc}"
     finally:
         _common.save_fig = orig_common

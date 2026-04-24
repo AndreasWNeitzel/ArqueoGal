@@ -35,7 +35,10 @@ log = logging.getLogger("assign_release_tier")
 def _main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--target", type=Path, action="append", default=None,
+        "--target",
+        type=Path,
+        action="append",
+        default=None,
         help="Override the default target list (repeatable).",
     )
     args = parser.parse_args()
@@ -53,10 +56,14 @@ def _main() -> None:
         n = summary["n_rows"]
         log.info(
             "%s: n=%d  tier1=%d (%.1f%%)  tier2=%d (%.1f%%)  tier3=%d (%.1f%%)",
-            path.name, n,
-            counts[1], 100 * counts[1] / n,
-            counts[2], 100 * counts[2] / n,
-            counts[3], 100 * counts[3] / n,
+            path.name,
+            n,
+            counts[1],
+            100 * counts[1] / n,
+            counts[2],
+            100 * counts[2] / n,
+            counts[3],
+            100 * counts[3] / n,
         )
 
 

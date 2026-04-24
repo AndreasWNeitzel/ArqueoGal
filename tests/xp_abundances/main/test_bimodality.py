@@ -30,7 +30,10 @@ def test_is_cell_bimodal_flags_clearly_bimodal_distribution():
     rng = np.random.default_rng(0)
     a = _make_bimodal_sample(rng, 500)
     flag, stats = _is_cell_bimodal(
-        a, min_minor_weight=0.15, min_mean_sep=0.08, bic_delta_min=4.0,
+        a,
+        min_minor_weight=0.15,
+        min_mean_sep=0.08,
+        bic_delta_min=4.0,
     )
     assert flag is True
     assert stats["bic_delta"] > 4.0
@@ -41,7 +44,10 @@ def test_is_cell_bimodal_does_not_flag_unimodal_distribution():
     rng = np.random.default_rng(1)
     a = _make_unimodal_sample(rng, 500)
     flag, _ = _is_cell_bimodal(
-        a, min_minor_weight=0.15, min_mean_sep=0.08, bic_delta_min=4.0,
+        a,
+        min_minor_weight=0.15,
+        min_mean_sep=0.08,
+        bic_delta_min=4.0,
     )
     assert flag is False
 
@@ -54,7 +60,10 @@ def test_is_cell_bimodal_rejects_too_small_minor_mode():
     mu = np.where(k == 0, 0.05, 0.30)
     a = rng.normal(mu, 0.02, size=n)
     flag, _ = _is_cell_bimodal(
-        a, min_minor_weight=0.15, min_mean_sep=0.08, bic_delta_min=4.0,
+        a,
+        min_minor_weight=0.15,
+        min_mean_sep=0.08,
+        bic_delta_min=4.0,
     )
     assert flag is False
 
@@ -63,7 +72,9 @@ def test_is_cell_bimodal_too_few_points():
     rng = np.random.default_rng(3)
     flag, stats = _is_cell_bimodal(
         rng.normal(0.10, 0.04, size=5),
-        min_minor_weight=0.15, min_mean_sep=0.08, bic_delta_min=4.0,
+        min_minor_weight=0.15,
+        min_mean_sep=0.08,
+        bic_delta_min=4.0,
     )
     assert flag is False
     assert stats["reason"] == "too few points"
@@ -93,7 +104,10 @@ def test_fit_bimodality_grid_detects_synthetic_bimodal_cell():
     alpha = np.concatenate([a1, a2])
 
     grid = fit_bimodality_grid(
-        teff, logg, mh, alpha,
+        teff,
+        logg,
+        mh,
+        alpha,
         teff_edges=np.array([4500.0, 5100.0]),
         logg_edges=np.array([2.2, 2.8]),
         mh_edges=np.array([-2.0, -1.5, -0.5, 0.0]),
@@ -104,11 +118,15 @@ def test_fit_bimodality_grid_detects_synthetic_bimodal_cell():
     assert grid.is_bimodal[0, 0, 2]
     assert not grid.is_bimodal[0, 0, 0]
     flag_bi, in_bi = grid.query(
-        np.array([4800.0]), np.array([2.5]), np.array([-0.4]),
+        np.array([4800.0]),
+        np.array([2.5]),
+        np.array([-0.4]),
     )
     assert flag_bi[0] and in_bi[0]
     flag_uni, in_uni = grid.query(
-        np.array([4800.0]), np.array([2.5]), np.array([-1.8]),
+        np.array([4800.0]),
+        np.array([2.5]),
+        np.array([-1.8]),
     )
     assert in_uni[0] and not flag_uni[0]
 
@@ -130,17 +148,23 @@ def test_query_out_of_grid_returns_false_and_not_in_grid():
     )
     # Inside grid — should return True
     flag, in_grid = grid.query(
-        np.array([4600.0]), np.array([2.5]), np.array([-0.5]),
+        np.array([4600.0]),
+        np.array([2.5]),
+        np.array([-0.5]),
     )
     assert flag[0] and in_grid[0]
     # Outside grid in Teff
     flag, in_grid = grid.query(
-        np.array([6000.0]), np.array([2.5]), np.array([-0.5]),
+        np.array([6000.0]),
+        np.array([2.5]),
+        np.array([-0.5]),
     )
     assert not flag[0] and not in_grid[0]
     # NaN entries must also be marked out-of-grid (not flag-propagating)
     flag, in_grid = grid.query(
-        np.array([np.nan]), np.array([2.5]), np.array([-0.5]),
+        np.array([np.nan]),
+        np.array([2.5]),
+        np.array([-0.5]),
     )
     assert not flag[0] and not in_grid[0]
 
@@ -166,10 +190,12 @@ def test_save_load_round_trip(tmp_path: Path):
         teff_edges=np.array([4000.0, 4500.0, 5000.0]),
         logg_edges=np.array([1.0, 2.0, 3.0]),
         mh_edges=np.array([-1.0, -0.5, 0.0]),
-        is_bimodal=np.array([
-            [[True, False], [False, True]],
-            [[False, True], [True, False]],
-        ]),
+        is_bimodal=np.array(
+            [
+                [[True, False], [False, True]],
+                [[False, True], [True, False]],
+            ]
+        ),
         n_per_cell=np.full((2, 2, 2), 100, dtype=np.int32),
         min_cell_n=50,
         min_minor_weight=0.15,
@@ -207,7 +233,10 @@ def test_fit_bimodality_grid_skips_small_cells():
     alpha = _make_bimodal_sample(rng, 30)
 
     grid = fit_bimodality_grid(
-        teff, logg, mh, alpha,
+        teff,
+        logg,
+        mh,
+        alpha,
         teff_edges=np.array([4500.0, 4900.0]),
         logg_edges=np.array([2.2, 2.6]),
         mh_edges=np.array([-0.5, -0.3]),
@@ -228,7 +257,10 @@ def test_fit_bimodality_grid_drops_nans():
     alpha[: n // 2] = np.nan
 
     grid = fit_bimodality_grid(
-        teff, logg, mh, alpha,
+        teff,
+        logg,
+        mh,
+        alpha,
         teff_edges=np.array([4500.0, 4900.0]),
         logg_edges=np.array([2.2, 2.6]),
         mh_edges=np.array([-0.5, -0.3]),

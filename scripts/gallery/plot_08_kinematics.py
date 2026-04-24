@@ -9,6 +9,7 @@ Outputs:
 Reads from data/processed/pipeline2_kinematics_stream3_volume.parquet
 (galpy/agama-integrated in MWPotential14).
 """
+
 from __future__ import annotations
 
 import sys
@@ -35,6 +36,7 @@ def _have(schema, name: str) -> bool:
 
 def _load() -> "pd.DataFrame":
     import pandas as pd  # noqa: F401
+
     # Minimal kinematics summary (ecc, z_max) + labels (mh, alpha_m)
     path = DATA_PROCESSED / "pipeline2_kinematics_stream3_volume.parquet"
     df = pq.read_table(path).to_pandas()
@@ -42,21 +44,45 @@ def _load() -> "pd.DataFrame":
     # Try to merge the 8-D downstream feature matrix for actions + energy + L_z.
     # Legacy filename prefix retained for consumer stability; active definition
     # now lives in Starfold (separate repo).
-    for candidate in ("pipeline2_features_stream3_volume_v11.parquet",
-                      "pipeline2_features_stream3_volume_v12.parquet",
-                      "pipeline2_features_stream3_volume.parquet"):
+    for candidate in (
+        "pipeline2_features_stream3_volume_v11.parquet",
+        "pipeline2_features_stream3_volume_v12.parquet",
+        "pipeline2_features_stream3_volume.parquet",
+    ):
         p = DATA_PROCESSED / candidate
         if not p.exists():
             continue
         fs = pq.read_schema(p)
-        want = ["source_id", "J_R", "J_z", "L_z", "E", "ecc", "z_max",
-                "jr", "jz", "lz", "energy", "eccentricity",
-                "m_h", "mh", "alpha_m", "mg_m"]
+        want = [
+            "source_id",
+            "J_R",
+            "J_z",
+            "L_z",
+            "E",
+            "ecc",
+            "z_max",
+            "jr",
+            "jz",
+            "lz",
+            "energy",
+            "eccentricity",
+            "m_h",
+            "mh",
+            "alpha_m",
+            "mg_m",
+        ]
         fcols = [c for c in want if _have(fs, c)]
         fdf = pq.read_table(p, columns=fcols).to_pandas()
-        fdf = fdf.rename(columns={"jr": "J_R", "jz": "J_z", "lz": "L_z",
-                                  "energy": "E", "eccentricity": "ecc",
-                                  "m_h": "mh"})
+        fdf = fdf.rename(
+            columns={
+                "jr": "J_R",
+                "jz": "J_z",
+                "lz": "L_z",
+                "energy": "E",
+                "eccentricity": "ecc",
+                "m_h": "mh",
+            }
+        )
         # drop any columns already in df except source_id
         overlap = [c for c in fdf.columns if c in df.columns and c != "source_id"]
         fdf = fdf.drop(columns=overlap)
@@ -79,9 +105,12 @@ def e_lz_plane() -> None:
     plt.colorbar(hb, ax=ax, shrink=0.9, pad=0.02, label="log N")
     ax.set_xlabel(r"$L_z$ [kpc km s$^{-1}$]")
     ax.set_ylabel(r"$E$ [km$^2$ s$^{-2}$]")
-    ax.set_title(rf"$E$-$L_z$ plane (Stream 3 volume-limited, n={int(m.sum()):,}) "
-                 r"— Gaia-Enceladus Sausage lobe expected at $L_z\approx 0$",
-                 fontsize=11, fontweight="semibold")
+    ax.set_title(
+        rf"$E$-$L_z$ plane (Stream 3 volume-limited, n={int(m.sum()):,}) "
+        r"— Gaia-Enceladus Sausage lobe expected at $L_z\approx 0$",
+        fontsize=11,
+        fontweight="semibold",
+    )
     ax.axvline(0, color="#fff", lw=0.6, alpha=0.6, ls="--")
     save_fig(fig, OUT / "e_lz_plane.png")
 
@@ -95,13 +124,17 @@ def action_diagram() -> None:
     jz = df["J_z"].to_numpy(dtype=float)
     m = np.isfinite(jr) & np.isfinite(jz) & (jr > 0) & (jz > 0)
     fig, ax = plt.subplots(figsize=(8, 7))
-    hb = ax.hexbin(jr[m], jz[m], xscale="log", yscale="log", gridsize=90, cmap="viridis",
-                   bins="log", mincnt=1)
+    hb = ax.hexbin(
+        jr[m], jz[m], xscale="log", yscale="log", gridsize=90, cmap="viridis", bins="log", mincnt=1
+    )
     plt.colorbar(hb, ax=ax, shrink=0.9, pad=0.02, label="log N")
     ax.set_xlabel(r"$J_R$ [kpc km s$^{-1}$]")
     ax.set_ylabel(r"$J_z$ [kpc km s$^{-1}$]")
-    ax.set_title(rf"Action diagram  (n={int(m.sum()):,})  —  thin disc lower-left, halo / thick disc upper-right",
-                 fontsize=11, fontweight="semibold")
+    ax.set_title(
+        rf"Action diagram  (n={int(m.sum()):,})  —  thin disc lower-left, halo / thick disc upper-right",
+        fontsize=11,
+        fontweight="semibold",
+    )
     # guide line
     xs = np.logspace(0, 4, 50)
     ax.plot(xs, xs, "w--", lw=0.5, alpha=0.5)
@@ -124,15 +157,20 @@ def ecc_lz() -> None:
     ax.set_xlabel(r"$L_z$ [kpc km s$^{-1}$]")
     ax.set_ylabel(r"eccentricity $\varepsilon$")
     ax.set_ylim(0, 1)
-    ax.set_title(rf"Eccentricity vs $L_z$  (n={int(m.sum()):,})  —  high-$\varepsilon$ retrograde peak flags accreted candidates",
-                 fontsize=11, fontweight="semibold")
+    ax.set_title(
+        rf"Eccentricity vs $L_z$  (n={int(m.sum()):,})  —  high-$\varepsilon$ retrograde peak flags accreted candidates",
+        fontsize=11,
+        fontweight="semibold",
+    )
     save_fig(fig, OUT / "ecc_lz.png")
 
 
 def orbit_families_fraction() -> None:
     df = _load()
     if not {"ecc", "L_z"}.issubset(df.columns) or "mh" not in df.columns:
-        print(f"[gallery] skipping orbit_families_fraction — missing ecc/L_z/mh; have {list(df.columns)}")
+        print(
+            f"[gallery] skipping orbit_families_fraction — missing ecc/L_z/mh; have {list(df.columns)}"
+        )
         return
     ecc = df["ecc"].to_numpy(dtype=float)
     lz = df["L_z"].to_numpy(dtype=float)
@@ -142,19 +180,19 @@ def orbit_families_fraction() -> None:
 
     # family assignment
     prograde_disc = (lz > 500) & (ecc < 0.4)
-    retrograde    = (lz < 0) & (ecc > 0.5)
-    halo          = (np.abs(lz) < 500) & (ecc > 0.6)
-    thick_disc    = (lz > 500) & (ecc >= 0.4) & (ecc < 0.6)
-    other         = ~(prograde_disc | retrograde | halo | thick_disc)
+    retrograde = (lz < 0) & (ecc > 0.5)
+    halo = (np.abs(lz) < 500) & (ecc > 0.6)
+    thick_disc = (lz > 500) & (ecc >= 0.4) & (ecc < 0.6)
+    other = ~(prograde_disc | retrograde | halo | thick_disc)
 
     bins = np.linspace(-2.0, 0.5, 11)
     centres = 0.5 * (bins[:-1] + bins[1:])
     fam = {
         "prograde disc (ε<0.4, L_z>500)": (prograde_disc, "#1f77b4"),
-        "thick disc (0.4≤ε<0.6, L_z>500)": (thick_disc,   "#2ca02c"),
-        "halo (ε>0.6, |L_z|<500)":        (halo,         "#d62728"),
-        "retrograde (ε>0.5, L_z<0)":      (retrograde,   "#9467bd"),
-        "other":                          (other,        "#7f7f7f"),
+        "thick disc (0.4≤ε<0.6, L_z>500)": (thick_disc, "#2ca02c"),
+        "halo (ε>0.6, |L_z|<500)": (halo, "#d62728"),
+        "retrograde (ε>0.5, L_z<0)": (retrograde, "#9467bd"),
+        "other": (other, "#7f7f7f"),
     }
 
     fractions = {}
@@ -166,13 +204,24 @@ def orbit_families_fraction() -> None:
     fig, ax = plt.subplots(figsize=(11, 5.5))
     bottom = np.zeros_like(centres)
     for lbl, (_mask, color) in fam.items():
-        ax.bar(centres, fractions[lbl], width=(bins[1] - bins[0]) * 0.9,
-               bottom=bottom, color=color, edgecolor="#333", alpha=0.9, label=lbl)
+        ax.bar(
+            centres,
+            fractions[lbl],
+            width=(bins[1] - bins[0]) * 0.9,
+            bottom=bottom,
+            color=color,
+            edgecolor="#333",
+            alpha=0.9,
+            label=lbl,
+        )
         bottom = bottom + np.nan_to_num(fractions[lbl])
     ax.set_xlabel(r"$[{\rm M}/{\rm H}]$ bin")
     ax.set_ylabel("population fraction")
-    ax.set_title("Orbit-family fractions vs metallicity (Stream 3 volume-limited)",
-                 fontsize=12, fontweight="semibold")
+    ax.set_title(
+        "Orbit-family fractions vs metallicity (Stream 3 volume-limited)",
+        fontsize=12,
+        fontweight="semibold",
+    )
     ax.set_ylim(0, 1.0)
     ax.legend(loc="upper right", fontsize=9)
     save_fig(fig, OUT / "orbit_families_fraction.png")

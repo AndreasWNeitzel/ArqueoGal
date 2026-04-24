@@ -7,6 +7,7 @@ The halfway-UMAP figures already exist under reports/pipeline1/halfway/ and
 are linked from the stage README directly, so this script only produces
 the single new loss-curve figure.
 """
+
 from __future__ import annotations
 
 import json
@@ -45,7 +46,9 @@ def _extract_curve(h: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         train = np.array(hist.get("train_loss", hist.get("loss", [np.nan] * n)))
         val = np.array(hist.get("val_loss", [np.nan] * n))
     else:
-        epochs = np.array([]); train = np.array([]); val = np.array([])
+        epochs = np.array([])
+        train = np.array([])
+        val = np.array([])
     return epochs, train, val
 
 
@@ -53,8 +56,16 @@ def pretrain_loss_curve() -> None:
     path = _find_history()
     fig, ax = plt.subplots(figsize=(10, 5.5))
     if path is None:
-        ax.text(0.5, 0.5, "contrastive history not found", ha="center", va="center",
-                fontsize=12, color="#d62728", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "contrastive history not found",
+            ha="center",
+            va="center",
+            fontsize=12,
+            color="#d62728",
+            transform=ax.transAxes,
+        )
         save_fig(fig, OUT / "pretrain_loss_curve.png")
         return
 
@@ -67,12 +78,14 @@ def pretrain_loss_curve() -> None:
     best = h.get("best_epoch")
     best_val = h.get("best_val_loss")
     if best is not None and best_val is not None:
-        ax.axvline(best, color="#333", lw=0.8, ls=":",
-                   label=f"best epoch {best} (val={best_val:.4f})")
+        ax.axvline(
+            best, color="#333", lw=0.8, ls=":", label=f"best epoch {best} (val={best_val:.4f})"
+        )
     ax.set_xlabel("epoch")
     ax.set_ylabel("contrastive SupCon loss")
-    ax.set_title("Run-A contrastive pretraining  —  loss vs epoch",
-                 fontsize=12, fontweight="semibold")
+    ax.set_title(
+        "Run-A contrastive pretraining  —  loss vs epoch", fontsize=12, fontweight="semibold"
+    )
     ax.legend()
     save_fig(fig, OUT / "pretrain_loss_curve.png")
 

@@ -71,6 +71,7 @@ def _jsonable(obj: Any) -> Any:
 
 # --- §3.3 Test 1: Physical gate --------------------------------------------
 
+
 def physical_gate(element: str, has_absorption: bool) -> TestResult:
     """Trivial boolean gate: does ``element`` have XP-window absorption?
 
@@ -87,6 +88,7 @@ def physical_gate(element: str, has_absorption: bool) -> TestResult:
 
 
 # --- §3.3 Test 2: Hold-out RMSE + bias stratified --------------------------
+
 
 def holdout_rmse(
     mu: np.ndarray,
@@ -121,8 +123,12 @@ def holdout_rmse(
         per_cell_rmse[int(c)] = float(np.sqrt((d**2).mean()))
         per_cell_bias[int(c)] = float(d.mean())
     if not per_cell_rmse:
-        return TestResult(passed=False, statistic=np.inf, threshold=worst_ratio_limit,
-                          detail={"reason": "no cells with ≥2 stars"})
+        return TestResult(
+            passed=False,
+            statistic=np.inf,
+            threshold=worst_ratio_limit,
+            detail={"reason": "no cells with ≥2 stars"},
+        )
 
     rmse_values = np.fromiter(per_cell_rmse.values(), dtype=np.float64)
     bias_values = np.fromiter(per_cell_bias.values(), dtype=np.float64)
@@ -148,6 +154,7 @@ def holdout_rmse(
 
 # --- §3.3 Test 3: Precision floor via open clusters ------------------------
 
+
 def cluster_precision(
     y_pred: np.ndarray,
     cluster_ids: np.ndarray,
@@ -172,8 +179,12 @@ def cluster_precision(
             continue
         sigmas.append(float(np.std(y_pred[mask], ddof=1)))
     if not sigmas:
-        return TestResult(passed=False, statistic=np.inf, threshold=apogee_sigma * inflation,
-                          detail={"reason": "no clusters with enough members"})
+        return TestResult(
+            passed=False,
+            statistic=np.inf,
+            threshold=apogee_sigma * inflation,
+            detail={"reason": "no clusters with enough members"},
+        )
     sigma_intra = float(np.median(sigmas))
     threshold = apogee_sigma * inflation
     return TestResult(
@@ -185,6 +196,7 @@ def cluster_precision(
 
 
 # --- §3.3 Test 4: §9.2 audit gate ------------------------------------------
+
 
 def audit_gate(  # noqa: PLR0913 — §9.2 has four test-specific thresholds
     permutation_importance: np.ndarray,
@@ -210,12 +222,7 @@ def audit_gate(  # noqa: PLR0913 — §9.2 has four test-specific thresholds
     looco_ok = bool(np.any(np.abs(np.asarray(looco_delta_rmse)) > _EPS))
     null_ok = null_skill_ratio <= null_ratio_limit
     decorr_ok = decorrelated_r2_ratio >= decorr_ratio_min
-    passed = (
-        n_informative >= min_informative_coefs
-        and looco_ok
-        and null_ok
-        and decorr_ok
-    )
+    passed = n_informative >= min_informative_coefs and looco_ok and null_ok and decorr_ok
     return TestResult(
         passed=passed,
         statistic=float(n_informative),
@@ -232,6 +239,7 @@ def audit_gate(  # noqa: PLR0913 — §9.2 has four test-specific thresholds
 
 
 # --- §3.3 Test 5: Cross-catalogue consistency ------------------------------
+
 
 def cross_catalogue_consistency(
     pred: np.ndarray,
@@ -260,8 +268,12 @@ def cross_catalogue_consistency(
         per_cat[name] = {"bias": float(d.mean()), "scatter": float(d.std(ddof=1))}
 
     if not per_cat:
-        return TestResult(passed=False, statistic=np.inf, threshold=bias_limit,
-                          detail={"reason": "no external catalogues provided"})
+        return TestResult(
+            passed=False,
+            statistic=np.inf,
+            threshold=bias_limit,
+            detail={"reason": "no external catalogues provided"},
+        )
     worst_bias = max(abs(v["bias"]) for v in per_cat.values())
     worst_scatter = max(v["scatter"] for v in per_cat.values())
     scatter_threshold = apogee_sigma * scatter_multiple
@@ -279,6 +291,7 @@ def cross_catalogue_consistency(
 
 
 # --- §3.3 Test 6: Conditional MI with bootstrap CI -------------------------
+
 
 def conditional_mi_bootstrap(  # noqa: PLR0913 — bootstrap exposes full CI + k knobs
     xp: np.ndarray,
@@ -310,7 +323,10 @@ def conditional_mi_bootstrap(  # noqa: PLR0913 — bootstrap exposes full CI + k
     for b in range(n_boot):
         idx = rng.integers(0, n, size=n)
         boot[b] = conditional_mi_ksg(
-            xp[idx], element[idx], stellar_params[idx], k=k,
+            xp[idx],
+            element[idx],
+            stellar_params[idx],
+            k=k,
         )
     lo, hi = np.quantile(boot, ci_levels)
     passed = lo > 0.0
@@ -329,6 +345,7 @@ def conditional_mi_bootstrap(  # noqa: PLR0913 — bootstrap exposes full CI + k
 
 
 # --- §3.3 Promotion decision tree ------------------------------------------
+
 
 @dataclass
 class TierPromotionReport:
@@ -366,8 +383,12 @@ class TierPromotionReport:
 
 
 def _decide_tier(  # noqa: PLR0913 — decision tree operates on six fixed tests
-    t1: TestResult, t2: TestResult, t3: TestResult,
-    t4: TestResult, t5: TestResult, t6: TestResult,
+    t1: TestResult,
+    t2: TestResult,
+    t3: TestResult,
+    t4: TestResult,
+    t5: TestResult,
+    t6: TestResult,
     calibration_ok: bool,
 ) -> str:
     # Test 1 is a hard reject — no photons = no signal.

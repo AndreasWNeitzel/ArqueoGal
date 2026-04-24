@@ -32,14 +32,17 @@ def _write_yaml(path: Path, body: str) -> Path:
 
 
 def test_load_config_basic(tmp_path: Path) -> None:
-    p = _write_yaml(tmp_path / "c.yaml", """
+    p = _write_yaml(
+        tmp_path / "c.yaml",
+        """
 name: exp1
 train:
   lr: 0.01
   epochs: 5
   optimizer: sgd
 seeds: [0, 1, 2]
-""")
+""",
+    )
     cfg = load_config(p, TopCfg)
     assert cfg.name == "exp1"
     assert cfg.train.lr == 0.01
@@ -49,9 +52,12 @@ seeds: [0, 1, 2]
 
 
 def test_load_config_resolves_relative_path(tmp_path: Path) -> None:
-    p = _write_yaml(tmp_path / "c.yaml", """
+    p = _write_yaml(
+        tmp_path / "c.yaml",
+        """
 outputs: out/x
-""")
+""",
+    )
     cfg = load_config(p, TopCfg)
     assert cfg.outputs is not None
     assert cfg.outputs.is_absolute()
@@ -98,8 +104,7 @@ def test_load_config_top_level_must_be_mapping(tmp_path: Path) -> None:
 
 
 def test_to_yaml_round_trip(tmp_path: Path) -> None:
-    cfg = TopCfg(name="r", train=TrainCfg(lr=0.2, epochs=3),
-                 outputs=tmp_path / "o", seeds=[0])
+    cfg = TopCfg(name="r", train=TrainCfg(lr=0.2, epochs=3), outputs=tmp_path / "o", seeds=[0])
     s = to_yaml(cfg)
     assert "name: r" in s
     assert "lr: 0.2" in s

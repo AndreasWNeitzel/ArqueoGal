@@ -139,9 +139,11 @@ def density_2d(  # noqa: PLR0913 — matplotlib-style plotting kwargs
         if total > 0:
             H = H / total
     im = ax.imshow(
-        H.T, origin="lower",
+        H.T,
+        origin="lower",
         extent=(xe[0], xe[-1], ye[0], ye[-1]),
-        aspect="auto", cmap=cmap,
+        aspect="auto",
+        cmap=cmap,
     )
     return im
 
@@ -166,8 +168,12 @@ def residual_panel(
         sigma = np.asarray(sigma)
         order = np.argsort(y_true)
         ax.fill_between(
-            y_true[order], -sigma[order], sigma[order],
-            alpha=0.2, color="tab:blue", label="±1σ",
+            y_true[order],
+            -sigma[order],
+            sigma[order],
+            alpha=0.2,
+            color="tab:blue",
+            label="±1σ",
         )
     if label:
         ax.set_ylabel(f"{label} residual")

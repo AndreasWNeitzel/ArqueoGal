@@ -75,25 +75,32 @@ _FLAG_COLORS = {
 
 
 def _load(arm: str) -> pd.DataFrame:
-    pred = pd.read_parquet(
-        DATA_PROCESSED / f"pipeline1_predictions_stream3_joint_{arm}.parquet"
-    )
+    pred = pd.read_parquet(DATA_PROCESSED / f"pipeline1_predictions_stream3_joint_{arm}.parquet")
     feat_cols = [
-        "source_id", "ra_deg", "dec_deg", "b_deg",
-        "g_mag", "av_nbhd_median", "distance_pc", "r_med_photogeo",
+        "source_id",
+        "ra_deg",
+        "dec_deg",
+        "b_deg",
+        "g_mag",
+        "av_nbhd_median",
+        "distance_pc",
+        "r_med_photogeo",
     ]
-    feat = pd.read_parquet(DATA_PROCESSED / "pipeline1_features_stream3.parquet",
-                           columns=feat_cols)
+    feat = pd.read_parquet(DATA_PROCESSED / "pipeline1_features_stream3.parquet", columns=feat_cols)
     df = pred.merge(feat, on="source_id", how="left")
     if "distance_pc" not in df.columns or df["distance_pc"].isna().all():
         df["distance_pc"] = df["r_med_photogeo"]
     if "release_tier" not in df.columns:
-        raise RuntimeError(f"release_tier column missing in arm '{arm}' parquet — "
-                           "run scripts/assign_release_tier.py first")
+        raise RuntimeError(
+            f"release_tier column missing in arm '{arm}' parquet — "
+            "run scripts/assign_release_tier.py first"
+        )
     return df
 
 
-def _binned_tier_fractions(x: np.ndarray, tier: np.ndarray, edges: np.ndarray) -> dict[int, np.ndarray]:
+def _binned_tier_fractions(
+    x: np.ndarray, tier: np.ndarray, edges: np.ndarray
+) -> dict[int, np.ndarray]:
     idx = np.digitize(x, edges) - 1
     idx = np.clip(idx, 0, len(edges) - 2)
     n = len(edges) - 1
@@ -119,9 +126,16 @@ def _panel_tier_vs_axis(ax, df, col, edges, xlabel, log_x=False):
     width = np.diff(edges)
     bot = np.zeros_like(centres)
     for t in (1, 2, 3):
-        ax.bar(centres, frac[t], width=width, bottom=bot,
-               color=_TIER_COLORS[t], edgecolor="none", align="center",
-               label=_TIER_LABEL[t])
+        ax.bar(
+            centres,
+            frac[t],
+            width=width,
+            bottom=bot,
+            color=_TIER_COLORS[t],
+            edgecolor="none",
+            align="center",
+            label=_TIER_LABEL[t],
+        )
         bot = bot + frac[t]
     ax.set_xlabel(xlabel)
     ax.set_ylabel("tier fraction")
@@ -145,8 +159,17 @@ def _panel_tier3_mollweide(ax, df):
     x, y = galactic_mollweide(l_deg, b_deg)
     is_t3 = (df["release_tier"].to_numpy()[m] == 3).astype(float)
     # hexbin mean of is_t3
-    hb = ax.hexbin(x, y, C=is_t3, reduce_C_function=np.mean,
-                   gridsize=60, cmap="magma", mincnt=30, vmin=0.0, vmax=1.0)
+    hb = ax.hexbin(
+        x,
+        y,
+        C=is_t3,
+        reduce_C_function=np.mean,
+        gridsize=60,
+        cmap="magma",
+        mincnt=30,
+        vmin=0.0,
+        vmax=1.0,
+    )
     plt.colorbar(hb, ax=ax, shrink=0.7, pad=0.02, label="Tier-3 fraction")
     style_galactic_mollweide(ax)
     ax.set_title("sky (Mollweide, Galactic)")
@@ -160,9 +183,18 @@ def _panel_tier3_2d(ax, df, xcol, ycol, xlim, ylim, xlabel, ylabel, invert_x=Fal
     is_t3 = (tier[m] == 3).astype(float)
     x_extent = (min(xlim), max(xlim))
     y_extent = (min(ylim), max(ylim))
-    hb = ax.hexbin(x[m], y[m], C=is_t3, reduce_C_function=np.mean,
-                   gridsize=50, cmap="magma", mincnt=10, vmin=0.0, vmax=1.0,
-                   extent=(x_extent[0], x_extent[1], y_extent[0], y_extent[1]))
+    hb = ax.hexbin(
+        x[m],
+        y[m],
+        C=is_t3,
+        reduce_C_function=np.mean,
+        gridsize=50,
+        cmap="magma",
+        mincnt=10,
+        vmin=0.0,
+        vmax=1.0,
+        extent=(x_extent[0], x_extent[1], y_extent[0], y_extent[1]),
+    )
     plt.colorbar(hb, ax=ax, shrink=0.85, pad=0.02, label="Tier-3 fraction")
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
@@ -192,8 +224,11 @@ def _panel_sigma_by_tier(ax, df):
             positions.append(3 * i + j)
             colors.append(_TIER_COLORS[t])
     bp = ax.boxplot(
-        boxdata, positions=positions, widths=0.7,
-        patch_artist=True, showfliers=False,
+        boxdata,
+        positions=positions,
+        widths=0.7,
+        patch_artist=True,
+        showfliers=False,
         medianprops=dict(color="black", linewidth=1.2),
     )
     for patch, c in zip(bp["boxes"], colors, strict=True):
@@ -211,8 +246,15 @@ def _panel_flag_contributions(ax, df):
     tier3 = df["release_tier"] == 3
     n_t3 = int(tier3.sum())
     if n_t3 == 0:
-        ax.text(0.5, 0.5, "no Tier-3 rows", transform=ax.transAxes,
-                ha="center", va="center", fontsize=10)
+        ax.text(
+            0.5,
+            0.5,
+            "no Tier-3 rows",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=10,
+        )
         ax.set_axis_off()
         return
     counts: dict[str, int] = {}
@@ -253,9 +295,12 @@ def _panel_tier_summary_bar(ax, df, arm):
     )
     for t in (1, 2, 3):
         ax.text(
-            t, fracs[t] + 0.01,
+            t,
+            fracs[t] + 0.01,
             f"{fracs[t] * 100:.1f}%\n(n={counts[t]:,})",
-            ha="center", va="bottom", fontsize=9,
+            ha="center",
+            va="bottom",
+            fontsize=9,
         )
     ax.set_xticks([1, 2, 3])
     ax.set_xticklabels(["Tier 1", "Tier 2", "Tier 3"])
@@ -270,7 +315,8 @@ def _figure_for_arm(arm: str) -> dict[str, int]:
     fig, axes = plt.subplots(3, 3, figsize=(16, 14))
     fig.suptitle(
         f"Pipeline 1 — regime diagnostics  •  Stream-3 {arm} arm",
-        fontsize=13, y=0.995,
+        fontsize=13,
+        y=0.995,
     )
 
     # Row 1 — tier composition vs 1-D axes
@@ -279,24 +325,36 @@ def _figure_for_arm(arm: str) -> dict[str, int]:
     d_edges = np.logspace(np.log10(50.0), np.log10(30000.0), 25)
 
     _panel_tier_vs_axis(axes[0, 0], df, "g_mag", g_edges, "G-mag")
-    _panel_tier_vs_axis(axes[0, 1], df, "av_nbhd_median", av_edges,
-                        r"$A_V$ (nbhd-median)")
-    _panel_tier_vs_axis(axes[0, 2], df, "distance_pc", d_edges,
-                        "distance [pc]", log_x=True)
+    _panel_tier_vs_axis(axes[0, 1], df, "av_nbhd_median", av_edges, r"$A_V$ (nbhd-median)")
+    _panel_tier_vs_axis(axes[0, 2], df, "distance_pc", d_edges, "distance [pc]", log_x=True)
 
     # Row 2 — 2-D Tier-3 fraction
     axes[1, 0].remove()
     ax_moll = fig.add_subplot(3, 3, 4, projection="mollweide")
     _panel_tier3_mollweide(ax_moll, df)
 
-    _panel_tier3_2d(axes[1, 1], df, "teff_pred", "logg_pred",
-                    xlim=(5800, 3800), ylim=(4.2, 0.5),
-                    xlabel=r"$T_{\rm eff}$ [K]", ylabel=r"$\log g$")
+    _panel_tier3_2d(
+        axes[1, 1],
+        df,
+        "teff_pred",
+        "logg_pred",
+        xlim=(5800, 3800),
+        ylim=(4.2, 0.5),
+        xlabel=r"$T_{\rm eff}$ [K]",
+        ylabel=r"$\log g$",
+    )
     axes[1, 1].set_title("HR")
 
-    _panel_tier3_2d(axes[1, 2], df, "mh_pred", "alpha_m_pred",
-                    xlim=(-2.0, 0.7), ylim=(-0.15, 0.55),
-                    xlabel=r"$[{\rm M}/{\rm H}]$", ylabel=r"$[\alpha/{\rm M}]$")
+    _panel_tier3_2d(
+        axes[1, 2],
+        df,
+        "mh_pred",
+        "alpha_m_pred",
+        xlim=(-2.0, 0.7),
+        ylim=(-0.15, 0.55),
+        xlabel=r"$[{\rm M}/{\rm H}]$",
+        ylabel=r"$[\alpha/{\rm M}]$",
+    )
     axes[1, 2].set_title("chemistry")
 
     # Row 3 — σ distributions + flag mix + summary
@@ -306,8 +364,15 @@ def _figure_for_arm(arm: str) -> dict[str, int]:
 
     # Legend in row 1
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center",
-               bbox_to_anchor=(0.5, 0.975), ncol=3, fontsize=10, frameon=False)
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.975),
+        ncol=3,
+        fontsize=10,
+        frameon=False,
+    )
 
     fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.965))
     save_fig(fig, _OUT / f"regime_diagnostics_{arm}.png", tight=False)
@@ -329,9 +394,13 @@ def main() -> None:
 
     (_OUT / "tier_summary.json").write_text(
         json.dumps(
-            {arm: {"counts": {str(k): v for k, v in s["counts"].items()},  # type: ignore[index]
-                   "n_rows": s["n_rows"]}
-             for arm, s in summary.items()},
+            {
+                arm: {
+                    "counts": {str(k): v for k, v in s["counts"].items()},  # type: ignore[index]
+                    "n_rows": s["n_rows"],
+                }
+                for arm, s in summary.items()
+            },
             indent=2,
         )
     )

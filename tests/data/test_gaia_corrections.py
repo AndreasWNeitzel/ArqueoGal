@@ -133,7 +133,9 @@ def test_zpt_missing_package_raises_with_install_hint(
 
 
 def _make_g_df(
-    g_mag: list[float], bp_rp: list[float], sol: list[int],
+    g_mag: list[float],
+    bp_rp: list[float],
+    sol: list[int],
     flux: list[float] | None = None,
 ) -> pd.DataFrame:
     data = {
@@ -192,9 +194,7 @@ def test_g_mag_correction_bprp_clipping() -> None:
     """BP-RP outside [0.25, 3.0] gets clipped; correction same at boundary."""
     df = _make_g_df([14.0, 14.0], [0.1, 0.25], [SOL_SIX_PARAM, SOL_SIX_PARAM])
     out = apply_g_mag_correction(df)
-    assert np.isclose(
-        out["phot_g_mean_mag_corr"].iloc[0], out["phot_g_mean_mag_corr"].iloc[1]
-    )
+    assert np.isclose(out["phot_g_mean_mag_corr"].iloc[0], out["phot_g_mean_mag_corr"].iloc[1])
 
 
 def test_g_mag_correction_nan_bprp_passes_through() -> None:
@@ -207,9 +207,7 @@ def test_g_mag_correction_flux_optional_and_multiplicative() -> None:
     df = _make_g_df([14.0], [1.0], [SOL_SIX_PARAM], flux=[1000.0])
     out = apply_g_mag_correction(df)
     factor = 1.00876 - 0.02540 + 0.01747 - 0.00277
-    np.testing.assert_allclose(
-        out["phot_g_mean_flux_corr"].iloc[0], 1000.0 * factor, rtol=1e-10
-    )
+    np.testing.assert_allclose(out["phot_g_mean_flux_corr"].iloc[0], 1000.0 * factor, rtol=1e-10)
 
 
 def test_g_mag_correction_no_flux_col_drops_flux_output() -> None:
@@ -252,9 +250,7 @@ def _has_real_zpt() -> bool:
     return True
 
 
-@pytest.mark.skipif(
-    not _has_real_zpt(), reason="gaiadr3-zeropoint not installed in this env"
-)
+@pytest.mark.skipif(not _has_real_zpt(), reason="gaiadr3-zeropoint not installed in this env")
 def test_zpt_real_package_returns_mas_not_uas() -> None:
     """Guard against unit regressions. Typical Lindegren zpt is ~-0.017 mas.
 

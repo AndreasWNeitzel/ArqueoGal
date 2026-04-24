@@ -171,8 +171,7 @@ def beta_nll_block_cholesky(  # noqa: PLR0913 — all kwargs are distinct numeri
     if sample_weights is not None:
         if sample_weights.shape != (mu.shape[0],):
             raise ValueError(
-                f"sample_weights shape {tuple(sample_weights.shape)} "
-                f"!= (B,) = ({mu.shape[0]},)",
+                f"sample_weights shape {tuple(sample_weights.shape)} != (B,) = ({mu.shape[0]},)",
             )
         nll_per_star = nll_per_star * sample_weights
 
@@ -198,9 +197,7 @@ def _validate_shapes(mu: torch.Tensor, L: torch.Tensor, y: torch.Tensor) -> None
     if mu.shape != y.shape:
         raise ValueError(f"mu shape {mu.shape} != y shape {y.shape}")
     if L.shape[-2:] != (mu.shape[-1], mu.shape[-1]):
-        raise ValueError(
-            f"L shape {L.shape} inconsistent with n_labels={mu.shape[-1]}"
-        )
+        raise ValueError(f"L shape {L.shape} inconsistent with n_labels={mu.shape[-1]}")
     if L.shape[0] != mu.shape[0]:
         raise ValueError(f"batch dim mismatch: L {L.shape[0]} vs mu {mu.shape[0]}")
 
@@ -314,21 +311,21 @@ class ContrastiveQueue:
         """Write ``(z, y)`` into the ring buffer. Detached internally."""
         bs = z.shape[0]
         if bs >= self.size:
-            self.z[:] = z[-self.size:].detach()
-            self.y[:] = y[-self.size:].detach()
+            self.z[:] = z[-self.size :].detach()
+            self.y[:] = y[-self.size :].detach()
             self.ptr = 0
             self.full = True
             return
         end = (self.ptr + bs) % self.size
         if self.ptr + bs <= self.size:
-            self.z[self.ptr:self.ptr + bs] = z.detach()
-            self.y[self.ptr:self.ptr + bs] = y.detach()
+            self.z[self.ptr : self.ptr + bs] = z.detach()
+            self.y[self.ptr : self.ptr + bs] = y.detach()
         else:
             ov = self.ptr + bs - self.size
-            self.z[self.ptr:] = z[:bs - ov].detach()
-            self.y[self.ptr:] = y[:bs - ov].detach()
-            self.z[:ov] = z[bs - ov:].detach()
-            self.y[:ov] = y[bs - ov:].detach()
+            self.z[self.ptr :] = z[: bs - ov].detach()
+            self.y[self.ptr :] = y[: bs - ov].detach()
+            self.z[:ov] = z[bs - ov :].detach()
+            self.y[:ov] = y[bs - ov :].detach()
             self.full = True
         self.ptr = end
         if end == 0:
@@ -338,7 +335,7 @@ class ContrastiveQueue:
         """Return the currently-stored ``(z, y)``. Empty prefix if not warm."""
         if self.full:
             return self.z, self.y
-        return self.z[:self.ptr], self.y[:self.ptr]
+        return self.z[: self.ptr], self.y[: self.ptr]
 
 
 __all__ = [

@@ -100,8 +100,7 @@ def ingest_stream3(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     n_raw = len(andrae)
     logger.info("Stream 3: %d vetted-RGB rows loaded", n_raw)
 
-    logger.info("Stream 3: §5.3 stratified sub-sample (per_cell=%d, seed=%d)",
-                per_cell, rng_seed)
+    logger.info("Stream 3: §5.3 stratified sub-sample (per_cell=%d, seed=%d)", per_cell, rng_seed)
     strat_kwargs = {"per_cell": per_cell, "rng_seed": rng_seed}
     if bins_teff is not None:
         strat_kwargs["bins_teff"] = bins_teff
@@ -130,7 +129,9 @@ def ingest_stream3(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     n_merged = len(merged)
     logger.info(
         "Stream 3: merged %d rows (sampled %d × Gaia %d)",
-        n_merged, n_sampled, len(enriched),
+        n_merged,
+        n_sampled,
+        len(enriched),
     )
 
     logger.info("Stream 3: Lindegren+2021 parallax zero-point")

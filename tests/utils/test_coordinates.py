@@ -32,7 +32,12 @@ def test_equatorial_to_galactic_uses_explicit_distance() -> None:
     parallax = np.array([5.0])  # 0.2 kpc implied, but overridden below.
     d = np.array([2.5])
     out = equatorial_to_galactic(
-        ra, dec, parallax, np.zeros(1), np.zeros(1), np.zeros(1),
+        ra,
+        dec,
+        parallax,
+        np.zeros(1),
+        np.zeros(1),
+        np.zeros(1),
         distance_kpc=d,
     )
     assert out["d_kpc"] == pytest.approx(2.5)
@@ -41,9 +46,12 @@ def test_equatorial_to_galactic_uses_explicit_distance() -> None:
 def test_equatorial_to_galactic_rejects_nonpositive_parallax() -> None:
     with pytest.raises(ValueError, match="parallax"):
         equatorial_to_galactic(
-            np.array([0.0]), np.array([0.0]),
+            np.array([0.0]),
+            np.array([0.0]),
             np.array([-1.0]),  # invalid
-            np.zeros(1), np.zeros(1), np.zeros(1),
+            np.zeros(1),
+            np.zeros(1),
+            np.zeros(1),
         )
 
 
@@ -71,6 +79,9 @@ def test_galactic_velocities_to_cylindrical_pi_over_2() -> None:
 def test_galactic_velocities_shape_mismatch_raises() -> None:
     with pytest.raises(ValueError, match="shape mismatch"):
         galactic_velocities_to_cylindrical(
-            np.zeros(3), np.zeros(3), np.zeros(3),
-            np.zeros(3), np.zeros(4),
+            np.zeros(3),
+            np.zeros(3),
+            np.zeros(3),
+            np.zeros(3),
+            np.zeros(4),
         )

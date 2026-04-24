@@ -50,6 +50,7 @@ def _tiers_for_label_set(label_set: str) -> LabelTiers:
         return LabelTiers.five_label()
     return LabelTiers()
 
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG = logging.getLogger("run_ensemble")
 
@@ -61,10 +62,14 @@ DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/run_a"
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "nogit"
 
@@ -75,8 +80,13 @@ def _cfg_hash(cfg: TrainingConfig) -> str:
 
 
 def build_ensemble_config(
-    *, parquet: Path, output_dir: Path, pretrained_ckpt: Path,
-    epochs: int, batch_size: int, seeds: tuple[int, ...],
+    *,
+    parquet: Path,
+    output_dir: Path,
+    pretrained_ckpt: Path,
+    epochs: int,
+    batch_size: int,
+    seeds: tuple[int, ...],
     output_prefix: str = "xp_abundances_main_ensemble",
     inverse_freq_weighting: bool = False,
     inverse_freq_clip: float = 5.0,
@@ -102,8 +112,11 @@ def build_ensemble_config(
         checkpoint_every_n_epochs=0,  # per-member only keeps best-val
         output_prefix=output_prefix,
         loss_weights=LossWeights(
-            supcon=0.1, beta_nll=1.0,
-            beta=0.0, supcon_sigma=0.10, supcon_label_n_first=None,
+            supcon=0.1,
+            beta_nll=1.0,
+            beta=0.0,
+            supcon_sigma=0.10,
+            supcon_label_n_first=None,
         ),
         grad_norm_abort_threshold=500.0,
         temperature_init=0.10,
@@ -123,19 +136,24 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
     parser.add_argument(
-        "--label-set", choices=("21", "5"), default="21",
+        "--label-set",
+        choices=("21", "5"),
+        default="21",
         help="21 = default LabelTiers (production, 4-block Cholesky). "
-             "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} "
-             "with a single 5×5 full Cholesky block (production as of #143).",
+        "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} "
+        "with a single 5×5 full Cholesky block (production as of #143).",
     )
     parser.add_argument(
-        "--inverse-freq", action="store_true",
+        "--inverse-freq",
+        action="store_true",
         help="Enable inverse-frequency [M/H]-bin weighting in the NLL. "
-             "v1.1 fix for the metal-poor [α/M] regression-to-mean "
-             "surfaced downstream of v1 (#198).",
+        "v1.1 fix for the metal-poor [α/M] regression-to-mean "
+        "surfaced downstream of v1 (#198).",
     )
     parser.add_argument(
-        "--inverse-freq-clip", type=float, default=5.0,
+        "--inverse-freq-clip",
+        type=float,
+        default=5.0,
         help="Max w = 1/p(bin) before mean-1 normalisation. Default 5.0.",
     )
     parser.add_argument("--dry-run", action="store_true")
@@ -153,9 +171,12 @@ def main() -> None:
     args.report_dir.mkdir(parents=True, exist_ok=True)
 
     tmp_cfg = build_ensemble_config(
-        parquet=args.parquet, output_dir=args.model_dir / "pending",
+        parquet=args.parquet,
+        output_dir=args.model_dir / "pending",
         pretrained_ckpt=args.pretrained,
-        epochs=args.epochs, batch_size=args.batch_size, seeds=seeds,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seeds=seeds,
         output_prefix=output_prefix,
         inverse_freq_weighting=args.inverse_freq,
         inverse_freq_clip=args.inverse_freq_clip,
@@ -165,9 +186,12 @@ def main() -> None:
     ensemble_dir.mkdir(parents=True, exist_ok=True)
 
     cfg = build_ensemble_config(
-        parquet=args.parquet, output_dir=ensemble_dir,
+        parquet=args.parquet,
+        output_dir=ensemble_dir,
         pretrained_ckpt=args.pretrained,
-        epochs=args.epochs, batch_size=args.batch_size, seeds=seeds,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        seeds=seeds,
         output_prefix=output_prefix,
         inverse_freq_weighting=args.inverse_freq,
         inverse_freq_clip=args.inverse_freq_clip,
@@ -182,8 +206,7 @@ def main() -> None:
         payload["git_sha"] = sha
         payload["cfg_hash"] = cfg_hash
         json.dump(payload, f, indent=2, default=str)
-    _LOG.info("ensemble_dir=%s cfg_hash=%s sha=%s seeds=%s",
-              ensemble_dir, cfg_hash, sha7, seeds)
+    _LOG.info("ensemble_dir=%s cfg_hash=%s sha=%s seeds=%s", ensemble_dir, cfg_hash, sha7, seeds)
 
     if args.dry_run:
         _LOG.info("dry run — skipping training")
@@ -200,8 +223,11 @@ def main() -> None:
         member_dir.mkdir(parents=True, exist_ok=True)
         best_path = save_checkpoint(
             member_dir / f"{cfg.output_prefix}_seed{seed}_best.pt",
-            model=result["model"], log_temp=result["log_temp"],
-            cfg=cfg, layout=layout, tiers=tiers,
+            model=result["model"],
+            log_temp=result["log_temp"],
+            cfg=cfg,
+            layout=layout,
+            tiers=tiers,
             label_scaler=result["label_scaler"],
             seed=seed,
             training_metrics={
@@ -211,16 +237,20 @@ def main() -> None:
             },
             git_sha=sha,
         )
-        members.append({
-            "seed": seed,
-            "ckpt": str(best_path),
-            "best_val_loss": float(result["best_val_loss"]),
-            "best_epoch": int(result["best_epoch"]),
-            "history": result["history"],
-        })
+        members.append(
+            {
+                "seed": seed,
+                "ckpt": str(best_path),
+                "best_val_loss": float(result["best_val_loss"]),
+                "best_epoch": int(result["best_epoch"]),
+                "history": result["history"],
+            }
+        )
         _LOG.info(
             "member seed=%d: best_val_loss=%.4f at epoch %d",
-            seed, result["best_val_loss"], result["best_epoch"],
+            seed,
+            result["best_val_loss"],
+            result["best_epoch"],
         )
 
     summary = {
@@ -232,15 +262,16 @@ def main() -> None:
         "members": members,
         "val_loss_mean": float(sum(m["best_val_loss"] for m in members) / len(members)),
         "val_loss_spread": float(
-            max(m["best_val_loss"] for m in members)
-            - min(m["best_val_loss"] for m in members),
+            max(m["best_val_loss"] for m in members) - min(m["best_val_loss"] for m in members),
         ),
     }
     with (args.report_dir / "ensemble_history.json").open("w") as f:
         json.dump(summary, f, indent=2, default=str)
     _LOG.info(
         "ensemble done: mean val loss=%.4f, spread=%.4f, %d members",
-        summary["val_loss_mean"], summary["val_loss_spread"], len(members),
+        summary["val_loss_mean"],
+        summary["val_loss_spread"],
+        len(members),
     )
 
 

@@ -129,7 +129,12 @@ def stratified_subsample(  # noqa: PLR0913 — keyword-only tuning knobs with sa
 
     if df.empty:
         return _empty_result(
-            bins_teff, bins_logg, bins_mh, bins_g, per_cell, rng_seed,
+            bins_teff,
+            bins_logg,
+            bins_mh,
+            bins_g,
+            per_cell,
+            rng_seed,
             (teff_col, logg_col, mh_col, g_col),
         )
 
@@ -146,10 +151,14 @@ def stratified_subsample(  # noqa: PLR0913 — keyword-only tuning knobs with sa
     i_g = np.digitize(g_mag, bins_g) - 1
 
     in_range = (
-        (i_teff >= 0) & (i_teff < len(bins_teff) - 1)
-        & (i_logg >= 0) & (i_logg < len(bins_logg) - 1)
-        & (i_mh >= 0) & (i_mh < len(bins_mh) - 1)
-        & (i_g >= 0) & (i_g < len(bins_g) - 1)
+        (i_teff >= 0)
+        & (i_teff < len(bins_teff) - 1)
+        & (i_logg >= 0)
+        & (i_logg < len(bins_logg) - 1)
+        & (i_mh >= 0)
+        & (i_mh < len(bins_mh) - 1)
+        & (i_g >= 0)
+        & (i_g < len(bins_g) - 1)
     )
     finite = np.isfinite(teff) & np.isfinite(logg) & np.isfinite(mh) & np.isfinite(g_mag)
     valid = in_range & finite
@@ -158,7 +167,8 @@ def stratified_subsample(  # noqa: PLR0913 — keyword-only tuning knobs with sa
     if n_excluded:
         logger.info(
             "stratified_subsample: %d/%d rows excluded (NaN or outside bin range)",
-            int(n_excluded), len(df),
+            int(n_excluded),
+            len(df),
         )
 
     # Build a string key per row so we can group without cross products.
@@ -190,7 +200,10 @@ def stratified_subsample(  # noqa: PLR0913 — keyword-only tuning knobs with sa
         selected_idx.extend(picks.tolist())
         counts_records.append(
             {
-                "i_teff": int(it), "i_logg": int(il), "i_mh": int(im), "i_g": int(ig),
+                "i_teff": int(it),
+                "i_logg": int(il),
+                "i_mh": int(im),
+                "i_g": int(ig),
                 "n_available": int(n_available),
                 "n_selected": int(n_selected),
             }
@@ -209,9 +222,9 @@ def stratified_subsample(  # noqa: PLR0913 — keyword-only tuning knobs with sa
         selected_idx = rng.permutation(selected_idx).tolist()
     sample = df.iloc[selected_idx].reset_index(drop=True)
     logger.info(
-        "stratified_subsample: drew %d stars from %d non-empty cells "
-        "(of %d possible)",
-        len(sample), len(counts_df),
+        "stratified_subsample: drew %d stars from %d non-empty cells (of %d possible)",
+        len(sample),
+        len(counts_df),
         (len(bins_teff) - 1) * (len(bins_logg) - 1) * (len(bins_mh) - 1) * (len(bins_g) - 1),
     )
 
@@ -229,9 +242,12 @@ def stratified_subsample(  # noqa: PLR0913 — keyword-only tuning knobs with sa
 
 
 def _empty_result(  # noqa: PLR0913 — internal helper, matches StratificationResult shape
-    bins_teff: np.ndarray, bins_logg: np.ndarray,
-    bins_mh: np.ndarray, bins_g: np.ndarray,
-    per_cell: int, rng_seed: int,
+    bins_teff: np.ndarray,
+    bins_logg: np.ndarray,
+    bins_mh: np.ndarray,
+    bins_g: np.ndarray,
+    per_cell: int,
+    rng_seed: int,
     columns: tuple[str, str, str, str],
 ) -> StratificationResult:
     return StratificationResult(
@@ -385,7 +401,8 @@ def volume_limited_subsample(
             logger.warning(
                 "volume_limited_subsample: below-cut pool (%d) smaller than "
                 "n_target (%d); returning full pool",
-                n_below_cut, n_target,
+                n_below_cut,
+                n_target,
             )
         sample = below_pool.reset_index(drop=True)
     else:
@@ -397,7 +414,12 @@ def volume_limited_subsample(
     logger.info(
         "volume_limited_subsample: d < %.3f kpc on column %r: "
         "%d/%d below cut, %d selected (seed=%d)",
-        distance_cut_kpc, distance_col, n_below_cut, n_input, len(sample), seed,
+        distance_cut_kpc,
+        distance_col,
+        n_below_cut,
+        n_input,
+        len(sample),
+        seed,
     )
 
     return VolumeLimitedResult(

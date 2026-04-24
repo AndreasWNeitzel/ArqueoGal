@@ -38,7 +38,11 @@ def test_default_hdu_is_1() -> None:
 
 def test_kept_columns_covers_stratification_axes() -> None:
     for col in (
-        "source_id", "teff_xgboost", "logg_xgboost", "mh_xgboost", "phot_g_mean_mag",
+        "source_id",
+        "teff_xgboost",
+        "logg_xgboost",
+        "mh_xgboost",
+        "phot_g_mean_mag",
     ):
         assert col in KEPT_COLUMNS
 
@@ -106,9 +110,14 @@ def test_load_andrae2023_parquet_roundtrip(tmp_path: Path) -> None:
     path = tmp_path / "andrae.parquet"
     n = 4
     df_in = pd.DataFrame(
-        {c: (np.arange(n, dtype=np.int64) if c == "source_id"
-             else np.full(n, 0.5, dtype=np.float32))
-         for c in VIZIER_KEPT_COLUMNS}
+        {
+            c: (
+                np.arange(n, dtype=np.int64)
+                if c == "source_id"
+                else np.full(n, 0.5, dtype=np.float32)
+            )
+            for c in VIZIER_KEPT_COLUMNS
+        }
     )
     df_in.to_parquet(path, index=False)
 
@@ -121,9 +130,14 @@ def test_load_andrae2023_parquet_roundtrip(tmp_path: Path) -> None:
 def test_load_andrae2023_parquet_subset(tmp_path: Path) -> None:
     path = tmp_path / "andrae.parquet"
     df_in = pd.DataFrame(
-        {c: (np.arange(3, dtype=np.int64) if c == "source_id"
-             else np.full(3, 0.5, dtype=np.float32))
-         for c in VIZIER_KEPT_COLUMNS}
+        {
+            c: (
+                np.arange(3, dtype=np.int64)
+                if c == "source_id"
+                else np.full(3, 0.5, dtype=np.float32)
+            )
+            for c in VIZIER_KEPT_COLUMNS
+        }
     )
     df_in.to_parquet(path, index=False)
 

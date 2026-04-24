@@ -53,25 +53,26 @@ def _save(fig, name: str) -> None:
 
 
 def plot_kiel(df: pd.DataFrame) -> None:
-    mask = (
-        df["teff_gspphot"].notna()
-        & df["logg_gspphot"].notna()
-        & df["fe_h_atm"].notna()
-    )
+    mask = df["teff_gspphot"].notna() & df["logg_gspphot"].notna() & df["fe_h_atm"].notna()
     sub = df.loc[mask].sample(min(80_000, int(mask.sum())), random_state=0)
     fig, ax = plt.subplots(figsize=(7, 5.5))
     sc = ax.scatter(
-        sub["teff_gspphot"], sub["logg_gspphot"],
-        c=sub["fe_h_atm"], cmap="viridis_r",
-        s=1.5, alpha=0.5, vmin=-1.5, vmax=0.4, rasterized=True,
+        sub["teff_gspphot"],
+        sub["logg_gspphot"],
+        c=sub["fe_h_atm"],
+        cmap="viridis_r",
+        s=1.5,
+        alpha=0.5,
+        vmin=-1.5,
+        vmax=0.4,
+        rasterized=True,
     )
     ax.set_xlim(6200, 3500)
     ax.set_ylim(5.0, 0.5)
     ax.set_xlabel("Teff (GSP-Phot) [K]")
     ax.set_ylabel("log g (GSP-Phot)")
     ax.set_title(
-        f"Kiel diagram — Pipeline-1 training set (n={len(sub):,})\n"
-        "colored by APOGEE [Fe/H]"
+        f"Kiel diagram — Pipeline-1 training set (n={len(sub):,})\ncolored by APOGEE [Fe/H]"
     )
     plt.colorbar(sc, ax=ax, label="[Fe/H] (APOGEE DR19, Mészáros+2025-corrected)")
     _save(fig, "01_kiel.png")
@@ -82,8 +83,9 @@ def plot_tinsley(df: pd.DataFrame) -> None:
     feh = df.loc[mask, "fe_h_atm"].to_numpy()
     mgfe = (df.loc[mask, "mg_h_atm"] - df.loc[mask, "fe_h_atm"]).to_numpy()
     fig, ax = plt.subplots(figsize=(7, 5))
-    hb = ax.hexbin(feh, mgfe, gridsize=90, extent=(-2.0, 0.6, -0.3, 0.6),
-                   cmap="Blues", mincnt=3, bins="log")
+    hb = ax.hexbin(
+        feh, mgfe, gridsize=90, extent=(-2.0, 0.6, -0.3, 0.6), cmap="Blues", mincnt=3, bins="log"
+    )
     ax.axhline(0.0, color="k", lw=0.5, alpha=0.5)
     ax.axvline(0.0, color="k", lw=0.5, alpha=0.5)
     ax.set_xlabel("[Fe/H]")
@@ -102,8 +104,7 @@ def plot_sky(df: pd.DataFrame) -> None:
     l_rad = c.l.wrap_at(180 * u.deg).radian
     b_rad = c.b.radian
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.2),
-                              subplot_kw={"projection": "mollweide"})
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.2), subplot_kw={"projection": "mollweide"})
 
     ax = axes[0]
     ax.hexbin(l_rad, b_rad, gridsize=(90, 45), cmap="magma", mincnt=1, bins="log")
@@ -112,10 +113,13 @@ def plot_sky(df: pd.DataFrame) -> None:
 
     ax = axes[1]
     bad = df["ye2024_flag"] == 1  # NO_SYNTH_PHOT
-    ax.scatter(l_rad[bad.to_numpy()], b_rad[bad.to_numpy()], s=0.6, c="crimson",
-               alpha=0.4, rasterized=True)
-    ax.set_title(f"Ye+2024 flag=NO_SYNTH_PHOT (n={int(bad.sum()):,})\n"
-                 "expected: northern sky, outside SkyMapper coverage")
+    ax.scatter(
+        l_rad[bad.to_numpy()], b_rad[bad.to_numpy()], s=0.6, c="crimson", alpha=0.4, rasterized=True
+    )
+    ax.set_title(
+        f"Ye+2024 flag=NO_SYNTH_PHOT (n={int(bad.sum()):,})\n"
+        "expected: northern sky, outside SkyMapper coverage"
+    )
     ax.grid(alpha=0.3)
 
     _save(fig, "03_sky_distribution.png")
@@ -152,8 +156,7 @@ def plot_extinction_priors(df: pd.DataFrame) -> None:
                 x = priors[j][1]
                 mask = np.isfinite(x) & np.isfinite(y)
                 if mask.sum() > 500:
-                    ax.hexbin(x[mask], y[mask], gridsize=40, cmap="Greys",
-                              mincnt=3, bins="log")
+                    ax.hexbin(x[mask], y[mask], gridsize=40, cmap="Greys", mincnt=3, bins="log")
                     lo = min(np.nanpercentile(x[mask], 1), np.nanpercentile(y[mask], 1))
                     hi = max(np.nanpercentile(x[mask], 99), np.nanpercentile(y[mask], 99))
                     ax.plot([lo, hi], [lo, hi], "r-", lw=0.8, alpha=0.7)
@@ -162,17 +165,30 @@ def plot_extinction_priors(df: pd.DataFrame) -> None:
             else:
                 ax.set_visible(False)
             ax.tick_params(labelsize=7)
-    fig.suptitle("Extinction-prior cross-comparison (log density; red = 1:1)",
-                 fontsize=12, y=1.00)
+    fig.suptitle("Extinction-prior cross-comparison (log density; red = 1:1)", fontsize=12, y=1.00)
     _save(fig, "04_extinction_priors.png")
 
 
 def plot_label_grid(df: pd.DataFrame) -> None:
     labels = [
-        "m_h_atm", "fe_h_atm", "c_h_atm", "n_h_atm", "o_h_atm",
-        "na_h_atm", "mg_h_atm", "al_h_atm", "si_h_atm", "s_h_atm",
-        "k_h_atm", "ca_h_atm", "ti_h_atm", "v_h_atm", "cr_h_atm",
-        "mn_h_atm", "ni_h_atm", "ce_h_atm",
+        "m_h_atm",
+        "fe_h_atm",
+        "c_h_atm",
+        "n_h_atm",
+        "o_h_atm",
+        "na_h_atm",
+        "mg_h_atm",
+        "al_h_atm",
+        "si_h_atm",
+        "s_h_atm",
+        "k_h_atm",
+        "ca_h_atm",
+        "ti_h_atm",
+        "v_h_atm",
+        "cr_h_atm",
+        "mn_h_atm",
+        "ni_h_atm",
+        "ce_h_atm",
     ]
     fig, axes = plt.subplots(3, 6, figsize=(16, 8))
     for ax, col in zip(axes.flat, labels):
@@ -181,12 +197,22 @@ def plot_label_grid(df: pd.DataFrame) -> None:
         ax.hist(vals, bins=100, range=(lo, hi), color="darkorange", alpha=0.85)
         ax.set_title(col.replace("_atm", "").replace("_", "/"), fontsize=10)
         ax.tick_params(labelsize=7)
-        ax.text(0.02, 0.96, f"n={len(vals):,}\nμ={np.nanmean(vals):+.2f}\nσ={np.nanstd(vals):.2f}",
-                ha="left", va="top", transform=ax.transAxes, fontsize=7,
-                family="monospace",
-                bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=1.5))
-    fig.suptitle("APOGEE DR19 element label distributions "
-                 "(Mészáros+2025-corrected where applicable)", fontsize=12, y=1.00)
+        ax.text(
+            0.02,
+            0.96,
+            f"n={len(vals):,}\nμ={np.nanmean(vals):+.2f}\nσ={np.nanstd(vals):.2f}",
+            ha="left",
+            va="top",
+            transform=ax.transAxes,
+            fontsize=7,
+            family="monospace",
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=1.5),
+        )
+    fig.suptitle(
+        "APOGEE DR19 element label distributions (Mészáros+2025-corrected where applicable)",
+        fontsize=12,
+        y=1.00,
+    )
     _save(fig, "05_label_grid.png")
 
 
@@ -213,8 +239,7 @@ def plot_xp_spectra(df: pd.DataFrame) -> None:
         flux = np.asarray(row["corrected_flux"])
         # Normalize each spectrum to its median for shape comparison
         flux_n = flux / np.nanmedian(flux)
-        ax.plot(YE2024_SAMPLING_NM, flux_n, color=cmap(norm(row["fe_h_atm"])),
-                lw=0.7, alpha=0.85)
+        ax.plot(YE2024_SAMPLING_NM, flux_n, color=cmap(norm(row["fe_h_atm"])), lw=0.7, alpha=0.85)
     ax.set_xlabel("wavelength [nm]")
     ax.set_ylabel("corrected flux / median")
     ax.set_title(f"Ye+2024-corrected XP spectra — {len(sub)} stars stratified in [Fe/H]")
@@ -256,15 +281,33 @@ def plot_data_flow(df: pd.DataFrame) -> None:
 
 def plot_feature_availability(df: pd.DataFrame) -> None:
     nullable = [
-        "ebv_edenhofer_2023", "ebv_sfd", "ag_gspphot",
-        "av_nbhd_median", "av_lallement_xcheck",
-        "r_med_photogeo", "teff_gspphot", "logg_gspphot",
+        "ebv_edenhofer_2023",
+        "ebv_sfd",
+        "ag_gspphot",
+        "av_nbhd_median",
+        "av_lallement_xcheck",
+        "r_med_photogeo",
+        "teff_gspphot",
+        "logg_gspphot",
         "mh_gspphot",
-        "g_mag", "bp_mag", "rp_mag",
-        "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
-        "m_h_atm", "fe_h_atm", "mg_h_atm", "al_h_atm",
-        "c_h_atm", "n_h_atm", "o_h_atm",
-        "ni_h_atm", "ce_h_atm", "v_h_atm",
+        "g_mag",
+        "bp_mag",
+        "rp_mag",
+        "j_mag",
+        "h_mag",
+        "k_mag",
+        "w1_mag",
+        "w2_mag",
+        "m_h_atm",
+        "fe_h_atm",
+        "mg_h_atm",
+        "al_h_atm",
+        "c_h_atm",
+        "n_h_atm",
+        "o_h_atm",
+        "ni_h_atm",
+        "ce_h_atm",
+        "v_h_atm",
     ]
     nullable = [c for c in nullable if c in df.columns]
     n = len(df)
@@ -284,9 +327,11 @@ def plot_feature_availability(df: pd.DataFrame) -> None:
     ax.axvline(0.5, color="k", lw=0.5, ls="--", alpha=0.5)
     ax.axvline(0.9, color="k", lw=0.5, ls="--", alpha=0.5)
     for yi, f in zip(y, frac):
-        ax.text(min(f + 0.01, 1.0), yi, f"{f*100:.1f}%", va="center", fontsize=7)
-    ax.set_title("Per-feature availability in pipeline1_features_stream1\n"
-                 "green ≥ 90%, orange 50–90%, red < 50%")
+        ax.text(min(f + 0.01, 1.0), yi, f"{f * 100:.1f}%", va="center", fontsize=7)
+    ax.set_title(
+        "Per-feature availability in pipeline1_features_stream1\n"
+        "green ≥ 90%, orange 50–90%, red < 50%"
+    )
     _save(fig, "08_feature_availability.png")
 
 
@@ -304,8 +349,15 @@ def plot_distance_extinction(df: pd.DataFrame) -> None:
     ax.set_yscale("log")
 
     ax = axes[1]
-    hb = ax.hexbin(d[mask] / 1000.0, ag[mask], gridsize=80, extent=(0, 10, 0, 3.5),
-                   cmap="viridis", mincnt=5, bins="log")
+    hb = ax.hexbin(
+        d[mask] / 1000.0,
+        ag[mask],
+        gridsize=80,
+        extent=(0, 10, 0, 3.5),
+        cmap="viridis",
+        mincnt=5,
+        bins="log",
+    )
     ax.set_xlabel("distance [kpc]")
     ax.set_ylabel("A_G (GSP-Phot) [mag]")
     ax.set_title("Extinction vs distance")

@@ -58,8 +58,9 @@ def main() -> None:
     src_ids = pd.read_parquet(ids_path)["source_id"].astype("int64").to_list()
     n_src = len(src_ids)
     n_batches = (n_src + BATCH_SIZE - 1) // BATCH_SIZE
-    logger.info("%d Stream 3 source_ids → AIP Gaia DR3 (%d batches of %d)",
-                n_src, n_batches, BATCH_SIZE)
+    logger.info(
+        "%d Stream 3 source_ids → AIP Gaia DR3 (%d batches of %d)", n_src, n_batches, BATCH_SIZE
+    )
 
     svc = aip_service()
     df = batched_upload_fetch_df(
@@ -76,24 +77,59 @@ def main() -> None:
     logger.info("fetched %d rows from AIP", len(df))
 
     float32_cols = [
-        "ra", "dec", "parallax", "parallax_error",
-        "pmra", "pmra_error", "pmdec", "pmdec_error",
-        "ra_dec_corr", "ra_parallax_corr", "ra_pmra_corr", "ra_pmdec_corr",
-        "dec_parallax_corr", "dec_pmra_corr", "dec_pmdec_corr",
-        "parallax_pmra_corr", "parallax_pmdec_corr", "pmra_pmdec_corr",
-        "phot_g_mean_mag", "phot_bp_mean_mag", "phot_rp_mean_mag",
-        "phot_g_mean_flux_over_error", "bp_rp", "bp_g", "g_rp",
-        "ruwe", "astrometric_excess_noise",
+        "ra",
+        "dec",
+        "parallax",
+        "parallax_error",
+        "pmra",
+        "pmra_error",
+        "pmdec",
+        "pmdec_error",
+        "ra_dec_corr",
+        "ra_parallax_corr",
+        "ra_pmra_corr",
+        "ra_pmdec_corr",
+        "dec_parallax_corr",
+        "dec_pmra_corr",
+        "dec_pmdec_corr",
+        "parallax_pmra_corr",
+        "parallax_pmdec_corr",
+        "pmra_pmdec_corr",
+        "phot_g_mean_mag",
+        "phot_bp_mean_mag",
+        "phot_rp_mean_mag",
+        "phot_g_mean_flux_over_error",
+        "bp_rp",
+        "bp_g",
+        "g_rp",
+        "ruwe",
+        "astrometric_excess_noise",
         "ipd_gof_harmonic_amplitude",
-        "radial_velocity", "radial_velocity_error",
-        "nu_eff_used_in_astrometry", "pseudocolour", "ecl_lat",
-        "teff_gspphot", "teff_gspphot_lower", "teff_gspphot_upper",
-        "logg_gspphot", "logg_gspphot_lower", "logg_gspphot_upper",
-        "mh_gspphot",   "mh_gspphot_lower",   "mh_gspphot_upper",
-        "ag_gspphot",   "ag_gspphot_lower",   "ag_gspphot_upper",
+        "radial_velocity",
+        "radial_velocity_error",
+        "nu_eff_used_in_astrometry",
+        "pseudocolour",
+        "ecl_lat",
+        "teff_gspphot",
+        "teff_gspphot_lower",
+        "teff_gspphot_upper",
+        "logg_gspphot",
+        "logg_gspphot_lower",
+        "logg_gspphot_upper",
+        "mh_gspphot",
+        "mh_gspphot_lower",
+        "mh_gspphot_upper",
+        "ag_gspphot",
+        "ag_gspphot_lower",
+        "ag_gspphot_upper",
         "ebpminrp_gspphot",
-        "distance_gspphot", "distance_gspphot_lower", "distance_gspphot_upper",
-        "teff_gspspec", "logg_gspspec", "mh_gspspec", "alphafe_gspspec",
+        "distance_gspphot",
+        "distance_gspphot_lower",
+        "distance_gspphot_upper",
+        "teff_gspspec",
+        "logg_gspspec",
+        "mh_gspspec",
+        "alphafe_gspspec",
     ]
     for col in float32_cols:
         if col in df.columns and df[col].dtype == np.float64:

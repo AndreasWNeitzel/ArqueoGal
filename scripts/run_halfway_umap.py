@@ -60,13 +60,18 @@ DEFAULT_REPORT_DIR = REPO_ROOT / "reports/gallery/10_contrastive_pretraining"
 # ADR-0014 Bug A diagnostic — encoder α/M-blindness shows as a smeared
 # continuum instead of disjoint low-α / high-α loci at fixed [M/H].
 DEFAULT_COLOR_COLUMNS = (
-    "teff_apogee", "mh_apogee", "logg_apogee",
-    "alpha_m_apogee", "mg_h_apogee",
+    "teff_apogee",
+    "mh_apogee",
+    "logg_apogee",
+    "alpha_m_apogee",
+    "mg_h_apogee",
 )
 
 
 def _load_pretrained_model(
-    ckpt_path: Path, layout: FeatureLayout, device: torch.device,
+    ckpt_path: Path,
+    layout: FeatureLayout,
+    device: torch.device,
 ) -> tuple[XpAbundanceModel, XpFeatureAdapter, dict]:
     """Reconstruct the pretrained model + adapter from a v2 checkpoint.
 
@@ -112,21 +117,36 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ckpt", type=Path, required=True, help="Pretrained best-val checkpoint.")
     parser.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
-    parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR,
-                        help="Output directory (default: gallery stage 10).")
-    parser.add_argument("--prefix", type=str, default="halfway",
-                        help="Filename prefix — plots are {prefix}_umap_{column}.png and "
-                             "the summary is {prefix}_summary.json. Use this to tag runs, "
-                             "e.g. --prefix halfway_v2 or halfway_v3_xponly_smoke.")
-    parser.add_argument("--color-by", type=str,
-                        default=",".join(DEFAULT_COLOR_COLUMNS),
-                        help="CSV of APOGEE label columns to colour by. Default includes "
-                             "[α/M] and [Mg/H] for the ADR-0014 α/M-blindness diagnostic.")
-    parser.add_argument("--feature-layout", choices=("default", "xponly"), default="default",
-                        help="'default' (140-D: XP + 2 c0 + 3 residuals + 27 aux) matches "
-                             "v1/v1.1/v2 checkpoints. 'xponly' (110-D: XP + 2 c0 only) is "
-                             "the ADR-0014 XP-only smoke layout — use this when the loaded "
-                             "checkpoint was trained with aux_cols=()/residual_cols=().")
+    parser.add_argument(
+        "--report-dir",
+        type=Path,
+        default=DEFAULT_REPORT_DIR,
+        help="Output directory (default: gallery stage 10).",
+    )
+    parser.add_argument(
+        "--prefix",
+        type=str,
+        default="halfway",
+        help="Filename prefix — plots are {prefix}_umap_{column}.png and "
+        "the summary is {prefix}_summary.json. Use this to tag runs, "
+        "e.g. --prefix halfway_v2 or halfway_v3_xponly_smoke.",
+    )
+    parser.add_argument(
+        "--color-by",
+        type=str,
+        default=",".join(DEFAULT_COLOR_COLUMNS),
+        help="CSV of APOGEE label columns to colour by. Default includes "
+        "[α/M] and [Mg/H] for the ADR-0014 α/M-blindness diagnostic.",
+    )
+    parser.add_argument(
+        "--feature-layout",
+        choices=("default", "xponly"),
+        default="default",
+        help="'default' (140-D: XP + 2 c0 + 3 residuals + 27 aux) matches "
+        "v1/v1.1/v2 checkpoints. 'xponly' (110-D: XP + 2 c0 only) is "
+        "the ADR-0014 XP-only smoke layout — use this when the loaded "
+        "checkpoint was trained with aux_cols=()/residual_cols=().",
+    )
     parser.add_argument("--n-stars", type=int, default=10_000)
     parser.add_argument("--split-seed", type=int, default=0)
     parser.add_argument("--umap-seed", type=int, default=0)
@@ -138,8 +158,10 @@ def main() -> None:
 
     color_cols = tuple(c.strip() for c in args.color_by.split(",") if c.strip())
 
-    device = torch.device(args.device) if args.device is not None else (
-        torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.device(args.device)
+        if args.device is not None
+        else (torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     )
     args.report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -167,7 +189,8 @@ def main() -> None:
 
     _LOG.info("loading feature matrix + running stratified split")
     df_ids = pd.read_parquet(
-        args.parquet, columns=["source_id", "fe_h_apogee", "teff_apogee", "b_deg"],
+        args.parquet,
+        columns=["source_id", "fe_h_apogee", "teff_apogee", "b_deg"],
     )
     df_ids = df_ids.drop_duplicates(subset="source_id", keep="first").reset_index(drop=True)
     split_ids = stratified_split_ids(df_ids, fracs=fracs, seed=split_seed)
@@ -180,14 +203,12 @@ def main() -> None:
 
     # Apply same NaN filter/imputation used by training.build_dataloaders so the
     # pretrained trunk sees the inputs it was trained on.
-    n_xp = (
-        len(layout.bp_coef_cols) + len(layout.rp_coef_cols)
-        + len(layout.xp_scalar_cols)
-    )
+    n_xp = len(layout.bp_coef_cols) + len(layout.rp_coef_cols) + len(layout.xp_scalar_cols)
     xp_finite = np.isfinite(arrs["X"][:, :n_xp]).all(axis=1)
     if not xp_finite.all():
-        _LOG.info("dropping %d/%d rows with NaN in XP features",
-                  int((~xp_finite).sum()), len(xp_finite))
+        _LOG.info(
+            "dropping %d/%d rows with NaN in XP features", int((~xp_finite).sum()), len(xp_finite)
+        )
         for k in ("X", "Y", "source_id"):
             arrs[k] = arrs[k][xp_finite]
     np.nan_to_num(arrs["X"], copy=False, nan=0.0, posinf=0.0, neginf=0.0)
@@ -207,10 +228,15 @@ def main() -> None:
 
     _LOG.info("embedding %d stars through trunk on %s", len(X_sub), device)
     he = compute_halfway_embedding(
-        model, adapter, X_sub, labels,
+        model,
+        adapter,
+        X_sub,
+        labels,
         device=device,
-        n_neighbors=args.n_neighbors, min_dist=args.min_dist,
-        umap_seed=args.umap_seed, batch_size=args.batch_size,
+        n_neighbors=args.n_neighbors,
+        min_dist=args.min_dist,
+        umap_seed=args.umap_seed,
+        batch_size=args.batch_size,
     )
     plot_paths = save_halfway_plots(he, args.report_dir, prefix=args.prefix)
 

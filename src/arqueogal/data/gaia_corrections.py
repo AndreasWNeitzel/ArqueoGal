@@ -112,15 +112,11 @@ def apply_parallax_zpt(
             dtype="float64",
         )
         out.loc[five_or_six, zpt_col] = zpt_mas
-        out.loc[five_or_six, corrected_col] = (
-            sub["parallax"].to_numpy().astype("float64") - zpt_mas
-        )
+        out.loc[five_or_six, corrected_col] = sub["parallax"].to_numpy().astype("float64") - zpt_mas
 
     n_two = int((~five_or_six).sum())
     if n_two:
-        logger.info(
-            "Lindegren zpt: %d 2-param (or unknown) solutions left uncorrected", n_two
-        )
+        logger.info("Lindegren zpt: %d 2-param (or unknown) solutions left uncorrected", n_two)
     logger.info("Lindegren zpt applied to %d/%d rows", int(five_or_six.sum()), len(df))
     return out
 
@@ -133,10 +129,16 @@ def apply_parallax_zpt(
 _G_CORR_BP_RP_CLIP_LO: Final[float] = 0.25
 _G_CORR_BP_RP_CLIP_HI: Final[float] = 3.0
 _G_CORR_BRIGHT_COEFFS: Final[tuple[float, float, float, float]] = (
-    1.00876, -0.02540, 0.01747, -0.00277,
+    1.00876,
+    -0.02540,
+    0.01747,
+    -0.00277,
 )
 _G_CORR_FAINT_COEFFS: Final[tuple[float, float, float, float]] = (
-    1.00525, -0.02323, 0.01740, -0.00253,
+    1.00525,
+    -0.02323,
+    0.01740,
+    -0.00253,
 )
 
 
@@ -205,24 +207,26 @@ def apply_g_mag_correction(
     cb = _G_CORR_BRIGHT_COEFFS
     cf = _G_CORR_FAINT_COEFFS
     factor[bright] = (
-        cb[0] + cb[1] * bp_rp_c[bright] + cb[2] * bp_rp_c[bright] ** 2
+        cb[0]
+        + cb[1] * bp_rp_c[bright]
+        + cb[2] * bp_rp_c[bright] ** 2
         + cb[3] * bp_rp_c[bright] ** 3
     )
     factor[faint] = (
-        cf[0] + cf[1] * bp_rp_c[faint] + cf[2] * bp_rp_c[faint] ** 2
-        + cf[3] * bp_rp_c[faint] ** 3
+        cf[0] + cf[1] * bp_rp_c[faint] + cf[2] * bp_rp_c[faint] ** 2 + cf[3] * bp_rp_c[faint] ** 3
     )
 
     out[corrected_mag_col] = g_mag - 2.5 * np.log10(factor)
     if flux_col in df.columns:
-        out[corrected_flux_col] = (
-            out[flux_col].to_numpy(dtype=np.float64, copy=False) * factor
-        )
+        out[corrected_flux_col] = out[flux_col].to_numpy(dtype=np.float64, copy=False) * factor
 
     n_corr = int(bright.sum() + faint.sum())
     logger.info(
         "Riello+2021 G-mag correction applied to %d/%d rows (bright=%d, faint=%d)",
-        n_corr, len(df), int(bright.sum()), int(faint.sum()),
+        n_corr,
+        len(df),
+        int(bright.sum()),
+        int(faint.sum()),
     )
     return out
 

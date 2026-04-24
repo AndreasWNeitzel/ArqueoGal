@@ -94,7 +94,9 @@ def test_training_happy_path(tmp_path: Path, training_inputs) -> None:
     stream_path, xp_path = training_inputs
     out_path = tmp_path / "processed" / "pipeline1_training.parquet"
     returned = build_pipeline1_training(
-        stream_path, xp_path, output_path=out_path,
+        stream_path,
+        xp_path,
+        output_path=out_path,
     )
     assert returned == out_path
     assert out_path.is_file()
@@ -143,7 +145,9 @@ def test_missing_schema_column_raises_schemaerror(tmp_path: Path) -> None:
 
     with pytest.raises(SchemaError, match="teff_apogee"):
         build_pipeline1_training(
-            stream_path, xp_path, output_path=tmp_path / "x.parquet",
+            stream_path,
+            xp_path,
+            output_path=tmp_path / "x.parquet",
         )
 
 
@@ -156,9 +160,7 @@ def test_row_counts_and_drops_in_provenance(tmp_path: Path) -> None:
 
     out_path = tmp_path / "training.parquet"
     build_pipeline1_training(stream_path, xp_path, output_path=out_path)
-    meta = json.loads(
-        out_path.with_suffix("").with_suffix(".provenance.json").read_text()
-    )
+    meta = json.loads(out_path.with_suffix("").with_suffix(".provenance.json").read_text())
     assert meta["row_count_before"] == 10
     assert meta["row_count_after"] == 7
     extra = meta["extra"]
@@ -169,15 +171,11 @@ def test_row_counts_and_drops_in_provenance(tmp_path: Path) -> None:
     assert extra["schema_name"] == "pipeline1_training"
 
 
-def test_both_inputs_listed_in_provenance_as_local(
-    tmp_path: Path, training_inputs
-) -> None:
+def test_both_inputs_listed_in_provenance_as_local(tmp_path: Path, training_inputs) -> None:
     stream_path, xp_path = training_inputs
     out_path = tmp_path / "training.parquet"
     build_pipeline1_training(stream_path, xp_path, output_path=out_path)
-    meta = json.loads(
-        out_path.with_suffix("").with_suffix(".provenance.json").read_text()
-    )
+    meta = json.loads(out_path.with_suffix("").with_suffix(".provenance.json").read_text())
     local_sources = [s for s in meta["sources"] if s["kind"] == "local"]
     assert len(local_sources) == 2
     paths = {s["path"] for s in local_sources}
@@ -199,7 +197,8 @@ def test_array_length_check_can_fail(tmp_path: Path) -> None:
 
     with pytest.raises(SchemaError, match="bp_coeffs_norm"):
         build_pipeline1_training(
-            stream_path, xp_path,
+            stream_path,
+            xp_path,
             output_path=tmp_path / "x.parquet",
             check_array_lengths=True,
         )
@@ -217,8 +216,6 @@ def test_inference_notes_mentions_andrae(tmp_path: Path, inference_inputs) -> No
     stream_path, xp_path = inference_inputs
     out_path = tmp_path / "pipeline1_inference.parquet"
     build_pipeline1_inference(stream_path, xp_path, output_path=out_path)
-    meta = json.loads(
-        out_path.with_suffix("").with_suffix(".provenance.json").read_text()
-    )
+    meta = json.loads(out_path.with_suffix("").with_suffix(".provenance.json").read_text())
     assert "Andrae" in meta["notes"]
     assert meta["extra"]["schema_name"] == "pipeline1_inference"

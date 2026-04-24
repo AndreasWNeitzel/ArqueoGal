@@ -35,7 +35,14 @@ HON2021_DEFAULT_PROB_THRESHOLD: Final[float] = 0.95
 """§4.1: authors' recommended high-confidence detection threshold."""
 
 HON2021_COLUMNS: Final[tuple[str, ...]] = (
-    "TIC", "RAJ2000", "DEJ2000", "numax", "e_numax", "Teff", "R", "Prob",
+    "TIC",
+    "RAJ2000",
+    "DEJ2000",
+    "numax",
+    "e_numax",
+    "Teff",
+    "R",
+    "Prob",
 )
 """§4.1: minimal column set we ingest. ``R`` is radius in R_sun. ``Sector``
 flags are excluded — they're multi-column and not needed for Task 4 yet."""
@@ -89,7 +96,8 @@ def fetch_hon2021(
     if len(df) > SYNC_ROW_THRESHOLD and mode == "sync":
         logger.warning(
             "Hon+2021 sync query returned %d rows (> %d) — consider mode='async'",
-            len(df), SYNC_ROW_THRESHOLD,
+            len(df),
+            SYNC_ROW_THRESHOLD,
         )
     logger.info("Hon+2021: %d rows after Prob > %s cut", len(df), prob_threshold)
     return df

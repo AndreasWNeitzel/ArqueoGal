@@ -53,9 +53,16 @@ LABELS = ("teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apo
 
 # Context columns we want for population-overlap checks.
 CONTEXT_COLS_WANTED = [
-    "source_id", "ra", "dec", "b_deg", "l_deg",
-    "phot_g_mean_mag_corrected", "bp_rp",
-    "av_edenhofer", "av_nbhd_median", "av_nbhd_std",
+    "source_id",
+    "ra",
+    "dec",
+    "b_deg",
+    "l_deg",
+    "phot_g_mean_mag_corrected",
+    "bp_rp",
+    "av_edenhofer",
+    "av_nbhd_median",
+    "av_nbhd_std",
     "ye2024_flag",
     "fe_h_apogee",
 ]
@@ -114,7 +121,9 @@ def main() -> None:
     cfg = TrainingConfig(
         train_parquet=PARQUET,
         output_dir=REPO_ROOT / "tmp_halt_diag",
-        epochs=1, batch_size=1024, num_workers=2,
+        epochs=1,
+        batch_size=1024,
+        num_workers=2,
         amp_dtype="bfloat16",
         use_c0_scalars=True,
         encoder_lr_ratio=0.1,
@@ -190,7 +199,8 @@ def main() -> None:
         if source_ids.shape[0] != y_raw.shape[0]:
             _LOG.warning(
                 "source_id count %d != y %d — skipping metadata join",
-                source_ids.shape[0], y_raw.shape[0],
+                source_ids.shape[0],
+                y_raw.shape[0],
             )
             source_ids = None
 
@@ -211,8 +221,7 @@ def main() -> None:
     lines.append(f"Source ckpt: `{CKPT.relative_to(REPO_ROOT)}`  \n")
     lines.append(f"Val stars total: **{y_raw.shape[0]}**  \n")
     lines.append(
-        f"Halt cells (err > 30 %): `{halt_cells}`  \n"
-        f"Over 15 % (warning): `{over_15_only}`  \n\n",
+        f"Halt cells (err > 30 %): `{halt_cells}`  \nOver 15 % (warning): `{over_15_only}`  \n\n",
     )
     lines.append(
         "Axis edges (quantile-binned on val):\n\n"
@@ -247,10 +256,8 @@ def main() -> None:
         logg_range = cell_range(idx3[1], edges[1], "log g")
         mh_range = cell_range(idx3[2], edges[2], "[M/H]")
 
-        var_z = [float(np.nanvar(z[in_cell, j])) if n >= 8 else float("nan")
-                 for j in range(5)]
-        mean_z = [float(np.nanmean(z[in_cell, j])) if n >= 8 else float("nan")
-                  for j in range(5)]
+        var_z = [float(np.nanvar(z[in_cell, j])) if n >= 8 else float("nan") for j in range(5)]
+        mean_z = [float(np.nanmean(z[in_cell, j])) if n >= 8 else float("nan") for j in range(5)]
 
         b_med = float("nan")
         av_med = float("nan")
@@ -266,9 +273,7 @@ def main() -> None:
             if "ye2024_flag" in sub.columns:
                 flag = sub["ye2024_flag"].to_numpy()
                 # ye2024_flag is int8: 0 = OK, 1 = flagged (NO_SYNTH_PHOT etc.).
-                ood_frac = (
-                    float(np.nanmean(flag.astype(float))) if flag.size else float("nan")
-                )
+                ood_frac = float(np.nanmean(flag.astype(float))) if flag.size else float("nan")
             if "fe_h_apogee" in sub.columns:
                 feh = sub["fe_h_apogee"].to_numpy()
                 mp_frac = float(np.nanmean(feh < -1.0)) if feh.size else float("nan")
@@ -285,15 +290,12 @@ def main() -> None:
     # Summaries.
     lines.append("\n## Summary\n\n")
     n_halt_edge = sum(
-        1 for c in halt_cells
+        1
+        for c in halt_cells
         if any(i == 0 or i == nb - 1 for i, nb in zip(decode_cell(c, n_bins), n_bins))
     )
-    total_halt_stars = int(sum(
-        (cell_ids == c).sum() for c in halt_cells
-    ))
-    n_halt_sparse = sum(
-        1 for c in halt_cells if int((cell_ids == c).sum()) < 50
-    )
+    total_halt_stars = int(sum((cell_ids == c).sum() for c in halt_cells))
+    n_halt_sparse = sum(1 for c in halt_cells if int((cell_ids == c).sum()) < 50)
     lines.append(f"- Halt cells at grid edges: **{n_halt_edge} / {len(halt_cells)}**\n")
     lines.append(f"- Halt cells with n < 50 val stars: **{n_halt_sparse} / {len(halt_cells)}**\n")
     lines.append(
@@ -306,13 +308,18 @@ def main() -> None:
     _LOG.info("wrote %s", OUT_PATH)
 
     # Stdout recap.
-    for c in cells_sorted[:len(halt_cells)]:
+    for c in cells_sorted[: len(halt_cells)]:
         idx3 = decode_cell(c, n_bins)
         n = int((cell_ids == c).sum())
         edge = any(i == 0 or i == nb - 1 for i, nb in zip(idx3, n_bins))
         _LOG.info(
             "cell %d  t=%d g=%d m=%d  n=%d  edge=%s",
-            c, idx3[0], idx3[1], idx3[2], n, edge,
+            c,
+            idx3[0],
+            idx3[1],
+            idx3[2],
+            n,
+            edge,
         )
 
 

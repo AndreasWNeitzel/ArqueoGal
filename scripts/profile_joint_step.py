@@ -61,12 +61,17 @@ def build_cfg() -> TrainingConfig:
         stage_dataset_on_gpu=True,
         output_prefix="xp_abundances_main_joint_profile",
         loss_weights=LossWeights(
-            supcon=1.0, beta_nll=1.0, beta=0.0,
-            barlow=1.0, barlow_lam=0.005,
-            supcon_sigma=0.10, supcon_label_n_first=None,
+            supcon=1.0,
+            beta_nll=1.0,
+            beta=0.0,
+            barlow=1.0,
+            barlow_lam=0.005,
+            supcon_sigma=0.10,
+            supcon_label_n_first=None,
         ),
         temperature_init=0.10,
-        queue_size=8192, queue_warm_start=True,
+        queue_size=8192,
+        queue_warm_start=True,
         ensemble_seeds=(0,),
     )
 
@@ -91,7 +96,10 @@ def main() -> None:
     layout = FeatureLayout()
     tiers = LabelTiers.five_label()
     train_loader, _val_loader, _split_ids, label_scaler = build_dataloaders(
-        cfg, layout, tiers, seed=0,
+        cfg,
+        layout,
+        tiers,
+        seed=0,
     )
     print(f"train batches/epoch={len(train_loader)}")
 
@@ -100,8 +108,10 @@ def main() -> None:
         ModelConfig(
             input_dim=layout.input_dim,
             block_layout=block_layout,
-            latent_dim=32, trunk_hidden=(256, 128),
-            head_hidden=128, dropout=0.10,
+            latent_dim=32,
+            trunk_hidden=(256, 128),
+            head_hidden=128,
+            dropout=0.10,
         ),
     ).to(device)
     log_temp = torch.nn.Parameter(
@@ -109,18 +119,30 @@ def main() -> None:
     )
     adapter = XpFeatureAdapter(layout, use_c0_scalars=cfg.use_c0_scalars).to(device)
     queue = ContrastiveQueue(
-        size=cfg.queue_size, latent_dim=32, n_labels=tiers.n_labels,
-        device=device, warm_start=cfg.queue_warm_start,
+        size=cfg.queue_size,
+        latent_dim=32,
+        n_labels=tiers.n_labels,
+        device=device,
+        warm_start=cfg.queue_warm_start,
     )
     optim = torch.optim.AdamW(
-        [*model.parameters(), log_temp], lr=cfg.max_lr, weight_decay=cfg.weight_decay,
+        [*model.parameters(), log_temp],
+        lr=cfg.max_lr,
+        weight_decay=cfg.weight_decay,
         fused=torch.cuda.is_available(),
     )
 
     # Macro timing via cuda.Event pairs
     components = (
-        "data", "adapter", "forward", "supcon", "beta_nll",
-        "barlow", "backward", "optimizer", "enqueue",
+        "data",
+        "adapter",
+        "forward",
+        "supcon",
+        "beta_nll",
+        "barlow",
+        "backward",
+        "optimizer",
+        "enqueue",
     )
     start_events: dict[str, list[torch.cuda.Event]] = {k: [] for k in components}
     end_events: dict[str, list[torch.cuda.Event]] = {k: [] for k in components}
@@ -175,35 +197,53 @@ def main() -> None:
     step_iter = iter(train_loader)
     for _ in range(args.measure):
         try:
-            tick("data"); batch = next(step_iter); tock("data")
+            tick("data")
+            batch = next(step_iter)
+            tock("data")
         except StopIteration:
             step_iter = iter(train_loader)
-            tick("data"); batch = next(step_iter); tock("data")
+            tick("data")
+            batch = next(step_iter)
+            tock("data")
         x = batch[0].to(device, non_blocking=True)
         y = batch[1].to(device, non_blocking=True)
         optim.zero_grad(set_to_none=True)
 
         with torch.amp.autocast(device_type=device.type, dtype=torch.bfloat16):
-            tick("adapter"); x_a = adapter(x); tock("adapter")
-            tick("forward"); mu, L, h, z = model(x_a); tock("forward")
+            tick("adapter")
+            x_a = adapter(x)
+            tock("adapter")
+            tick("forward")
+            mu, L, h, z = model(x_a)
+            tock("forward")
             tau = _clamped_temperature(log_temp, cfg.temperature_bounds)
             qz, qy = queue.get()
             zk = torch.cat([z, qz], dim=0)
             yk = torch.cat([y, qy], dim=0)
-            tick("supcon"); supcon = supcon_soft_positive(z, y, zk, yk, temperature=tau, sigma=lw.supcon_sigma); tock("supcon")
+            tick("supcon")
+            supcon = supcon_soft_positive(z, y, zk, yk, temperature=tau, sigma=lw.supcon_sigma)
+            tock("supcon")
             y_block = model.block_layout.reorder_human_to_block(y)
             finite = torch.isfinite(y_block)
             y_clean = torch.where(finite, y_block, mu.detach())
-            tick("beta_nll"); nll = beta_nll_block_cholesky(mu, L, y_clean, beta=lw.beta, mask=finite.float()); tock("beta_nll")
-            tick("barlow"); bt = barlow_twins_loss(h, lam=lw.barlow_lam); tock("barlow")
+            tick("beta_nll")
+            nll = beta_nll_block_cholesky(mu, L, y_clean, beta=lw.beta, mask=finite.float())
+            tock("beta_nll")
+            tick("barlow")
+            bt = barlow_twins_loss(h, lam=lw.barlow_lam)
+            tock("barlow")
             total = lw.supcon * supcon + lw.beta_nll * nll + lw.barlow * bt
 
-        tick("backward"); total.backward(); tock("backward")
+        tick("backward")
+        total.backward()
+        tock("backward")
         tick("optimizer")
         torch.nn.utils.clip_grad_norm_([*model.parameters(), log_temp], cfg.grad_clip_norm)
         optim.step()
         tock("optimizer")
-        tick("enqueue"); queue.enqueue(z.detach(), y.detach()); tock("enqueue")
+        tick("enqueue")
+        queue.enqueue(z.detach(), y.detach())
+        tock("enqueue")
     torch.cuda.synchronize()
 
     # Collect timings
@@ -236,7 +276,9 @@ def main() -> None:
     sched = schedule(wait=1, warmup=2, active=args.profiler_steps, repeat=1)
     with profile(
         activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-        schedule=sched, record_shapes=False, with_stack=False,
+        schedule=sched,
+        record_shapes=False,
+        with_stack=False,
     ) as prof:
         for _ in range(args.profiler_steps + 3):
             try:

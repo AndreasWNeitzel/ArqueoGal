@@ -64,12 +64,17 @@ DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet
 
 
 def _build_cfg_for_val_loader(
-    parquet: Path, pretrained_ckpt: Path | None, batch_size: int, seed: int,
+    parquet: Path,
+    pretrained_ckpt: Path | None,
+    batch_size: int,
+    seed: int,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
         output_dir=REPO_ROOT / "tmp_calibration",
-        epochs=1, batch_size=batch_size, num_workers=2,
+        epochs=1,
+        batch_size=batch_size,
+        num_workers=2,
         amp_dtype="bfloat16",
         use_c0_scalars=True,
         encoder_lr_ratio=0.1,
@@ -84,7 +89,9 @@ def _build_cfg_for_val_loader(
 
 
 def _reconstruct_model(
-    blob: dict, layout: FeatureLayout, block_layout: CovarianceBlockLayout,
+    blob: dict,
+    layout: FeatureLayout,
+    block_layout: CovarianceBlockLayout,
     device: torch.device,
 ) -> tuple[XpAbundanceModel, XpFeatureAdapter]:
     cfg_yaml = json.loads(blob["config_yaml"])
@@ -98,8 +105,10 @@ def _reconstruct_model(
         ModelConfig(
             input_dim=layout.input_dim,
             block_layout=block_layout,
-            latent_dim=latent_dim, trunk_hidden=trunk_hidden,
-            head_hidden=head_hidden, dropout=dropout,
+            latent_dim=latent_dim,
+            trunk_hidden=trunk_hidden,
+            head_hidden=head_hidden,
+            dropout=dropout,
         ),
     ).to(device)
     model.encoder.load_state_dict(blob["encoder"])
@@ -109,8 +118,10 @@ def _reconstruct_model(
 
 
 def _collect_member_preds(
-    model: XpAbundanceModel, adapter: XpFeatureAdapter,
-    loader, device: torch.device,
+    model: XpAbundanceModel,
+    adapter: XpFeatureAdapter,
+    loader,
+    device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run `model(adapter(x))` over `loader`; return (mu, L, y) as CPU float32 arrays."""
     model.eval()
@@ -163,7 +174,8 @@ def _moment_match(mus: np.ndarray, Ls: np.ndarray) -> tuple[np.ndarray, np.ndarr
 def _mahal_bulk(mu: np.ndarray, L: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Per-star Mahalanobis² using scipy's triangular solve (bulk loop)."""
     from scipy.linalg import solve_triangular
-    diff = (y - mu)
+
+    diff = y - mu
     out = np.empty(mu.shape[0], dtype=np.float64)
     for b in range(mu.shape[0]):
         z = solve_triangular(L[b], diff[b], lower=True)
@@ -172,7 +184,10 @@ def _mahal_bulk(mu: np.ndarray, L: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def _variance_decomposition(
-    mu: np.ndarray, L: np.ndarray, y: np.ndarray, cell_ids: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
+    y: np.ndarray,
+    cell_ids: np.ndarray,
 ) -> dict:
     """Decompose E[z²] per label into within-cell and between-cell components.
 
@@ -220,7 +235,8 @@ def _variance_decomposition(
         if not cell_means:
             within[j] = between[j] = float("nan")
             continue
-        w = np.asarray(cell_weights); w = w / w.sum()
+        w = np.asarray(cell_weights)
+        w = w / w.sum()
         means = np.asarray(cell_means)
         vars_ = np.asarray(cell_vars)
         within[j] = float((w * vars_).sum())
@@ -233,7 +249,10 @@ def _variance_decomposition(
 
 
 def _reliability_per_cell(
-    mu: np.ndarray, L: np.ndarray, y: np.ndarray, cell_ids: np.ndarray,
+    mu: np.ndarray,
+    L: np.ndarray,
+    y: np.ndarray,
+    cell_ids: np.ndarray,
 ) -> tuple[np.ndarray, float, np.ndarray]:
     """Per-cell reliability error via standardised-residual variance.
 
@@ -328,15 +347,23 @@ def _adjacent_cell_smoothness(
                 if lr > max_log:
                     max_log = lr
                     max_info = {
-                        "cell_a": int(c), "cell_b": int(c2),
-                        "axis": int(axis), "label_idx": int(j),
-                        "alpha_a": float(a1), "alpha_b": float(a2),
+                        "cell_a": int(c),
+                        "cell_b": int(c2),
+                        "axis": int(axis),
+                        "label_idx": int(j),
+                        "alpha_a": float(a1),
+                        "alpha_b": float(a2),
                     }
 
     arr = np.asarray(log_ratios, dtype=np.float64)
     if arr.size == 0:
-        return {"n_pairs": 0, "max_ratio": 1.0, "median_ratio": 1.0,
-                "p90_ratio": 1.0, "max_pair_info": None}
+        return {
+            "n_pairs": 0,
+            "max_ratio": 1.0,
+            "median_ratio": 1.0,
+            "p90_ratio": 1.0,
+            "max_pair_info": None,
+        }
     ratios = np.exp(arr)
     return {
         "n_pairs": int(arr.size),
@@ -348,19 +375,23 @@ def _adjacent_cell_smoothness(
 
 
 def _plot_reliability(
-    per_cell: np.ndarray, out_path: Path,
-    title: str, threshold: float = 0.15,
+    per_cell: np.ndarray,
+    out_path: Path,
+    title: str,
+    threshold: float = 0.15,
 ) -> None:
     fig, ax = plt.subplots(figsize=(8, 4.5))
     x = np.arange(per_cell.size)
-    colors = ["tab:green" if (not np.isnan(v) and v <= threshold)
-              else ("tab:orange" if (not np.isnan(v) and v <= 2 * threshold)
-                    else "tab:red")
-              for v in per_cell]
-    ax.bar(x, np.where(np.isnan(per_cell), 0, per_cell),
-           color=colors, edgecolor="k", linewidth=0.3)
-    ax.axhline(threshold, linestyle="--", color="k", linewidth=0.8,
-               label=f"pass threshold = {threshold}")
+    colors = [
+        "tab:green"
+        if (not np.isnan(v) and v <= threshold)
+        else ("tab:orange" if (not np.isnan(v) and v <= 2 * threshold) else "tab:red")
+        for v in per_cell
+    ]
+    ax.bar(x, np.where(np.isnan(per_cell), 0, per_cell), color=colors, edgecolor="k", linewidth=0.3)
+    ax.axhline(
+        threshold, linestyle="--", color="k", linewidth=0.8, label=f"pass threshold = {threshold}"
+    )
     ax.set_xlabel("(Teff × log g × [M/H]) cell id")
     ax.set_ylabel("reliability error (mean across labels)")
     ax.set_title(title)
@@ -373,26 +404,40 @@ def _plot_reliability(
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     src = p.add_mutually_exclusive_group(required=True)
-    src.add_argument("--ensemble", type=Path,
-                     help="Ensemble directory holding member_seed{N}/ sub-dirs.")
-    src.add_argument("--checkpoint", type=Path,
-                     help="Single-member checkpoint .pt file. Used for the #135 "
-                          "β=0 canary — one member trained end-to-end.")
+    src.add_argument(
+        "--ensemble", type=Path, help="Ensemble directory holding member_seed{N}/ sub-dirs."
+    )
+    src.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="Single-member checkpoint .pt file. Used for the #135 "
+        "β=0 canary — one member trained end-to-end.",
+    )
     p.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
     p.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     p.add_argument("--batch-size", type=int, default=1024)
-    p.add_argument("--tag", type=str, default=None,
-                   help="Optional suffix for report filenames (e.g. 'beta0'). "
-                        "When set, outputs go to calibration_report_<tag>.json etc.")
-    p.add_argument("--apply-gp-smoothing", action=argparse.BooleanOptionalAction,
-                   default=True,
-                   help="Fit 3-D GP α over (Teff, log g, [M/H]) and replace the "
-                        "discrete shrunken per-cell α with continuous predictions. "
-                        "Default on — disable with --no-apply-gp-smoothing.")
-    p.add_argument("--apply-regime-b", action=argparse.BooleanOptionalAction,
-                   default=True,
-                   help="Compute regime-B exclusion envelope (|b|<5°, Teff>4750 K, "
-                        "log g<2.1) and report calibration with those stars excluded.")
+    p.add_argument(
+        "--tag",
+        type=str,
+        default=None,
+        help="Optional suffix for report filenames (e.g. 'beta0'). "
+        "When set, outputs go to calibration_report_<tag>.json etc.",
+    )
+    p.add_argument(
+        "--apply-gp-smoothing",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Fit 3-D GP α over (Teff, log g, [M/H]) and replace the "
+        "discrete shrunken per-cell α with continuous predictions. "
+        "Default on — disable with --no-apply-gp-smoothing.",
+    )
+    p.add_argument(
+        "--apply-regime-b",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Compute regime-B exclusion envelope (|b|<5°, Teff>4750 K, "
+        "log g<2.1) and report calibration with those stars excluded.",
+    )
     args = p.parse_args()
 
     args.report_dir.mkdir(parents=True, exist_ok=True)
@@ -439,15 +484,23 @@ def main() -> None:
     block_layout = CovarianceBlockLayout.from_dict(first_blob["block_layout"])
     _LOG.info(
         "tiers: t1=%d t2=%d t3=%d  block_sizes=%s",
-        len(tier1), len(tier2), len(tier3), block_layout.block_sizes,
+        len(tier1),
+        len(tier2),
+        len(tier3),
+        block_layout.block_sizes,
     )
 
     cfg = _build_cfg_for_val_loader(
-        parquet=args.parquet, pretrained_ckpt=pretrained_ckpt,
-        batch_size=args.batch_size, seed=split_seed,
+        parquet=args.parquet,
+        pretrained_ckpt=pretrained_ckpt,
+        batch_size=args.batch_size,
+        seed=split_seed,
     )
     _, val_loader, _, _scaler_from_loader = build_dataloaders(
-        cfg, layout, tiers, seed=split_seed,
+        cfg,
+        layout,
+        tiers,
+        seed=split_seed,
     )
     _LOG.info("val loader built, batches=%d", len(val_loader))
 
@@ -456,8 +509,10 @@ def main() -> None:
     # order in _collect_member_preds.
     val_source_ids = np.asarray(val_loader.dataset.source_id)
     import pandas as pd  # local import avoids top-level coupling.
+
     b_deg_lookup = pd.read_parquet(
-        args.parquet, columns=["source_id", "b_deg"],
+        args.parquet,
+        columns=["source_id", "b_deg"],
     ).drop_duplicates(subset="source_id", keep="first")
     b_deg_by_sid = dict(
         zip(b_deg_lookup["source_id"].to_numpy(), b_deg_lookup["b_deg"].to_numpy()),
@@ -468,7 +523,8 @@ def main() -> None:
     )
     _LOG.info(
         "joined b_deg for %d/%d val stars (%d NaN)",
-        int(np.isfinite(b_deg_val).sum()), b_deg_val.size,
+        int(np.isfinite(b_deg_val).sum()),
+        b_deg_val.size,
         int((~np.isfinite(b_deg_val)).sum()),
     )
 
@@ -514,7 +570,8 @@ def main() -> None:
     mu_bar_scaled, L_bar_scaled = _moment_match(mus, Ls)
     _LOG.info(
         "moment-matched ensemble (scaled): μ̄ shape=%s  L̄ shape=%s",
-        mu_bar_scaled.shape, L_bar_scaled.shape,
+        mu_bar_scaled.shape,
+        L_bar_scaled.shape,
     )
 
     # Un-scale μ̄, L̄, and y back to raw physical units so every downstream
@@ -528,7 +585,8 @@ def main() -> None:
     y_cpu = scaler_block.inverse_mean(y_cpu).astype(np.float32)
     _LOG.info(
         "un-scaled to raw units — Teff scale=%.1f [M/H] scale=%.2f",
-        float(scaler_block.scale[0]), float(scaler_block.scale[2]),
+        float(scaler_block.scale[0]),
+        float(scaler_block.scale[2]),
     )
 
     # Cell binning on APOGEE truth (Teff, logg, [M/H]) — block indices 0,1,2.
@@ -542,7 +600,10 @@ def main() -> None:
     # so its observed-σ is computed only on finite residuals.
     y_clean = np.where(np.isfinite(y_cpu), y_cpu, mu_bar)
     per_cell_raw, global_raw, var_z_raw = _reliability_per_cell(
-        mu_bar, L_bar, y_cpu, cell_ids,
+        mu_bar,
+        L_bar,
+        y_cpu,
+        cell_ids,
     )
     cov_raw = coverage_at_levels(mu_bar, L_bar, y_clean, levels=(0.68, 0.95, 0.99))
     _LOG.info("pre-calibration global reliability err=%.4f", global_raw)
@@ -552,8 +613,7 @@ def main() -> None:
     # to compare against the β=0.5 baseline (Teff=0.48, [M/H]=0.62).
     var_decomp_pre = _variance_decomposition(mu_bar, L_bar, y_cpu, cell_ids)
     _LOG.info(
-        "pre-cal variance decomp (Teff/logg/[M/H] between-cell Var(E[z|c])): "
-        "%.3f / %.3f / %.3f",
+        "pre-cal variance decomp (Teff/logg/[M/H] between-cell Var(E[z|c])): %.3f / %.3f / %.3f",
         var_decomp_pre["between_cell_var"][0],
         var_decomp_pre["between_cell_var"][1],
         var_decomp_pre["between_cell_var"][2],
@@ -580,7 +640,8 @@ def main() -> None:
     _LOG.info(
         "off-diagonal diagnostic: E[mahal²] full=%.2f diag=%.2f (target=%d)",
         offdiag_diag["full_Sigma_mean_mahal_sq"],
-        offdiag_diag["diag_only_mean_mahal_sq"], n_dims,
+        offdiag_diag["diag_only_mean_mahal_sq"],
+        n_dims,
     )
 
     need_cal = bool((np.nan_to_num(per_cell_raw, nan=0.0) > 0.15).any() or global_raw > 0.10)
@@ -595,16 +656,23 @@ def main() -> None:
     # L' = diag(α) L so Σ' = diag(α) Σ diag(α) — preserves PD and the joint
     # correlation structure, rescales marginal variances per (cell, label).
     shrunk = shrunken_per_cell_per_label_scale(
-        mu_bar, L_bar, y_clean, cell_ids, tau=50.0, min_cell_stars=8,
+        mu_bar,
+        L_bar,
+        y_clean,
+        cell_ids,
+        tau=50.0,
+        min_cell_stars=8,
     )
     per_star_alpha = shrunk["per_star_alpha"]  # (B, n)
     L_calibrated = (per_star_alpha[:, :, None] * L_bar).astype(np.float32)
 
     per_cell_post, global_post, var_z_post = _reliability_per_cell(
-        mu_bar, L_calibrated, y_cpu, cell_ids,
+        mu_bar,
+        L_calibrated,
+        y_cpu,
+        cell_ids,
     )
-    cov_post = coverage_at_levels(mu_bar, L_calibrated, y_clean,
-                                  levels=(0.68, 0.95, 0.99))
+    cov_post = coverage_at_levels(mu_bar, L_calibrated, y_clean, levels=(0.68, 0.95, 0.99))
     _LOG.info("post-shrinkage global reliability err=%.4f", global_post)
 
     # Joint-covariance preservation check: diag(α) Σ diag(α) is still PD and
@@ -621,7 +689,8 @@ def main() -> None:
     _LOG.info(
         "joint preservation: pre E[mahal²]=%.2f post=%.2f (target=%d)",
         joint_preservation["pre_shrink_mean_mahal_sq"],
-        joint_preservation["post_shrink_mean_mahal_sq"], n_dims,
+        joint_preservation["post_shrink_mean_mahal_sq"],
+        n_dims,
     )
 
     # Adjacent-cell smoothness diagnostic: max α-ratio between cells that
@@ -629,7 +698,8 @@ def main() -> None:
     # grid. Large ratios ⇒ hard cell edges will produce visible σ
     # discontinuities at cell boundaries — flag for v2 GP smoothing.
     adjacency_stats = _adjacent_cell_smoothness(
-        shrunk["scales"], cell_def["n_bins"],
+        shrunk["scales"],
+        cell_def["n_bins"],
     )
 
     # --- GP α-smoothing (regime A remediation) ---
@@ -641,23 +711,37 @@ def main() -> None:
     if args.apply_gp_smoothing:
         _LOG.info("fitting 3-D GP α-smoothing over (Teff, log g, [M/H])")
         gp_out = gp_smoothed_per_cell_per_label_scale(
-            mu_bar, L_bar, y_clean, cell_features, cell_ids,
-            min_cell_stars_for_training=32, min_cell_stars=8,
+            mu_bar,
+            L_bar,
+            y_clean,
+            cell_features,
+            cell_ids,
+            min_cell_stars_for_training=32,
+            min_cell_stars=8,
         )
         alpha_gp = gp_out["per_star_alpha"]  # (B, n)
         L_gp = (alpha_gp[:, :, None] * L_bar).astype(np.float32)
         per_cell_gp, global_gp, var_z_gp = _reliability_per_cell(
-            mu_bar, L_gp, y_cpu, cell_ids,
+            mu_bar,
+            L_gp,
+            y_cpu,
+            cell_ids,
         )
         cov_gp = coverage_at_levels(
-            mu_bar, L_gp, y_clean, levels=(0.68, 0.95, 0.99),
+            mu_bar,
+            L_gp,
+            y_clean,
+            levels=(0.68, 0.95, 0.99),
         )
         gp_adjacency = _adjacent_cell_smoothness(
-            gp_out["scales"], cell_def["n_bins"],
+            gp_out["scales"],
+            cell_def["n_bins"],
         )
         _LOG.info(
             "GP calibration: global err=%.4f  cov95=%.3f  max α-ratio=%.3f",
-            global_gp, cov_gp["joint"][0.95], gp_adjacency["max_ratio"],
+            global_gp,
+            cov_gp["joint"][0.95],
+            gp_adjacency["max_ratio"],
         )
         gp_stats = {
             "global_alpha": [float(x) for x in gp_out["global_alpha"]],
@@ -667,8 +751,7 @@ def main() -> None:
             "alpha_per_cell_per_label": {
                 f"{c}_{j}": float(v) for (c, j), v in gp_out["scales"].items()
             },
-            "per_label_var_z": [float(x) if not np.isnan(x) else None
-                                for x in var_z_gp],
+            "per_label_var_z": [float(x) if not np.isnan(x) else None for x in var_z_gp],
         }
 
     # --- Regime B exclusion envelope (per-star tier1 release flag) ---
@@ -696,17 +779,25 @@ def main() -> None:
             L_use = L_gp if L_gp is not None else L_calibrated
             idx = np.where(tier1_release)[0]
             per_cell_tier1, global_tier1, var_z_tier1 = _reliability_per_cell(
-                mu_bar[idx], L_use[idx], y_cpu[idx], cell_ids[idx],
+                mu_bar[idx],
+                L_use[idx],
+                y_cpu[idx],
+                cell_ids[idx],
             )
             cov_tier1 = coverage_at_levels(
-                mu_bar[idx], L_use[idx], y_clean[idx], levels=(0.68, 0.95, 0.99),
+                mu_bar[idx],
+                L_use[idx],
+                y_clean[idx],
+                levels=(0.68, 0.95, 0.99),
             )
             halt_cells_tier1 = [
-                int(c) for c, e in zip(np.unique(cell_ids[idx]), per_cell_tier1)
+                int(c)
+                for c, e in zip(np.unique(cell_ids[idx]), per_cell_tier1)
                 if (not np.isnan(e) and e > 0.30)
             ]
             cells_over_15_tier1 = [
-                int(c) for c, e in zip(np.unique(cell_ids[idx]), per_cell_tier1)
+                int(c)
+                for c, e in zip(np.unique(cell_ids[idx]), per_cell_tier1)
                 if (not np.isnan(e) and e > 0.15)
             ]
         else:
@@ -731,14 +822,10 @@ def main() -> None:
                 "per_cell_reliability_err": [
                     float(x) if not np.isnan(x) else None for x in per_cell_tier1
                 ],
-                "per_label_var_z": [
-                    float(x) if not np.isnan(x) else None for x in var_z_tier1
-                ],
-                "coverage_joint": {str(k): float(v)
-                                   for k, v in cov_tier1["joint"].items()},
+                "per_label_var_z": [float(x) if not np.isnan(x) else None for x in var_z_tier1],
+                "coverage_joint": {str(k): float(v) for k, v in cov_tier1["joint"].items()},
                 "coverage_per_label": {
-                    str(k): [float(x) for x in v]
-                    for k, v in cov_tier1["per_label"].items()
+                    str(k): [float(x) for x in v] for k, v in cov_tier1["per_label"].items()
                 },
                 "halt_cells_over_30pct": halt_cells_tier1,
                 "cells_over_15pct": cells_over_15_tier1,
@@ -746,51 +833,56 @@ def main() -> None:
         }
         _LOG.info(
             "regime B envelope: excluded=%d/%d (%.3f%%)  captures cells{34,49}: %d/%d",
-            envelope_stats["n_excluded"], tier1_release.size,
+            envelope_stats["n_excluded"],
+            tier1_release.size,
             100.0 * envelope_stats["n_excluded"] / tier1_release.size,
-            envelope_excludes_halt, halt_in_val,
+            envelope_excludes_halt,
+            halt_in_val,
         )
     _LOG.info(
         "adjacent-cell α-ratio: max=%.3f  median=%.3f  p90=%.3f over %d pairs",
-        adjacency_stats["max_ratio"], adjacency_stats["median_ratio"],
-        adjacency_stats["p90_ratio"], adjacency_stats["n_pairs"],
+        adjacency_stats["max_ratio"],
+        adjacency_stats["median_ratio"],
+        adjacency_stats["p90_ratio"],
+        adjacency_stats["n_pairs"],
     )
 
     # Conformal non-conformity scores (on calibrated L if applied).
     conf_scores = conformal_nonconformity_scores(mu_bar, L_calibrated, y_clean)
-    conf_radii = {
-        float(lvl): float(np.quantile(conf_scores, lvl))
-        for lvl in (0.68, 0.95, 0.99)
-    }
+    conf_radii = {float(lvl): float(np.quantile(conf_scores, lvl)) for lvl in (0.68, 0.95, 0.99)}
 
     tag_suffix = f"_{args.tag}" if args.tag else ""
     _plot_reliability(
-        per_cell_raw, args.report_dir / f"reliability_precal{tag_suffix}.png",
+        per_cell_raw,
+        args.report_dir / f"reliability_precal{tag_suffix}.png",
         title=f"Reliability error per cell — pre-calibration{tag_suffix}",
     )
     _plot_reliability(
-        per_cell_post, args.report_dir / f"reliability_postcal{tag_suffix}.png",
+        per_cell_post,
+        args.report_dir / f"reliability_postcal{tag_suffix}.png",
         title=f"Reliability error per cell — post shrunken α_{{c,l}}{tag_suffix}",
     )
     if per_cell_gp is not None:
         _plot_reliability(
-            per_cell_gp, args.report_dir / f"reliability_gp{tag_suffix}.png",
+            per_cell_gp,
+            args.report_dir / f"reliability_gp{tag_suffix}.png",
             title=f"Reliability error per cell — post GP α-smoothing{tag_suffix}",
         )
 
     per_cell_post_clean = np.nan_to_num(per_cell_post, nan=0.0)
     cells_unique = np.unique(cell_ids)
-    halt_cells = [int(c) for c, e in zip(cells_unique, per_cell_post)
-                  if (not np.isnan(e) and e > 0.30)]
-    cells_over_15 = [int(c) for c, e in zip(cells_unique, per_cell_post)
-                     if (not np.isnan(e) and e > 0.15)]
+    halt_cells = [
+        int(c) for c, e in zip(cells_unique, per_cell_post) if (not np.isnan(e) and e > 0.30)
+    ]
+    cells_over_15 = [
+        int(c) for c, e in zip(cells_unique, per_cell_post) if (not np.isnan(e) and e > 0.15)
+    ]
 
     # Pass-gate decision (DESIGN + phase directive).
     pass_global = bool(global_post <= 0.10)
     pass_per_cell = bool((per_cell_post_clean <= 0.15).all())
     cov_deltas = {
-        float(lvl): float(cov_post["joint"][float(lvl)] - lvl)
-        for lvl in (0.68, 0.95, 0.99)
+        float(lvl): float(cov_post["joint"][float(lvl)] - lvl) for lvl in (0.68, 0.95, 0.99)
     }
     pass_coverage = all(abs(d) <= 0.05 for d in cov_deltas.values())
 
@@ -827,7 +919,7 @@ def main() -> None:
         release_gate = {
             "applied": True,
             "spec": "global≤0.10 AND all cells≤0.15 AND |cov-nominal|≤0.05 "
-                    "AND GP α + regime B applied",
+            "AND GP α + regime B applied",
             "pass_global": bool(pass_rel_global),
             "pass_per_cell": bool(pass_rel_cells),
             "pass_coverage": bool(pass_rel_cov),
@@ -839,7 +931,9 @@ def main() -> None:
         }
         _LOG.info(
             "release gate: global=%s cells=%s cov=%s → PASS=%s",
-            pass_rel_global, pass_rel_cells, pass_rel_cov,
+            pass_rel_global,
+            pass_rel_cells,
+            pass_rel_cov,
             release_gate["pass"],
         )
 
@@ -854,12 +948,15 @@ def main() -> None:
         "reliability_metric": "mean_j |Var((y-mu)/sigma_diag)_j - 1|",
         "off_diagonal_diagnostic": offdiag_diag,
         "variance_decomposition": {
-            "total_Ez2": [float(x) if not np.isnan(x) else None
-                          for x in var_decomp_pre["total_Ez2"]],
-            "within_cell_var": [float(x) if not np.isnan(x) else None
-                                for x in var_decomp_pre["within_cell_var"]],
-            "between_cell_var": [float(x) if not np.isnan(x) else None
-                                 for x in var_decomp_pre["between_cell_var"]],
+            "total_Ez2": [
+                float(x) if not np.isnan(x) else None for x in var_decomp_pre["total_Ez2"]
+            ],
+            "within_cell_var": [
+                float(x) if not np.isnan(x) else None for x in var_decomp_pre["within_cell_var"]
+            ],
+            "between_cell_var": [
+                float(x) if not np.isnan(x) else None for x in var_decomp_pre["between_cell_var"]
+            ],
             "notes": (
                 "E[z²] = E[Var(z|cell)] + Var(E[z|cell]). Between-cell var is"
                 " the per-cell μ-bias signal that β=0.5 can absorb by"
@@ -868,22 +965,18 @@ def main() -> None:
         },
         "pre_calibration": {
             "global_reliability_err": global_raw,
-            "per_cell_reliability_err": [float(x) if not np.isnan(x) else None
-                                         for x in per_cell_raw],
-            "per_label_var_z": [float(x) if not np.isnan(x) else None
-                                for x in var_z_raw],
-            "coverage_joint": {str(k): float(v)
-                               for k, v in cov_raw["joint"].items()},
+            "per_cell_reliability_err": [
+                float(x) if not np.isnan(x) else None for x in per_cell_raw
+            ],
+            "per_label_var_z": [float(x) if not np.isnan(x) else None for x in var_z_raw],
+            "coverage_joint": {str(k): float(v) for k, v in cov_raw["joint"].items()},
             "coverage_per_label": {
-                str(k): [float(x) for x in v]
-                for k, v in cov_raw["per_label"].items()
+                str(k): [float(x) for x in v] for k, v in cov_raw["per_label"].items()
             },
         },
         "calibration_method": "shrunken_per_cell_per_label_alpha",
         "needed_calibration": need_cal,
-        "temperature_per_cell_comparator": {
-            str(k): float(v) for k, v in temp_scale_map.items()
-        },
+        "temperature_per_cell_comparator": {str(k): float(v) for k, v in temp_scale_map.items()},
         "shrinkage": {
             "tau": shrunk["tau"],
             "global_alpha": [float(x) for x in shrunk["global_alpha"]],
@@ -900,31 +993,33 @@ def main() -> None:
                 "global_reliability_err": float(global_gp) if global_gp is not None else None,
                 "per_cell_reliability_err": (
                     [float(x) if not np.isnan(x) else None for x in per_cell_gp]
-                    if per_cell_gp is not None else None
+                    if per_cell_gp is not None
+                    else None
                 ),
                 "coverage_joint": (
                     {str(k): float(v) for k, v in cov_gp["joint"].items()}
-                    if cov_gp is not None else None
+                    if cov_gp is not None
+                    else None
                 ),
                 "coverage_per_label": (
-                    {str(k): [float(x) for x in v]
-                     for k, v in cov_gp["per_label"].items()}
-                    if cov_gp is not None else None
+                    {str(k): [float(x) for x in v] for k, v in cov_gp["per_label"].items()}
+                    if cov_gp is not None
+                    else None
                 ),
             }
-            if args.apply_gp_smoothing else None
+            if args.apply_gp_smoothing
+            else None
         ),
         "regime_b_envelope": envelope_stats if args.apply_regime_b else None,
         "post_calibration": {
             "global_reliability_err": float(global_post),
-            "per_cell_reliability_err": [float(x) if not np.isnan(x) else None
-                                         for x in per_cell_post],
-            "per_label_var_z": [float(x) if not np.isnan(x) else None
-                                for x in var_z_post],
+            "per_cell_reliability_err": [
+                float(x) if not np.isnan(x) else None for x in per_cell_post
+            ],
+            "per_label_var_z": [float(x) if not np.isnan(x) else None for x in var_z_post],
             "coverage_joint": {str(k): float(v) for k, v in cov_post["joint"].items()},
             "coverage_per_label": {
-                str(k): [float(x) for x in v]
-                for k, v in cov_post["per_label"].items()
+                str(k): [float(x) for x in v] for k, v in cov_post["per_label"].items()
             },
             "coverage_deltas_vs_nominal": {str(k): float(v) for k, v in cov_deltas.items()},
         },
@@ -950,8 +1045,12 @@ def main() -> None:
     _LOG.info("wrote %s", report_path)
     _LOG.info(
         "gate: global=%s cells=%s cov=%s halt=%d escalate=%s smooth_v2=%s",
-        pass_global, pass_per_cell, pass_coverage,
-        len(halt_cells), escalate, smooth_flag_v2,
+        pass_global,
+        pass_per_cell,
+        pass_coverage,
+        len(halt_cells),
+        escalate,
+        smooth_flag_v2,
     )
 
 

@@ -272,9 +272,7 @@ def _adql_for_service(service_flavor: str) -> tuple[str, str]:
         return TMASS_ADQL_UPLOAD_ESA, ALLWISE_ADQL_UPLOAD_ESA
     if sf in {"aip", "gaia_aip"}:
         return TMASS_ADQL_UPLOAD_AIP, ALLWISE_ADQL_UPLOAD_AIP
-    raise ValueError(
-        f"unknown service_flavor {service_flavor!r}; expected 'esa' or 'aip'"
-    )
+    raise ValueError(f"unknown service_flavor {service_flavor!r}; expected 'esa' or 'aip'")
 
 
 # -----------------------------------------------------------------------------

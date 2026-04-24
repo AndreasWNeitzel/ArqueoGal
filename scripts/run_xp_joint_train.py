@@ -88,10 +88,14 @@ DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/run_a"
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "nogit"
 
@@ -102,8 +106,14 @@ def _cfg_hash(cfg: TrainingConfig) -> str:
 
 
 def build_joint_config(
-    *, parquet: Path, output_dir: Path, epochs: int, batch_size: int,
-    queue_size: int, barlow_weight: float, barlow_lam: float,
+    *,
+    parquet: Path,
+    output_dir: Path,
+    epochs: int,
+    batch_size: int,
+    queue_size: int,
+    barlow_weight: float,
+    barlow_lam: float,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -160,20 +170,26 @@ def main() -> None:
     args.report_dir.mkdir(parents=True, exist_ok=True)
 
     tmp_cfg = build_joint_config(
-        parquet=args.parquet, output_dir=args.model_dir / "pending",
-        epochs=args.epochs, batch_size=args.batch_size,
+        parquet=args.parquet,
+        output_dir=args.model_dir / "pending",
+        epochs=args.epochs,
+        batch_size=args.batch_size,
         queue_size=args.queue_size,
-        barlow_weight=args.barlow_weight, barlow_lam=args.barlow_lam,
+        barlow_weight=args.barlow_weight,
+        barlow_lam=args.barlow_lam,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
     run_dir = args.model_dir / f"{date_tag}_{sha7}_{cfg_hash}_xp_joint"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     cfg = build_joint_config(
-        parquet=args.parquet, output_dir=run_dir,
-        epochs=args.epochs, batch_size=args.batch_size,
+        parquet=args.parquet,
+        output_dir=run_dir,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
         queue_size=args.queue_size,
-        barlow_weight=args.barlow_weight, barlow_lam=args.barlow_lam,
+        barlow_weight=args.barlow_weight,
+        barlow_lam=args.barlow_lam,
     )
 
     # XP-only 110-D layout. 108-D effective after use_c0_scalars=False zeroes c0.
@@ -195,8 +211,13 @@ def main() -> None:
         json.dump(payload, f, indent=2, default=str)
     _LOG.info(
         "run_dir=%s cfg_hash=%s sha=%s input_dim=%d labels=%s queue=%d barlow=%s",
-        run_dir, cfg_hash, sha7, layout.input_dim, tiers.all_labels,
-        args.queue_size, args.barlow_weight,
+        run_dir,
+        cfg_hash,
+        sha7,
+        layout.input_dim,
+        tiers.all_labels,
+        args.queue_size,
+        args.barlow_weight,
     )
 
     if args.dry_run:
@@ -209,8 +230,11 @@ def main() -> None:
 
     best_path = save_checkpoint(
         run_dir / f"{cfg.output_prefix}_seed{args.seed}_best.pt",
-        model=result["model"], log_temp=result["log_temp"],
-        cfg=cfg, layout=layout, tiers=tiers,
+        model=result["model"],
+        log_temp=result["log_temp"],
+        cfg=cfg,
+        layout=layout,
+        tiers=tiers,
         label_scaler=result["label_scaler"],
         seed=args.seed,
         training_metrics={
@@ -234,11 +258,15 @@ def main() -> None:
                 "history": result["history"],
                 "cadence_checkpoints": [str(p) for p in result["cadence_checkpoints"]],
             },
-            f, indent=2, default=str,
+            f,
+            indent=2,
+            default=str,
         )
     _LOG.info(
         "done: best_val_loss=%.4f at epoch %d, saved to %s",
-        result["best_val_loss"], result["best_epoch"], best_path,
+        result["best_val_loss"],
+        result["best_epoch"],
+        best_path,
     )
 
 

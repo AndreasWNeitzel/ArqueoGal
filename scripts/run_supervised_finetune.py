@@ -42,6 +42,7 @@ def _tiers_for_label_set(label_set: str) -> LabelTiers:
         return LabelTiers.five_label()
     return LabelTiers()
 
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG = logging.getLogger("run_supervised_finetune")
 
@@ -53,10 +54,14 @@ DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/run_a"
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "nogit"
 
@@ -67,8 +72,12 @@ def _cfg_hash(cfg: TrainingConfig) -> str:
 
 
 def build_finetune_config(
-    *, parquet: Path, output_dir: Path, pretrained_ckpt: Path,
-    epochs: int, batch_size: int,
+    *,
+    parquet: Path,
+    output_dir: Path,
+    pretrained_ckpt: Path,
+    epochs: int,
+    batch_size: int,
     beta: float = 0.5,
     grad_norm_abort_threshold: float = float("inf"),
     output_prefix: str = "xp_abundances_main_finetune",
@@ -94,8 +103,10 @@ def build_finetune_config(
         checkpoint_every_n_epochs=1,
         output_prefix=output_prefix,
         loss_weights=LossWeights(
-            supcon=0.0, beta_nll=1.0,
-            beta=beta, supcon_sigma=0.10,
+            supcon=0.0,
+            beta_nll=1.0,
+            beta=beta,
+            supcon_sigma=0.10,
             supcon_label_n_first=None,
         ),
         temperature_init=0.10,
@@ -114,20 +125,26 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
-        "--beta", type=float, default=0.5,
+        "--beta",
+        type=float,
+        default=0.5,
         help="Seitzer β in β-NLL. 0.5 is the production default; 0.0 is the "
-             "pure-Gaussian-NLL canary for the #135 escalation.",
+        "pure-Gaussian-NLL canary for the #135 escalation.",
     )
     parser.add_argument(
-        "--grad-norm-abort", type=float, default=None,
+        "--grad-norm-abort",
+        type=float,
+        default=None,
         help="Abort training if any batch exceeds this pre-clip grad norm. "
-             "Defaults to 500.0 when --beta=0 (canary), inf otherwise.",
+        "Defaults to 500.0 when --beta=0 (canary), inf otherwise.",
     )
     parser.add_argument(
-        "--label-set", choices=("21", "5"), default="21",
+        "--label-set",
+        choices=("21", "5"),
+        default="21",
         help="21 = default LabelTiers (production, 4-block Cholesky). "
-             "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} "
-             "with a single 5×5 full Cholesky block (#143).",
+        "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} "
+        "with a single 5×5 full Cholesky block (#143).",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -153,10 +170,13 @@ def main() -> None:
     args.report_dir.mkdir(parents=True, exist_ok=True)
 
     tmp_cfg = build_finetune_config(
-        parquet=args.parquet, output_dir=args.model_dir / "pending",
+        parquet=args.parquet,
+        output_dir=args.model_dir / "pending",
         pretrained_ckpt=args.pretrained,
-        epochs=args.epochs, batch_size=args.batch_size,
-        beta=args.beta, grad_norm_abort_threshold=grad_abort,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        beta=args.beta,
+        grad_norm_abort_threshold=grad_abort,
         output_prefix=output_prefix,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
@@ -168,10 +188,13 @@ def main() -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
 
     cfg = build_finetune_config(
-        parquet=args.parquet, output_dir=run_dir,
+        parquet=args.parquet,
+        output_dir=run_dir,
         pretrained_ckpt=args.pretrained,
-        epochs=args.epochs, batch_size=args.batch_size,
-        beta=args.beta, grad_norm_abort_threshold=grad_abort,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        beta=args.beta,
+        grad_norm_abort_threshold=grad_abort,
         output_prefix=output_prefix,
     )
     layout = FeatureLayout()
@@ -198,8 +221,11 @@ def main() -> None:
 
     best_path = save_checkpoint(
         run_dir / f"{cfg.output_prefix}_seed{args.seed}_best.pt",
-        model=result["model"], log_temp=result["log_temp"],
-        cfg=cfg, layout=layout, tiers=tiers,
+        model=result["model"],
+        log_temp=result["log_temp"],
+        cfg=cfg,
+        layout=layout,
+        tiers=tiers,
         label_scaler=result["label_scaler"],
         seed=args.seed,
         training_metrics={
@@ -224,11 +250,15 @@ def main() -> None:
                 "history": result["history"],
                 "cadence_checkpoints": [str(p) for p in result["cadence_checkpoints"]],
             },
-            f, indent=2, default=str,
+            f,
+            indent=2,
+            default=str,
         )
     _LOG.info(
         "done: best_val_loss=%.4f at epoch %d, saved to %s",
-        result["best_val_loss"], result["best_epoch"], best_path,
+        result["best_val_loss"],
+        result["best_epoch"],
+        best_path,
     )
 
 

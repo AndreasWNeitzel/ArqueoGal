@@ -40,9 +40,7 @@ def test_galactic_to_xyz_north_pole() -> None:
 
 def test_galactic_to_xyz_shape() -> None:
     n = 7
-    xyz = galactic_to_xyz(
-        np.zeros(n), np.linspace(-90, 90, n), np.full(n, 10.0)
-    )
+    xyz = galactic_to_xyz(np.zeros(n), np.linspace(-90, 90, n), np.full(n, 10.0))
     assert xyz.shape == (n, 3)
 
 
@@ -72,7 +70,11 @@ def test_neighborhood_constant_field_recovers_the_constant() -> None:
     data = _make_linear_stars(n, spacing_pc=5.0, av_fn=lambda _i: 0.5)
 
     feats = neighborhood_av_features(
-        data["ra"], data["dec"], data["distance"], data["av"], radius_pc=30.0,
+        data["ra"],
+        data["dec"],
+        data["distance"],
+        data["av"],
+        radius_pc=30.0,
     )
 
     # Ends have fewer neighbours; pick a star well inside the line.
@@ -89,8 +91,12 @@ def test_neighborhood_count_includes_only_points_inside_radius() -> None:
     data = _make_linear_stars(n, spacing_pc=10.0, av_fn=lambda i: float(i))
 
     feats = neighborhood_av_features(
-        data["ra"], data["dec"], data["distance"], data["av"],
-        radius_pc=25.0, min_neighbors=1,
+        data["ra"],
+        data["dec"],
+        data["distance"],
+        data["av"],
+        radius_pc=25.0,
+        min_neighbors=1,
     )
     # Interior star at index 10: neighbours at 8,9,11,12 → count 4.
     assert feats.n_neighbors[10] == 4
@@ -107,7 +113,12 @@ def test_neighborhood_excludes_self_by_default() -> None:
     av = np.array([0.0, 1.0, 100.0, 1.0, 0.0])
 
     feats = neighborhood_av_features(
-        ra, dec, distance, av, radius_pc=50.0, min_neighbors=1,
+        ra,
+        dec,
+        distance,
+        av,
+        radius_pc=50.0,
+        min_neighbors=1,
     )
     assert feats.n_neighbors[2] == 4
     assert feats.av_nbhd_median[2] == pytest.approx(0.5)
@@ -121,10 +132,22 @@ def test_neighborhood_include_self_changes_result() -> None:
     av = np.array([0.0, 10.0, 0.0])
 
     excl = neighborhood_av_features(
-        ra, dec, distance, av, radius_pc=15.0, min_neighbors=1, include_self=False,
+        ra,
+        dec,
+        distance,
+        av,
+        radius_pc=15.0,
+        min_neighbors=1,
+        include_self=False,
     )
     incl = neighborhood_av_features(
-        ra, dec, distance, av, radius_pc=15.0, min_neighbors=1, include_self=True,
+        ra,
+        dec,
+        distance,
+        av,
+        radius_pc=15.0,
+        min_neighbors=1,
+        include_self=True,
     )
     # Middle star: neighbours excl self = [0, 0] → median 0. Incl self = [0, 10, 0] → median 0.
     # Check count differs: excl=2, incl=3.
@@ -141,8 +164,12 @@ def test_neighborhood_below_min_neighbors_gives_nan() -> None:
     data = _make_linear_stars(n, spacing_pc=50.0, av_fn=lambda i: float(i))
 
     feats = neighborhood_av_features(
-        data["ra"], data["dec"], data["distance"], data["av"],
-        radius_pc=10.0, min_neighbors=5,  # radius < spacing, no neighbours at all
+        data["ra"],
+        data["dec"],
+        data["distance"],
+        data["av"],
+        radius_pc=10.0,
+        min_neighbors=5,  # radius < spacing, no neighbours at all
     )
     assert np.all(np.isnan(feats.av_nbhd_median))
     assert np.all(np.isnan(feats.av_nbhd_std))
@@ -156,7 +183,12 @@ def test_neighborhood_nan_distance_excluded_from_tree() -> None:
     av = np.array([0.5, 0.9, 0.5])
 
     feats = neighborhood_av_features(
-        ra, dec, distance, av, radius_pc=150.0, min_neighbors=1,
+        ra,
+        dec,
+        distance,
+        av,
+        radius_pc=150.0,
+        min_neighbors=1,
     )
     assert np.isnan(feats.av_nbhd_median[1])
     assert feats.n_neighbors[1] == 0
@@ -170,7 +202,12 @@ def test_neighborhood_nan_av_still_gets_neighbourhood_stat() -> None:
     av = np.array([0.5, 0.5, np.nan, 0.5, 0.5])
 
     feats = neighborhood_av_features(
-        ra, dec, distance, av, radius_pc=50.0, min_neighbors=1,
+        ra,
+        dec,
+        distance,
+        av,
+        radius_pc=50.0,
+        min_neighbors=1,
     )
     assert feats.av_nbhd_median[2] == pytest.approx(0.5)
     assert feats.n_neighbors[2] == 4  # 4 finite neighbours
@@ -184,7 +221,13 @@ def test_neighborhood_nan_av_neighbours_are_dropped_from_median() -> None:
     av = np.array([1.0, np.nan, 3.0, 5.0])
 
     feats = neighborhood_av_features(
-        ra, dec, distance, av, radius_pc=50.0, min_neighbors=1, include_self=False,
+        ra,
+        dec,
+        distance,
+        av,
+        radius_pc=50.0,
+        min_neighbors=1,
+        include_self=False,
     )
     # Star at index 0: neighbours [1, 2, 3] → AVs [nan, 3, 5] → dropping nan → median 4.
     assert feats.n_neighbors[0] == 2
@@ -197,14 +240,20 @@ def test_neighborhood_nan_av_neighbours_are_dropped_from_median() -> None:
 def test_neighborhood_rejects_mismatched_lengths() -> None:
     with pytest.raises(ValueError, match="mismatched lengths"):
         neighborhood_av_features(
-            np.zeros(3), np.zeros(4), np.zeros(3), np.zeros(3),
+            np.zeros(3),
+            np.zeros(4),
+            np.zeros(3),
+            np.zeros(3),
         )
 
 
 def test_neighborhood_rejects_nonpositive_radius() -> None:
     with pytest.raises(ValueError, match="radius_pc"):
         neighborhood_av_features(
-            np.zeros(2), np.zeros(2), np.ones(2), np.zeros(2),
+            np.zeros(2),
+            np.zeros(2),
+            np.ones(2),
+            np.zeros(2),
             radius_pc=0.0,
         )
 
@@ -212,7 +261,10 @@ def test_neighborhood_rejects_nonpositive_radius() -> None:
 def test_neighborhood_rejects_zero_min_neighbors() -> None:
     with pytest.raises(ValueError, match="min_neighbors"):
         neighborhood_av_features(
-            np.zeros(2), np.zeros(2), np.ones(2), np.zeros(2),
+            np.zeros(2),
+            np.zeros(2),
+            np.ones(2),
+            np.zeros(2),
             min_neighbors=0,
         )
 
@@ -224,7 +276,11 @@ def test_neighborhood_returns_float32_and_int32() -> None:
     n = 20
     data = _make_linear_stars(n, spacing_pc=5.0, av_fn=lambda i: 0.1 * i)
     feats = neighborhood_av_features(
-        data["ra"], data["dec"], data["distance"], data["av"], radius_pc=30.0,
+        data["ra"],
+        data["dec"],
+        data["distance"],
+        data["av"],
+        radius_pc=30.0,
     )
     assert feats.av_nbhd_median.dtype == np.float32
     assert feats.av_nbhd_std.dtype == np.float32
@@ -239,7 +295,11 @@ def test_features_to_frame_without_source_ids() -> None:
     n = 5
     data = _make_linear_stars(n, spacing_pc=5.0, av_fn=lambda _i: 1.0)
     feats = neighborhood_av_features(
-        data["ra"], data["dec"], data["distance"], data["av"], radius_pc=30.0,
+        data["ra"],
+        data["dec"],
+        data["distance"],
+        data["av"],
+        radius_pc=30.0,
     )
     df = feats.to_frame()
     assert list(df.columns) == ["av_nbhd_median", "av_nbhd_std", "n_neighbors"]
@@ -276,7 +336,10 @@ def test_min_neighbors_default_is_sensible() -> None:
 
 def test_neighborhood_empty_input() -> None:
     feats = neighborhood_av_features(
-        np.array([]), np.array([]), np.array([]), np.array([]),
+        np.array([]),
+        np.array([]),
+        np.array([]),
+        np.array([]),
     )
     assert feats.av_nbhd_median.shape == (0,)
     assert feats.av_nbhd_std.shape == (0,)
@@ -286,7 +349,10 @@ def test_neighborhood_empty_input() -> None:
 def test_neighborhood_all_nan_distances() -> None:
     n = 5
     feats = neighborhood_av_features(
-        np.zeros(n), np.zeros(n), np.full(n, np.nan), np.zeros(n),
+        np.zeros(n),
+        np.zeros(n),
+        np.full(n, np.nan),
+        np.zeros(n),
     )
     assert np.all(np.isnan(feats.av_nbhd_median))
     assert np.all(feats.n_neighbors == 0)
@@ -306,16 +372,18 @@ def test_neighborhood_isolated_cluster() -> None:
     xyz_a = offsets_a + np.array([100.0, 0.0, 0.0])
     xyz_b = offsets_b + np.array([600.0, 0.0, 0.0])
     xyz_all = np.vstack([xyz_a, xyz_b])
-    av_all = np.concatenate(
-        [rng.normal(0.3, 0.01, n_each), rng.normal(1.5, 0.01, n_each)]
-    )
+    av_all = np.concatenate([rng.normal(0.3, 0.01, n_each), rng.normal(1.5, 0.01, n_each)])
 
     ra = np.rad2deg(np.arctan2(xyz_all[:, 1], xyz_all[:, 0]))
     distance = np.linalg.norm(xyz_all, axis=1)
     dec = np.rad2deg(np.arcsin(xyz_all[:, 2] / distance))
 
     feats = neighborhood_av_features(
-        ra, dec, distance, av_all, radius_pc=30.0,
+        ra,
+        dec,
+        distance,
+        av_all,
+        radius_pc=30.0,
     )
     # Cluster A median should hover near 0.3, cluster B near 1.5.
     a_median = np.nanmedian(feats.av_nbhd_median[:n_each])
@@ -331,14 +399,20 @@ def test_neighborhood_isolated_cluster() -> None:
 
 def test_neighborhood_accepts_pandas_series() -> None:
     n = 10
-    df = pd.DataFrame({
-        "ra": np.zeros(n),
-        "dec": np.zeros(n),
-        "distance": np.arange(1, n + 1, dtype=float) * 10.0,
-        "av": np.full(n, 0.5),
-    })
+    df = pd.DataFrame(
+        {
+            "ra": np.zeros(n),
+            "dec": np.zeros(n),
+            "distance": np.arange(1, n + 1, dtype=float) * 10.0,
+            "av": np.full(n, 0.5),
+        }
+    )
     feats = neighborhood_av_features(
-        df["ra"], df["dec"], df["distance"], df["av"], radius_pc=50.0,
+        df["ra"],
+        df["dec"],
+        df["distance"],
+        df["av"],
+        radius_pc=50.0,
     )
     assert feats.av_nbhd_median.shape == (n,)
 
@@ -371,7 +445,9 @@ def test_compose_av_routes_by_distance() -> None:
     distance_pc = np.array([500.0, 2000.0, 5000.0])  # near, mid, far
 
     out = compose_av(
-        ra, dec, distance_pc,
+        ra,
+        dec,
+        distance_pc,
         near_query=_constant_query(0.3),
         mid_query=_constant_query(0.9),
         far_query=_constant_query(0.1),  # E(B−V)=0.1 → A_V=0.2742
@@ -390,7 +466,9 @@ def test_compose_av_boundary_inclusivity() -> None:
     distance_pc = np.array([1250.0, 3000.0])
 
     out = compose_av(
-        ra, dec, distance_pc,
+        ra,
+        dec,
+        distance_pc,
         near_query=_constant_query(0.3),
         mid_query=_constant_query(0.9),
         far_query=_constant_query(0.2),
@@ -406,7 +484,9 @@ def test_compose_av_nan_distance_gets_source_minus_one() -> None:
     dec = np.array([0.0, 0.0])
     distance_pc = np.array([500.0, np.nan])
     out = compose_av(
-        ra, dec, distance_pc,
+        ra,
+        dec,
+        distance_pc,
         near_query=_constant_query(0.4),
         mid_query=_constant_query(0.4),
         far_query=_constant_query(0.4),
@@ -421,7 +501,9 @@ def test_compose_av_negative_distance_excluded() -> None:
     dec = np.array([0.0])
     distance_pc = np.array([-100.0])
     out = compose_av(
-        ra, dec, distance_pc,
+        ra,
+        dec,
+        distance_pc,
         near_query=_constant_query(0.4),
         mid_query=_constant_query(0.4),
         far_query=_constant_query(0.4),
@@ -438,8 +520,10 @@ def test_compose_av_all_far_uses_sfd_conversion() -> None:
     distance_pc = np.full(n, 5000.0)  # all in far bin
     ebv = 0.25
     out = compose_av(
-        ra, dec, distance_pc,
-        near_query=_constant_query(99.0),   # should never be called
+        ra,
+        dec,
+        distance_pc,
+        near_query=_constant_query(99.0),  # should never be called
         mid_query=_constant_query(99.0),
         far_query=_constant_query(ebv),
     )
@@ -455,6 +539,7 @@ def test_compose_av_query_receives_only_its_bin() -> None:
         def q(coords) -> np.ndarray:  # noqa: ANN001
             seen_lengths[name].append(len(coords))
             return np.full(len(coords), value, dtype=float)
+
         return q
 
     ra = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
@@ -462,7 +547,9 @@ def test_compose_av_query_receives_only_its_bin() -> None:
     distance_pc = np.array([100.0, 500.0, 2000.0, 4000.0, 6000.0])  # 2 near, 1 mid, 2 far
 
     compose_av(
-        ra, dec, distance_pc,
+        ra,
+        dec,
+        distance_pc,
         near_query=track("near", 0.3),
         mid_query=track("mid", 0.9),
         far_query=track("far", 0.1),
@@ -480,6 +567,7 @@ def test_compose_av_empty_bin_skips_query() -> None:
         def q(coords) -> np.ndarray:  # noqa: ANN001
             called.append(name)
             return np.full(len(coords), 0.0, dtype=float)
+
         return q
 
     ra = np.array([0.0, 1.0])
@@ -487,7 +575,9 @@ def test_compose_av_empty_bin_skips_query() -> None:
     distance_pc = np.array([100.0, 200.0])  # both near
 
     compose_av(
-        ra, dec, distance_pc,
+        ra,
+        dec,
+        distance_pc,
         near_query=mark("near"),
         mid_query=mark("mid"),
         far_query=mark("far"),
@@ -508,7 +598,9 @@ def test_compose_av_query_nan_yields_source_minus_one() -> None:
     dec = np.zeros(4)
     distance_pc = np.full(4, 500.0)  # all near
     out = compose_av(
-        ra, dec, distance_pc,
+        ra,
+        dec,
+        distance_pc,
         near_query=partial_nan_query,
         mid_query=_constant_query(0.9),
         far_query=_constant_query(0.1),
@@ -522,7 +614,9 @@ def test_compose_av_query_nan_yields_source_minus_one() -> None:
 def test_compose_av_rejects_mismatched_lengths() -> None:
     with pytest.raises(ValueError, match="mismatched lengths"):
         compose_av(
-            np.zeros(3), np.zeros(4), np.zeros(3),
+            np.zeros(3),
+            np.zeros(4),
+            np.zeros(3),
             near_query=_constant_query(0.0),
             mid_query=_constant_query(0.0),
             far_query=_constant_query(0.0),
@@ -532,7 +626,9 @@ def test_compose_av_rejects_mismatched_lengths() -> None:
 def test_compose_av_rejects_bad_boundaries() -> None:
     with pytest.raises(ValueError, match="near_boundary"):
         compose_av(
-            np.zeros(1), np.zeros(1), np.array([100.0]),
+            np.zeros(1),
+            np.zeros(1),
+            np.array([100.0]),
             near_query=_constant_query(0.0),
             mid_query=_constant_query(0.0),
             far_query=_constant_query(0.0),
@@ -541,7 +637,9 @@ def test_compose_av_rejects_bad_boundaries() -> None:
         )
     with pytest.raises(ValueError, match="near_boundary"):
         compose_av(
-            np.zeros(1), np.zeros(1), np.array([100.0]),
+            np.zeros(1),
+            np.zeros(1),
+            np.array([100.0]),
             near_query=_constant_query(0.0),
             mid_query=_constant_query(0.0),
             far_query=_constant_query(0.0),
@@ -552,7 +650,9 @@ def test_compose_av_rejects_bad_boundaries() -> None:
 
 def test_compose_av_empty_input() -> None:
     out = compose_av(
-        np.array([]), np.array([]), np.array([]),
+        np.array([]),
+        np.array([]),
+        np.array([]),
         near_query=_constant_query(0.0),
         mid_query=_constant_query(0.0),
         far_query=_constant_query(0.0),
@@ -563,7 +663,9 @@ def test_compose_av_empty_input() -> None:
 
 def test_compose_av_returns_float32_av() -> None:
     out = compose_av(
-        np.array([0.0]), np.array([0.0]), np.array([100.0]),
+        np.array([0.0]),
+        np.array([0.0]),
+        np.array([100.0]),
         near_query=_constant_query(0.5),
         mid_query=_constant_query(0.0),
         far_query=_constant_query(0.0),

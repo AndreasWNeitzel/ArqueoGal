@@ -96,24 +96,59 @@ def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
 def _cast_gaia_float32(df: pd.DataFrame) -> pd.DataFrame:
     # Same cast list as Stream 1/3 enrichment scripts.
     float32_cols = [
-        "ra", "dec", "parallax", "parallax_error",
-        "pmra", "pmra_error", "pmdec", "pmdec_error",
-        "ra_dec_corr", "ra_parallax_corr", "ra_pmra_corr", "ra_pmdec_corr",
-        "dec_parallax_corr", "dec_pmra_corr", "dec_pmdec_corr",
-        "parallax_pmra_corr", "parallax_pmdec_corr", "pmra_pmdec_corr",
-        "phot_g_mean_mag", "phot_bp_mean_mag", "phot_rp_mean_mag",
-        "phot_g_mean_flux_over_error", "bp_rp", "bp_g", "g_rp",
-        "ruwe", "astrometric_excess_noise",
+        "ra",
+        "dec",
+        "parallax",
+        "parallax_error",
+        "pmra",
+        "pmra_error",
+        "pmdec",
+        "pmdec_error",
+        "ra_dec_corr",
+        "ra_parallax_corr",
+        "ra_pmra_corr",
+        "ra_pmdec_corr",
+        "dec_parallax_corr",
+        "dec_pmra_corr",
+        "dec_pmdec_corr",
+        "parallax_pmra_corr",
+        "parallax_pmdec_corr",
+        "pmra_pmdec_corr",
+        "phot_g_mean_mag",
+        "phot_bp_mean_mag",
+        "phot_rp_mean_mag",
+        "phot_g_mean_flux_over_error",
+        "bp_rp",
+        "bp_g",
+        "g_rp",
+        "ruwe",
+        "astrometric_excess_noise",
         "ipd_gof_harmonic_amplitude",
-        "radial_velocity", "radial_velocity_error",
-        "nu_eff_used_in_astrometry", "pseudocolour", "ecl_lat",
-        "teff_gspphot", "teff_gspphot_lower", "teff_gspphot_upper",
-        "logg_gspphot", "logg_gspphot_lower", "logg_gspphot_upper",
-        "mh_gspphot",   "mh_gspphot_lower",   "mh_gspphot_upper",
-        "ag_gspphot",   "ag_gspphot_lower",   "ag_gspphot_upper",
+        "radial_velocity",
+        "radial_velocity_error",
+        "nu_eff_used_in_astrometry",
+        "pseudocolour",
+        "ecl_lat",
+        "teff_gspphot",
+        "teff_gspphot_lower",
+        "teff_gspphot_upper",
+        "logg_gspphot",
+        "logg_gspphot_lower",
+        "logg_gspphot_upper",
+        "mh_gspphot",
+        "mh_gspphot_lower",
+        "mh_gspphot_upper",
+        "ag_gspphot",
+        "ag_gspphot_lower",
+        "ag_gspphot_upper",
         "ebpminrp_gspphot",
-        "distance_gspphot", "distance_gspphot_lower", "distance_gspphot_upper",
-        "teff_gspspec", "logg_gspspec", "mh_gspspec", "alphafe_gspspec",
+        "distance_gspphot",
+        "distance_gspphot_lower",
+        "distance_gspphot_upper",
+        "teff_gspspec",
+        "logg_gspspec",
+        "mh_gspspec",
+        "alphafe_gspspec",
     ]
     for col in float32_cols:
         if col in df.columns and df[col].dtype == np.float64:
@@ -144,8 +179,9 @@ def main() -> None:
     # hon2021.parquet has column 'tic' (int64); normalise casing for the join.
     assert "tic" in hon.columns, f"expected 'tic' column in {hon_path}"
     n_hon = len(hon)
-    logger.info("Hon+2021: %d rows (pre-cut by Prob > %s upstream)",
-                n_hon, HON2021_DEFAULT_PROB_THRESHOLD)
+    logger.info(
+        "Hon+2021: %d rows (pre-cut by Prob > %s upstream)", n_hon, HON2021_DEFAULT_PROB_THRESHOLD
+    )
 
     logger.info("TIC v8.2 lookup via VizieR (batch=%d)", TIC_BATCH_SIZE)
     vz = vizier_service()
@@ -162,8 +198,12 @@ def main() -> None:
     tic_valid = tic.dropna(subset=["gaia"]).copy()
     tic_valid["gaia"] = tic_valid["gaia"].astype("int64")
     n_tic_dr2 = len(tic_valid)
-    logger.info("TIC rows: %d total, %d with DR2 GAIA (%d dropped)",
-                n_tic_total, n_tic_dr2, n_tic_total - n_tic_dr2)
+    logger.info(
+        "TIC rows: %d total, %d with DR2 GAIA (%d dropped)",
+        n_tic_total,
+        n_tic_dr2,
+        n_tic_total - n_tic_dr2,
+    )
 
     logger.info("DR2→DR3 crossmatch via AIP UPLOAD (batch=%d)", XMATCH_BATCH_SIZE)
     aip = aip_service()
@@ -188,18 +228,24 @@ def main() -> None:
         max_mag_diff=DEFAULT_MAG_DIFF_LIMIT,
     )
     n_dr3 = len(resolved)
-    logger.info("DR2→DR3 resolved: %d / %d DR2 sources pass §4.3 cuts",
-                n_dr3, n_tic_dr2)
+    logger.info("DR2→DR3 resolved: %d / %d DR2 sources pass §4.3 cuts", n_dr3, n_tic_dr2)
 
     # Stage 1 intermediate: Hon × TIC × DR2→DR3 mapping only (no Gaia enrichment).
     xmatch = hon.merge(tic_valid, on="tic", how="inner")
     xmatch = xmatch.merge(
-        resolved, left_on="gaia", right_on="dr2_source_id", how="inner",
+        resolved,
+        left_on="gaia",
+        right_on="dr2_source_id",
+        how="inner",
     )
     _write_parquet_atomic(xmatch, xmatch_out)
-    logger.info("wrote xmatch intermediate: %s (%d rows, %d cols, %.1f MB)",
-                xmatch_out, len(xmatch), len(xmatch.columns),
-                xmatch_out.stat().st_size / 1024**2)
+    logger.info(
+        "wrote xmatch intermediate: %s (%d rows, %d cols, %.1f MB)",
+        xmatch_out,
+        len(xmatch),
+        len(xmatch.columns),
+        xmatch_out.stat().st_size / 1024**2,
+    )
 
     # ------------------------------------------------------------------
     # Stage 2: Gaia DR3 enrichment via UPLOAD
@@ -207,8 +253,11 @@ def main() -> None:
     dr3_ids = xmatch["dr3_source_id"].astype("int64").drop_duplicates().to_list()
     n_enrich = len(dr3_ids)
     n_enrich_batches = (n_enrich + ENRICH_BATCH_SIZE - 1) // ENRICH_BATCH_SIZE
-    logger.info("Gaia DR3 enrichment via AIP UPLOAD: %d unique DR3 source_ids (%d batches)",
-                n_enrich, n_enrich_batches)
+    logger.info(
+        "Gaia DR3 enrichment via AIP UPLOAD: %d unique DR3 source_ids (%d batches)",
+        n_enrich,
+        n_enrich_batches,
+    )
     gaia_raw = batched_upload_fetch_df(
         aip,
         dr3_ids,
@@ -223,8 +272,9 @@ def main() -> None:
     logger.info("Gaia enrichment: fetched %d rows", len(gaia_raw))
     gaia_raw = _cast_gaia_float32(gaia_raw)
     _write_parquet_atomic(gaia_raw, gaia_raw_out)
-    logger.info("wrote raw enrichment: %s (%.1f MB)",
-                gaia_raw_out, gaia_raw_out.stat().st_size / 1024**2)
+    logger.info(
+        "wrote raw enrichment: %s (%.1f MB)", gaia_raw_out, gaia_raw_out.stat().st_size / 1024**2
+    )
 
     # Provenance for raw enrichment (mirrors Stream 1/3 convention).
     prov_raw = Provenance(
@@ -268,9 +318,12 @@ def main() -> None:
         if col in gaia_corr.columns and gaia_corr[col].dtype == np.float64:
             gaia_corr[col] = gaia_corr[col].astype(np.float32)
     _write_parquet_atomic(gaia_corr, gaia_corr_out)
-    logger.info("wrote corrected enrichment: %s (%.1f MB, %d cols)",
-                gaia_corr_out, gaia_corr_out.stat().st_size / 1024**2,
-                len(gaia_corr.columns))
+    logger.info(
+        "wrote corrected enrichment: %s (%.1f MB, %d cols)",
+        gaia_corr_out,
+        gaia_corr_out.stat().st_size / 1024**2,
+        len(gaia_corr.columns),
+    )
 
     n_zpt_applied = int(gaia_corr["parallax_zpt"].notna().sum())
     prov_corr = Provenance(
@@ -303,18 +356,21 @@ def main() -> None:
     # ------------------------------------------------------------------
     overlap_hon_gaia = set(xmatch.columns) & set(gaia_corr.columns) - {"dr3_source_id"}
     if overlap_hon_gaia:
-        logger.warning("dropping overlapping non-key cols from xmatch: %s",
-                       sorted(overlap_hon_gaia))
+        logger.warning(
+            "dropping overlapping non-key cols from xmatch: %s", sorted(overlap_hon_gaia)
+        )
         xmatch = xmatch.drop(columns=list(overlap_hon_gaia))
 
     final = xmatch.merge(
-        gaia_corr, left_on="dr3_source_id", right_on="source_id", how="inner",
+        gaia_corr,
+        left_on="dr3_source_id",
+        right_on="source_id",
+        how="inner",
     )
     n_final = len(final)
     logger.info("final joined: %d rows × %d cols", n_final, len(final.columns))
     _write_parquet_atomic(final, final_out)
-    logger.info("wrote final: %s (%.1f MB)",
-                final_out, final_out.stat().st_size / 1024**2)
+    logger.info("wrote final: %s (%.1f MB)", final_out, final_out.stat().st_size / 1024**2)
 
     prov_final = Provenance(
         output_file=str(final_out.relative_to(repo)),

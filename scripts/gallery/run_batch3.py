@@ -2,6 +2,7 @@
 
 $ python scripts/gallery/run_batch3.py
 """
+
 from __future__ import annotations
 
 import importlib
@@ -25,10 +26,12 @@ def main() -> None:
         try:
             mod = importlib.import_module(m)
             mod.main()
-            print(f"[ok]  {m}  ({time.time()-t0:.1f}s)")
-        except Exception as exc:   # noqa: BLE001
+            print(f"[ok]  {m}  ({time.time() - t0:.1f}s)")
+        except Exception as exc:  # noqa: BLE001
             print(f"[FAIL]  {m}: {type(exc).__name__}: {exc}")
-            import traceback; traceback.print_exc()
+            import traceback
+
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

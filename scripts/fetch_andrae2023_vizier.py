@@ -83,13 +83,29 @@ FROM {TABLE}
 """
 
 FLOAT32_COLS = (
-    "ra_deg", "dec_deg", "g_mag", "parallax_mas", "parallax_err_mas",
-    "ebv", "bp_rp_0", "g_mag_0",
-    "teff", "e_teff", "s_teff",
-    "logg", "e_logg", "s_logg",
-    "fe_h", "e_fe_h", "s_fe_h",
-    "c_fe", "e_c_fe", "s_c_fe",
-    "c_cor", "energy", "l_z",
+    "ra_deg",
+    "dec_deg",
+    "g_mag",
+    "parallax_mas",
+    "parallax_err_mas",
+    "ebv",
+    "bp_rp_0",
+    "g_mag_0",
+    "teff",
+    "e_teff",
+    "s_teff",
+    "logg",
+    "e_logg",
+    "s_logg",
+    "fe_h",
+    "e_fe_h",
+    "s_fe_h",
+    "c_fe",
+    "e_c_fe",
+    "s_c_fe",
+    "c_cor",
+    "energy",
+    "l_z",
 )
 
 
@@ -183,7 +199,9 @@ def main() -> None:
     arrow_table = pa.Table.from_arrays(arrays, names=col_names)
     del arrays
     gc.collect()
-    logger.info("arrow table built — schema=%s", arrow_table.schema.to_string(show_field_metadata=False))
+    logger.info(
+        "arrow table built — schema=%s", arrow_table.schema.to_string(show_field_metadata=False)
+    )
 
     tmp = out.with_suffix(out.suffix + ".part")
     pq.write_table(arrow_table, tmp, compression="snappy")

@@ -65,9 +65,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("alpha_m_triage")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_ENSEMBLE = (
-    REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
-)
+DEFAULT_ENSEMBLE = REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
 DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
 DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/audit"
 
@@ -80,7 +78,9 @@ H3_NEAR_ZERO_ABS_MAX: float = 0.003
 
 
 def _build_cfg_for_val_loader(
-    parquet: Path, split_seed: int, batch_size: int,
+    parquet: Path,
+    split_seed: int,
+    batch_size: int,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -101,17 +101,28 @@ def _build_cfg_for_val_loader(
 def _feature_family_indices(layout: FeatureLayout) -> dict[str, list[int]]:
     i = 0
     families: dict[str, list[int]] = {}
-    n_bp = len(layout.bp_coef_cols); families["bp_shape"] = list(range(i, i + n_bp)); i += n_bp
-    n_rp = len(layout.rp_coef_cols); families["rp_shape"] = list(range(i, i + n_rp)); i += n_rp
-    n_c0 = len(layout.xp_scalar_cols); families["xp_c0"] = list(range(i, i + n_c0)); i += n_c0
-    n_res = len(layout.residual_cols); families["residual"] = list(range(i, i + n_res)); i += n_res
-    n_aux = len(layout.aux_cols); families["aux"] = list(range(i, i + n_aux)); i += n_aux
+    n_bp = len(layout.bp_coef_cols)
+    families["bp_shape"] = list(range(i, i + n_bp))
+    i += n_bp
+    n_rp = len(layout.rp_coef_cols)
+    families["rp_shape"] = list(range(i, i + n_rp))
+    i += n_rp
+    n_c0 = len(layout.xp_scalar_cols)
+    families["xp_c0"] = list(range(i, i + n_c0))
+    i += n_c0
+    n_res = len(layout.residual_cols)
+    families["residual"] = list(range(i, i + n_res))
+    i += n_res
+    n_aux = len(layout.aux_cols)
+    families["aux"] = list(range(i, i + n_aux))
+    i += n_aux
     assert i == layout.input_dim, (i, layout.input_dim)
     return families
 
 
 def _pca_xp_summary(
-    X_val_xp: np.ndarray, n_components: int,
+    X_val_xp: np.ndarray,
+    n_components: int,
 ) -> tuple[np.ndarray, int, float]:
     """Return PCA projection with a fixed number of components.
 
@@ -128,7 +139,7 @@ def _pca_xp_summary(
     """
     Xc = X_val_xp - X_val_xp.mean(axis=0, keepdims=True)
     U, s, _Vt = np.linalg.svd(Xc.astype(np.float64), full_matrices=False)
-    var = (s ** 2) / max(Xc.shape[0] - 1, 1)
+    var = (s**2) / max(Xc.shape[0] - 1, 1)
     cum = np.cumsum(var) / var.sum()
     k = int(min(n_components, len(s)))
     proj = U[:, :k] * s[:k]
@@ -136,7 +147,8 @@ def _pca_xp_summary(
 
 
 def _aux_conditioning(
-    parquet_path: Path, source_ids: np.ndarray,
+    parquet_path: Path,
+    source_ids: np.ndarray,
 ) -> tuple[np.ndarray, tuple[str, ...]]:
     import pandas as pd
 
@@ -155,7 +167,11 @@ def _aux_conditioning(
 
 
 def _conditional_mi_ksg_raw(
-    x: np.ndarray, y: np.ndarray, z: np.ndarray, *, k: int = 5,
+    x: np.ndarray,
+    y: np.ndarray,
+    z: np.ndarray,
+    *,
+    k: int = 5,
 ) -> float:
     """Raw (unclipped) KSG conditional MI — identical math to audit.conditional_mi_ksg,
     minus the ``max(mi, 0)`` clamp. Used by Test 2 (H3).
@@ -202,9 +218,7 @@ def _cmi_single_label(  # noqa: PLR0913
     Returns ``(cmi, n_used)``.
     """
     rng = np.random.default_rng(seed)
-    finite_row = (
-        np.isfinite(xp_summary).all(axis=1) & np.isfinite(Z).all(axis=1) & np.isfinite(y)
-    )
+    finite_row = np.isfinite(xp_summary).all(axis=1) & np.isfinite(Z).all(axis=1) & np.isfinite(y)
     idx = np.flatnonzero(finite_row)
     if idx.size < 200:  # noqa: PLR2004
         return float("nan"), int(idx.size)
@@ -256,10 +270,15 @@ def main() -> None:
     split_seed = int(json.loads(first_blob["config_yaml"]).get("split_seed", 0))
 
     cfg = _build_cfg_for_val_loader(
-        parquet=args.parquet, split_seed=split_seed, batch_size=args.batch_size,
+        parquet=args.parquet,
+        split_seed=split_seed,
+        batch_size=args.batch_size,
     )
     _train_loader, val_loader, _split_ids, scaler_human = build_dataloaders(
-        cfg, layout, tiers, seed=split_seed,
+        cfg,
+        layout,
+        tiers,
+        seed=split_seed,
     )
 
     val_ds = val_loader.dataset
@@ -275,7 +294,9 @@ def main() -> None:
     X_val_xp = X_val[:, xp_idx].astype(np.float64)
     xp_pca15, k_pca15, var_at_k15 = _pca_xp_summary(X_val_xp, args.pca_components_rich)
     _LOG.info(
-        "PCA: k=%d components, cumulative variance at k = %.4f", k_pca15, var_at_k15,
+        "PCA: k=%d components, cumulative variance at k = %.4f",
+        k_pca15,
+        var_at_k15,
     )
 
     # Conditioning — full 4-D.
@@ -294,8 +315,13 @@ def main() -> None:
     # -- Test 1 — 15-PC CMI with full 4-D aux, clipped ------------------------
     _LOG.info("Test 1 — 15-PC CMI with full 4-D aux (clipped)")
     t1_val, t1_n = _cmi_single_label(
-        xp_pca15, y_target, Z_full,
-        max_samples=args.mi_max_samples, k=8, seed=0, clip=True,
+        xp_pca15,
+        y_target,
+        Z_full,
+        max_samples=args.mi_max_samples,
+        k=8,
+        seed=0,
+        clip=True,
     )
     _LOG.info("Test 1 CMI = %.6f (n=%d)", t1_val, t1_n)
     tests["test_1_pca15_clipped"] = {
@@ -329,18 +355,32 @@ def main() -> None:
                 f"({var_at_k15 * 100:.2f}% variance retained at 15 PC vs ~95.8% at 7 PC)."
             ),
         )
-        _write_outputs(args.report_dir, _assemble_payload(
-            args, cfg, split_seed, X_val.shape[0], ckpt_label_names,
-            tests, verdict, cond_names,
-        ))
+        _write_outputs(
+            args.report_dir,
+            _assemble_payload(
+                args,
+                cfg,
+                split_seed,
+                X_val.shape[0],
+                ckpt_label_names,
+                tests,
+                verdict,
+                cond_names,
+            ),
+        )
         _LOG.info("Short-circuit: H1 confirmed.")
         return
 
     # -- Test 2 — 15-PC CMI with full 4-D aux, UNCLIPPED (H3) -----------------
     _LOG.info("Test 2 — 15-PC CMI with full 4-D aux, UNCLIPPED")
     t2_val, t2_n = _cmi_single_label(
-        xp_pca15, y_target, Z_full,
-        max_samples=args.mi_max_samples, k=8, seed=0, clip=False,
+        xp_pca15,
+        y_target,
+        Z_full,
+        max_samples=args.mi_max_samples,
+        k=8,
+        seed=0,
+        clip=False,
     )
     _LOG.info("Test 2 CMI (unclipped) = %.6f (n=%d)", t2_val, t2_n)
     tests["test_2_pca15_unclipped"] = {
@@ -373,10 +413,19 @@ def main() -> None:
                 f"but the clipping in audit.conditional_mi_ksg masked part of it."
             ),
         )
-        _write_outputs(args.report_dir, _assemble_payload(
-            args, cfg, split_seed, X_val.shape[0], ckpt_label_names,
-            tests, verdict, cond_names,
-        ))
+        _write_outputs(
+            args.report_dir,
+            _assemble_payload(
+                args,
+                cfg,
+                split_seed,
+                X_val.shape[0],
+                ckpt_label_names,
+                tests,
+                verdict,
+                cond_names,
+            ),
+        )
         _LOG.info("Short-circuit: H1+H3 (meaningful positive in unclipped).")
         return
 
@@ -400,18 +449,32 @@ def main() -> None:
                 f"{CMI_POSITIVE_THRESHOLD_NATS}-nat threshold."
             ),
         )
-        _write_outputs(args.report_dir, _assemble_payload(
-            args, cfg, split_seed, X_val.shape[0], ckpt_label_names,
-            tests, verdict, cond_names,
-        ))
+        _write_outputs(
+            args.report_dir,
+            _assemble_payload(
+                args,
+                cfg,
+                split_seed,
+                X_val.shape[0],
+                ckpt_label_names,
+                tests,
+                verdict,
+                cond_names,
+            ),
+        )
         _LOG.info("Short-circuit: H3 (estimator noise dominant).")
         return
 
     # -- Test 3 — Minimal conditioning (H2) -----------------------------------
     _LOG.info("Test 3 — 15-PC CMI conditioning only on parallax")
     t3_val, t3_n = _cmi_single_label(
-        xp_pca15, y_target, Z_parallax,
-        max_samples=args.mi_max_samples, k=8, seed=0, clip=True,
+        xp_pca15,
+        y_target,
+        Z_parallax,
+        max_samples=args.mi_max_samples,
+        k=8,
+        seed=0,
+        clip=True,
     )
     _LOG.info("Test 3 CMI (parallax-only) = %.6f (n=%d)", t3_val, t3_n)
     tests["test_3_pca15_parallax_only"] = {
@@ -452,10 +515,19 @@ def main() -> None:
             ),
         )
 
-    _write_outputs(args.report_dir, _assemble_payload(
-        args, cfg, split_seed, X_val.shape[0], ckpt_label_names,
-        tests, verdict, cond_names,
-    ))
+    _write_outputs(
+        args.report_dir,
+        _assemble_payload(
+            args,
+            cfg,
+            split_seed,
+            X_val.shape[0],
+            ckpt_label_names,
+            tests,
+            verdict,
+            cond_names,
+        ),
+    )
     _LOG.info("All three tests ran; verdict=%s", verdict["supported_hypothesis"])
 
 
@@ -605,8 +677,7 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
     lines.append(f"- Estimator: KSG k={payload['cmi_estimator_k']}")
     lines.append(f"- Max samples per test: {payload['max_samples']}")
     lines.append(
-        f"- Full aux conditioning: "
-        f"{', '.join(payload['full_conditioning_columns'])}",
+        f"- Full aux conditioning: {', '.join(payload['full_conditioning_columns'])}",
     )
     lines.append(f"- Ensemble: `{payload['ensemble_dir']}`")
     lines.append(f"- Parquet: `{payload['parquet']}`")

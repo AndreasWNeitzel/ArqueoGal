@@ -113,26 +113,35 @@ def _stratify(preds: dict, edges: tuple[float, ...]) -> list[dict]:
         finite = np.isfinite(preds["alpha_m_truth"]) & np.isfinite(preds["alpha_m_pred"]) & m
         n = int(finite.sum())
         if n == 0:
-            rows.append({
-                "bin": BIN_LABELS[b], "n": 0,
-                "pred_mean": None, "truth_mean": None, "bias": None,
-                "pred_std": None, "truth_std": None, "std_ratio": None,
-            })
+            rows.append(
+                {
+                    "bin": BIN_LABELS[b],
+                    "n": 0,
+                    "pred_mean": None,
+                    "truth_mean": None,
+                    "bias": None,
+                    "pred_std": None,
+                    "truth_std": None,
+                    "std_ratio": None,
+                }
+            )
             continue
         pred = preds["alpha_m_pred"][finite]
         truth = preds["alpha_m_truth"][finite]
         pred_std = float(pred.std())
         truth_std = float(truth.std())
-        rows.append({
-            "bin": BIN_LABELS[b],
-            "n": n,
-            "pred_mean": float(pred.mean()),
-            "truth_mean": float(truth.mean()),
-            "bias": float(pred.mean() - truth.mean()),
-            "pred_std": pred_std,
-            "truth_std": truth_std,
-            "std_ratio": pred_std / truth_std if truth_std > 0 else None,
-        })
+        rows.append(
+            {
+                "bin": BIN_LABELS[b],
+                "n": n,
+                "pred_mean": float(pred.mean()),
+                "truth_mean": float(truth.mean()),
+                "bias": float(pred.mean() - truth.mean()),
+                "pred_std": pred_std,
+                "truth_std": truth_std,
+                "std_ratio": pred_std / truth_std if truth_std > 0 else None,
+            }
+        )
     return rows
 
 
@@ -176,15 +185,19 @@ def main() -> None:
 
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     with OUT_JSON.open("w") as f:
-        json.dump({
-            "mh_bin_edges": list(MH_EDGES),
-            "v1_ensemble": str(V1_ENSEMBLE),
-            "v11_ensemble": str(V11_ENSEMBLE),
-            "v2_ensemble": str(V2_ENSEMBLE),
-            "v1": v1_bins,
-            "v1_1": v11_bins,
-            "v2": v2_bins,
-        }, f, indent=2)
+        json.dump(
+            {
+                "mh_bin_edges": list(MH_EDGES),
+                "v1_ensemble": str(V1_ENSEMBLE),
+                "v11_ensemble": str(V11_ENSEMBLE),
+                "v2_ensemble": str(V2_ENSEMBLE),
+                "v1": v1_bins,
+                "v1_1": v11_bins,
+                "v2": v2_bins,
+            },
+            f,
+            indent=2,
+        )
     _LOG.info("wrote %s", OUT_JSON)
 
 

@@ -106,8 +106,7 @@ def fit_mahalanobis_ood(
     X = features[finite_mask].astype(np.float64)
     if X.shape[0] < X.shape[1] + 2:
         raise ValueError(
-            f"need at least F+2 = {X.shape[1] + 2} finite rows to fit "
-            f"covariance, got {X.shape[0]}",
+            f"need at least F+2 = {X.shape[1] + 2} finite rows to fit covariance, got {X.shape[0]}",
         )
 
     mu = X.mean(axis=0)
@@ -198,8 +197,7 @@ def ensemble_disagreement_ratio(
         raise ValueError(f"mu_per_member must be (M, B, n), got {mu_per_member.shape}")
     if mu_per_member.shape != sigma_diag_per_member.shape:
         raise ValueError(
-            f"shape mismatch: mu {mu_per_member.shape} vs sigma "
-            f"{sigma_diag_per_member.shape}",
+            f"shape mismatch: mu {mu_per_member.shape} vs sigma {sigma_diag_per_member.shape}",
         )
     if mu_per_member.shape[0] < 2:
         raise ValueError(
@@ -207,7 +205,7 @@ def ensemble_disagreement_ratio(
         )
 
     epistemic_var = mu_per_member.var(axis=0, ddof=0)  # (B, n)
-    aleatoric_var = (sigma_diag_per_member ** 2).mean(axis=0)  # (B, n)
+    aleatoric_var = (sigma_diag_per_member**2).mean(axis=0)  # (B, n)
     total_var = epistemic_var + aleatoric_var
     total_sigma = np.sqrt(np.clip(total_var, _EPS, None))
     epistemic_sigma = np.sqrt(np.clip(epistemic_var, 0.0, None))

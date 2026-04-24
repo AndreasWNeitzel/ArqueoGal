@@ -40,7 +40,10 @@ def _sample_from_mvn(mu: np.ndarray, L: np.ndarray, rng: np.random.Generator) ->
 
 
 def _batched_cholesky(
-    B: int, n: int, scale: float = 0.3, seed: int = 0,
+    B: int,
+    n: int,
+    scale: float = 0.3,
+    seed: int = 0,
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
     out = np.zeros((B, n, n), dtype=np.float32)
@@ -53,6 +56,7 @@ def _batched_cholesky(
 
 
 # --- bin_by_cells ---
+
 
 def test_bin_by_cells_produces_expected_n_cells() -> None:
     rng = np.random.default_rng(0)
@@ -73,6 +77,7 @@ def test_bin_by_cells_rejects_wrong_ndim() -> None:
 
 
 # --- temperature scaling ---
+
 
 def test_temperature_scaling_recovers_inflation() -> None:
     """If truth is drawn from Σ_true and model predicts 4·Σ_true, recovered s ≈ 0.5."""
@@ -99,6 +104,7 @@ def test_temperature_scaling_small_cell_returns_one() -> None:
 
 # --- shrunken per-cell-per-label scaling ---
 
+
 def test_shrunken_scale_recovers_heteroscedastic_inflation() -> None:
     """Two cells with different per-label miscalibration → α ≈ truth per cell/label."""
     rng = np.random.default_rng(7)
@@ -118,11 +124,17 @@ def test_shrunken_scale_recovers_heteroscedastic_inflation() -> None:
         L_pred[:B_per_cell, i, i] = scales_cell0[i]
         L_pred[B_per_cell:, i, i] = scales_cell1[i]
 
-    cell_ids = np.concatenate([np.zeros(B_per_cell, dtype=np.int64),
-                               np.ones(B_per_cell, dtype=np.int64)])
+    cell_ids = np.concatenate(
+        [np.zeros(B_per_cell, dtype=np.int64), np.ones(B_per_cell, dtype=np.int64)]
+    )
 
     out = shrunken_per_cell_per_label_scale(
-        mu, L_pred, y, cell_ids, tau=1.0, min_cell_stars=8,
+        mu,
+        L_pred,
+        y,
+        cell_ids,
+        tau=1.0,
+        min_cell_stars=8,
     )
     # Expected α: predicted σ is `s`, truth σ is `1.0`, so z = y/s has
     # Var(z) = 1/s². Recovered α = √Var(z) = 1/s. So α_0 ≈ 1/scales_cell0.
@@ -139,10 +151,14 @@ def test_shrunken_scale_sparse_cell_shrinks_to_global() -> None:
     mu = np.zeros((B_big + B_small, n), dtype=np.float32)
     L = np.tile(np.eye(n, dtype=np.float32), (B_big + B_small, 1, 1))
     y = _sample_from_mvn(mu, L, rng)
-    cell_ids = np.concatenate([np.zeros(B_big, dtype=np.int64),
-                               np.ones(B_small, dtype=np.int64)])
+    cell_ids = np.concatenate([np.zeros(B_big, dtype=np.int64), np.ones(B_small, dtype=np.int64)])
     out = shrunken_per_cell_per_label_scale(
-        mu, L, y, cell_ids, tau=50.0, min_cell_stars=8,
+        mu,
+        L,
+        y,
+        cell_ids,
+        tau=50.0,
+        min_cell_stars=8,
     )
     # Sparse cell 1 should have α equal to global α (fallback path).
     for j in range(n):
@@ -157,7 +173,11 @@ def test_shrunken_scale_preserves_pd_via_diag_alpha_L() -> None:
     L = _batched_cholesky(B, n, scale=0.4, seed=3)
     y = _sample_from_mvn(mu, L, rng)
     out = shrunken_per_cell_per_label_scale(
-        mu, L, y, np.zeros(B, dtype=np.int64), tau=10.0,
+        mu,
+        L,
+        y,
+        np.zeros(B, dtype=np.int64),
+        tau=10.0,
     )
     alpha = out["per_star_alpha"]  # (B, n)
     L_prime = alpha[:, :, None] * L  # diag(α) L
@@ -190,8 +210,11 @@ def test_shrunken_scale_alpha_one_when_perfectly_calibrated() -> None:
 
 # --- GP-smoothed per-cell-per-label scaling ---
 
+
 def _make_gp_fixture(
-    n_cells_per_axis: int = 3, stars_per_cell: int = 80, seed: int = 11,
+    n_cells_per_axis: int = 3,
+    stars_per_cell: int = 80,
+    seed: int = 11,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """3-D grid of cells with a smooth per-axis α field in label 0.
 
@@ -208,8 +231,9 @@ def _make_gp_fixture(
         for j, b in enumerate(axes):
             for k, c in enumerate(axes):
                 cid = (i * n_cells_per_axis + j) * n_cells_per_axis + k
-                feat = rng.normal(loc=[a, b, c], scale=0.15,
-                                  size=(stars_per_cell, 3)).astype(np.float32)
+                feat = rng.normal(loc=[a, b, c], scale=0.15, size=(stars_per_cell, 3)).astype(
+                    np.float32
+                )
                 X_list.append(feat)
                 cell_list.extend([cid] * stars_per_cell)
                 alpha_truth_list.append(1.0 + 0.8 * a)  # smooth with feat 0
@@ -224,7 +248,8 @@ def _make_gp_fixture(
     # Model predicts σ_pred = α_truth * σ_true on label 0 only. Thus
     # z = y/σ_pred has Var(z) = 1/α_truth² → recovered α ≈ 1/α_truth.
     alpha_truth_per_star = np.array(
-        [alpha_truth_list[c] for c in cell_ids], dtype=np.float32,
+        [alpha_truth_list[c] for c in cell_ids],
+        dtype=np.float32,
     )
     L_pred = L_true.copy()
     L_pred[:, 0, 0] = alpha_truth_per_star
@@ -234,8 +259,13 @@ def _make_gp_fixture(
 def test_gp_smoothed_alpha_shape_and_positivity() -> None:
     mu, L, y, feats, cells = _make_gp_fixture()
     out = gp_smoothed_per_cell_per_label_scale(
-        mu, L, y, feats, cells,
-        min_cell_stars_for_training=32, min_cell_stars=8,
+        mu,
+        L,
+        y,
+        feats,
+        cells,
+        min_cell_stars_for_training=32,
+        min_cell_stars=8,
     )
     assert out["per_star_alpha"].shape == mu.shape
     assert (out["per_star_alpha"] > 0).all()
@@ -254,8 +284,13 @@ def test_gp_smoothed_alpha_matches_smooth_field() -> None:
     """
     mu, L, y, feats, cells = _make_gp_fixture(n_cells_per_axis=3, stars_per_cell=120)
     out = gp_smoothed_per_cell_per_label_scale(
-        mu, L, y, feats, cells,
-        min_cell_stars_for_training=32, min_cell_stars=8,
+        mu,
+        L,
+        y,
+        feats,
+        cells,
+        min_cell_stars_for_training=32,
+        min_cell_stars=8,
     )
     scales = out["scales"]
     # cid = (i*3 + j)*3 + k. i == feat0 axis bin: 0 → -1, 2 → +1.
@@ -270,8 +305,13 @@ def test_gp_smoothed_alpha_matches_smooth_field() -> None:
 def test_gp_smoothed_alpha_labels_with_no_miscalibration_return_near_one() -> None:
     mu, L, y, feats, cells = _make_gp_fixture(n_cells_per_axis=3, stars_per_cell=150)
     out = gp_smoothed_per_cell_per_label_scale(
-        mu, L, y, feats, cells,
-        min_cell_stars_for_training=32, min_cell_stars=8,
+        mu,
+        L,
+        y,
+        feats,
+        cells,
+        min_cell_stars_for_training=32,
+        min_cell_stars=8,
     )
     # Labels 1 and 2 were perfectly calibrated — α should be near 1 everywhere.
     for j in (1, 2):
@@ -286,8 +326,13 @@ def test_gp_smoothed_alpha_labels_with_no_miscalibration_return_near_one() -> No
 def test_gp_smoothed_alpha_preserves_pd_via_diag_alpha_L() -> None:
     mu, L, y, feats, cells = _make_gp_fixture()
     out = gp_smoothed_per_cell_per_label_scale(
-        mu, L, y, feats, cells,
-        min_cell_stars_for_training=32, min_cell_stars=8,
+        mu,
+        L,
+        y,
+        feats,
+        cells,
+        min_cell_stars_for_training=32,
+        min_cell_stars=8,
     )
     alpha = out["per_star_alpha"]
     L_prime = alpha[:, :, None] * L
@@ -313,8 +358,13 @@ def test_gp_smoothed_alpha_sparse_cell_borrows_from_neighbors() -> None:
     feats_s, cells_s = feats[keep_mask], cells[keep_mask]
 
     out = gp_smoothed_per_cell_per_label_scale(
-        mu_s, L_s, y_s, feats_s, cells_s,
-        min_cell_stars_for_training=32, min_cell_stars=8,
+        mu_s,
+        L_s,
+        y_s,
+        feats_s,
+        cells_s,
+        min_cell_stars_for_training=32,
+        min_cell_stars=8,
     )
     # Cell 13 should NOT be in train_cell_ids (10 < 32).
     assert target_cell not in set(out["train_cell_ids"])
@@ -336,8 +386,13 @@ def test_gp_bundle_roundtrip_and_apply_consistency() -> None:
     """
     mu, L, y, feats, cells = _make_gp_fixture()
     out = gp_smoothed_per_cell_per_label_scale(
-        mu, L, y, feats, cells,
-        min_cell_stars_for_training=32, min_cell_stars=8,
+        mu,
+        L,
+        y,
+        feats,
+        cells,
+        min_cell_stars_for_training=32,
+        min_cell_stars=8,
     )
     bundle = out["gp_bundle"]
     blob = bundle.to_dict()
@@ -354,8 +409,13 @@ def test_gp_smoothed_alpha_handles_nonfinite_features() -> None:
     feats_bad = feats.copy()
     feats_bad[::50, 0] = np.nan
     out = gp_smoothed_per_cell_per_label_scale(
-        mu, L, y, feats_bad, cells,
-        min_cell_stars_for_training=32, min_cell_stars=8,
+        mu,
+        L,
+        y,
+        feats_bad,
+        cells,
+        min_cell_stars_for_training=32,
+        min_cell_stars=8,
     )
     nan_rows = np.where(~np.isfinite(feats_bad).all(axis=1))[0]
     # Cell-center eval derives each cell's centre from the *finite* rows in
@@ -366,6 +426,7 @@ def test_gp_smoothed_alpha_handles_nonfinite_features() -> None:
 
 
 # --- regime B exclusion envelope ---
+
 
 def test_regime_b_envelope_captures_plane_warm_rgb() -> None:
     env = RegimeBEnvelope()
@@ -383,13 +444,15 @@ def test_regime_b_envelope_respects_all_three_thresholds() -> None:
     env = RegimeBEnvelope()
     # Must violate *all three* conditions to be inside the envelope.
     cases = [
-        (4700.0, 2.0, 2.0),   # Teff too cool
-        (5000.0, 2.3, 2.0),   # logg too high
-        (5000.0, 2.0, 6.0),   # |b| too large
+        (4700.0, 2.0, 2.0),  # Teff too cool
+        (5000.0, 2.3, 2.0),  # logg too high
+        (5000.0, 2.0, 6.0),  # |b| too large
     ]
     for teff, logg, b in cases:
         assert not env.mask(
-            np.array([teff]), np.array([logg]), np.array([b]),
+            np.array([teff]),
+            np.array([logg]),
+            np.array([b]),
         )[0]
 
 
@@ -414,6 +477,7 @@ def test_regime_b_envelope_handles_absolute_b() -> None:
 
 # --- isotonic ---
 
+
 def test_isotonic_per_label_monotone_non_decreasing() -> None:
     rng = np.random.default_rng(0)
     B, n = 500, 3
@@ -429,6 +493,7 @@ def test_isotonic_per_label_monotone_non_decreasing() -> None:
 
 
 # --- coverage ---
+
 
 def test_coverage_at_levels_nominal_on_calibrated_data() -> None:
     """When truth is sampled from predicted Σ, coverage should match nominal."""
@@ -457,6 +522,7 @@ def test_coverage_miscalibrated_data_deviates() -> None:
 
 
 # --- conformal ---
+
 
 def test_conformal_scores_shape_and_nonnegative() -> None:
     rng = np.random.default_rng(0)
@@ -490,6 +556,7 @@ def test_conformal_radius_empty_scores_raises() -> None:
 
 # --- apply_calibration ---
 
+
 def test_apply_calibration_scales_cholesky() -> None:
     B, n = 50, 3
     mu = np.zeros((B, n), dtype=np.float32)
@@ -513,6 +580,7 @@ def test_apply_calibration_unknown_cell_falls_back_to_one() -> None:
 
 # --- end-to-end fit_calibration ---
 
+
 def test_fit_calibration_roundtrip_checkpoint_schema() -> None:
     rng = np.random.default_rng(0)
     B, n = 300, 3
@@ -523,8 +591,12 @@ def test_fit_calibration_roundtrip_checkpoint_schema() -> None:
 
     art = fit_calibration(mu, L, y, cell_features=cell_features, cell_n_bins=(2, 2))
     blob = art.as_checkpoint_dict()
-    assert set(blob) == {"temperature_per_cell", "isotonic_per_label",
-                         "conformal_scores", "cell_definition"}
+    assert set(blob) == {
+        "temperature_per_cell",
+        "isotonic_per_label",
+        "conformal_scores",
+        "cell_definition",
+    }
     assert len(art.temperature_per_cell) >= 1
     assert len(art.isotonic_per_label) == n
     assert art.conformal_scores.shape == (B,)
@@ -544,6 +616,7 @@ def test_fit_calibration_temperature_recovery_endtoend() -> None:
 
 
 # --- collect_predictions ---
+
 
 def test_collect_predictions_round_trip() -> None:
     cfg = ModelConfig(

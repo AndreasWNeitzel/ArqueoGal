@@ -82,12 +82,20 @@ def _parse_args() -> argparse.Namespace:
 
 def _load(path: Path) -> pd.DataFrame:
     cols = [
-        "source_id", "corrected_flux", "ye2024_flag",
-        "g_mag", "bp_mag", "rp_mag",
-        "teff_gspphot", "logg_gspphot",
-        "fe_h_atm", "m_h_atm",
-        "ebv_sfd", "av_nbhd_median",
-        "ra_deg", "dec_deg",
+        "source_id",
+        "corrected_flux",
+        "ye2024_flag",
+        "g_mag",
+        "bp_mag",
+        "rp_mag",
+        "teff_gspphot",
+        "logg_gspphot",
+        "fe_h_atm",
+        "m_h_atm",
+        "ebv_sfd",
+        "av_nbhd_median",
+        "ra_deg",
+        "dec_deg",
     ]
     df = pd.read_parquet(path, columns=cols)
     # Drop rows Ye refused to emit (flag=1 ⇒ NO_SYNTH_PHOT, flux is NaN-filled).
@@ -116,7 +124,9 @@ def _enrich(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _stratified_indices(
-    df: pd.DataFrame, n_sample: int, rng: np.random.Generator,
+    df: pd.DataFrame,
+    n_sample: int,
+    rng: np.random.Generator,
 ) -> np.ndarray:
     """Stratify on (Teff, [Fe/H], G) via a coarse 3D histogram.
 
@@ -152,7 +162,8 @@ def _forced_indices(df: pd.DataFrame, rng: np.random.Generator) -> dict[str, np.
     pools: dict[str, tuple[np.ndarray, int]] = {
         "blue_neg": (df.index[df["blue_neg"]].to_numpy(), 100),
         "fe_h_lt_-1.5": (
-            df.index[(df["fe_h_atm"] < -1.5) & df["fe_h_atm"].notna()].to_numpy(), 50,
+            df.index[(df["fe_h_atm"] < -1.5) & df["fe_h_atm"].notna()].to_numpy(),
+            50,
         ),
         "teff_gt_6000": (df.index[df["teff_gspphot"] > 6000].to_numpy(), 50),
         "av_sfd_gt_3": (df.index[df["av_sfd"] > 3.0].to_numpy(), 50),
@@ -171,7 +182,9 @@ def _forced_indices(df: pd.DataFrame, rng: np.random.Generator) -> dict[str, np.
 
 
 def _build_sample(
-    df: pd.DataFrame, n_sample: int, seed: int,
+    df: pd.DataFrame,
+    n_sample: int,
+    seed: int,
 ) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
     rng = np.random.default_rng(seed)
     strat = _stratified_indices(df, n_sample, rng)
@@ -181,12 +194,14 @@ def _build_sample(
     # Remap forced indices into the sample frame for later labelling.
     pos = {src: i for i, src in enumerate(all_idx)}
     sub_masks = {
-        name: np.array([pos[s] for s in idx], dtype=np.int64)
-        for name, idx in forced.items()
+        name: np.array([pos[s] for s in idx], dtype=np.int64) for name, idx in forced.items()
     }
     logger.info(
         "Sample size: %d (stratified %d + forced %d, union %d)",
-        len(sample), strat.size, sum(v.size for v in forced.values()), all_idx.size,
+        len(sample),
+        strat.size,
+        sum(v.size for v in forced.values()),
+        all_idx.size,
     )
     return sample, sub_masks
 
@@ -208,7 +223,11 @@ def _plot_residual_distribution(
     """Histogram of residual RMS: overall + per-sub-pop."""
     set_aa_style()
     fig, axes = plt.subplots(
-        2, 3, figsize=(AA_DOUBLE_COLUMN_IN, 5.0), sharex=True, sharey=False,
+        2,
+        3,
+        figsize=(AA_DOUBLE_COLUMN_IN, 5.0),
+        sharex=True,
+        sharey=False,
     )
     log_r = np.log10(np.maximum(residuals, 1e-30))
     # Compute p99 on the "normal" population (excluding catastrophic Ye failures)
@@ -222,11 +241,17 @@ def _plot_residual_distribution(
     ax = axes[0, 0]
     ax.hist(log_r, bins=bins, color=WONG_PALETTE[0], alpha=0.8)
     ax.axvline(
-        np.log10(p_overall_normal[3]), color="k", lw=0.8, ls="--",
+        np.log10(p_overall_normal[3]),
+        color="k",
+        lw=0.8,
+        ls="--",
         label=f"normal p99 = {p_overall_normal[3]:.1e}",
     )
     ax.axvline(
-        np.log10(YE_CATASTROPHIC_RESIDUAL), color="r", lw=0.8, ls=":",
+        np.log10(YE_CATASTROPHIC_RESIDUAL),
+        color="r",
+        lw=0.8,
+        ls=":",
         label=f"catastrophic = {YE_CATASTROPHIC_RESIDUAL:.0e}",
     )
     n_cat = int((~normal).sum())
@@ -250,8 +275,10 @@ def _plot_residual_distribution(
         ax.hist(log_r, bins=bins, color="0.8", alpha=0.6, label="all")
         ax.hist(
             np.log10(np.maximum(sub_r, 1e-30)),
-            bins=bins, color=WONG_PALETTE[1 + i % (len(WONG_PALETTE) - 1)],
-            alpha=0.9, label=name,
+            bins=bins,
+            color=WONG_PALETTE[1 + i % (len(WONG_PALETTE) - 1)],
+            alpha=0.9,
+            label=name,
         )
         ax.set_title(f"{name} (N={sub_r.size}, cat={per_subpop_n_cat[name]})")
         ax.legend(fontsize=7)
@@ -277,12 +304,8 @@ def _plot_residual_distribution(
         "p95_normal": float(p_overall_normal[2]),
         "p99_normal": float(p_overall_normal[3]),
         "n_catastrophic": n_cat,
-        "per_subpop_normal_p50": {
-            k: _normal_percentiles(v)[0] for k, v in per_subpop.items()
-        },
-        "per_subpop_normal_p99": {
-            k: _normal_percentiles(v)[1] for k, v in per_subpop.items()
-        },
+        "per_subpop_normal_p50": {k: _normal_percentiles(v)[0] for k, v in per_subpop.items()},
+        "per_subpop_normal_p99": {k: _normal_percentiles(v)[1] for k, v in per_subpop.items()},
         "per_subpop_n_catastrophic": per_subpop_n_cat,
     }
 
@@ -304,7 +327,13 @@ def _plot_c0_vs_g(
         sign = np.sign(c0)
         mag = np.log10(np.abs(c0).clip(min=1e-40))
         sc = ax.scatter(
-            g, sign * mag, c=sign, s=8, cmap="coolwarm", vmin=-1, vmax=1,
+            g,
+            sign * mag,
+            c=sign,
+            s=8,
+            cmap="coolwarm",
+            vmin=-1,
+            vmax=1,
             linewidths=0,
         )
         ax.set_xlabel("G (mag)")
@@ -319,7 +348,10 @@ def _plot_c0_vs_g(
 
 
 def _plot_pca(
-    sample: pd.DataFrame, coeffs: np.ndarray, residuals: np.ndarray, out_path: Path,
+    sample: pd.DataFrame,
+    coeffs: np.ndarray,
+    residuals: np.ndarray,
+    out_path: Path,
 ) -> dict:
     set_aa_style()
     # Exclude catastrophic-Ye rows so the PCA describes the normal population
@@ -329,7 +361,9 @@ def _plot_pca(
     sample_k = sample.loc[keep].reset_index(drop=True)
     logger.info(
         "PCA on %d / %d rows (dropped %d catastrophic-Ye rows)",
-        keep.sum(), keep.size, (~keep).sum(),
+        keep.sum(),
+        keep.size,
+        (~keep).sum(),
     )
     # Robust standardisation: median + MAD*1.4826 (≈σ under Gaussian) so a
     # handful of moderate outliers don't blow up the column scales. Then
@@ -353,7 +387,11 @@ def _plot_pca(
         ("g_mag", "G (mag)", "magma"),
     ]
     fig, axes = plt.subplots(
-        1, len(color_cols), figsize=(AA_DOUBLE_COLUMN_IN, 3.0), sharex=True, sharey=True,
+        1,
+        len(color_cols),
+        figsize=(AA_DOUBLE_COLUMN_IN, 3.0),
+        sharex=True,
+        sharey=True,
     )
     for ax, (col, label, cmap) in zip(axes, color_cols):
         c = sample_k[col].to_numpy()
@@ -371,7 +409,9 @@ def _plot_pca(
 
 
 def _plot_noise_floor(
-    bp_coeffs: np.ndarray, rp_coeffs: np.ndarray, out_path: Path,
+    bp_coeffs: np.ndarray,
+    rp_coeffs: np.ndarray,
+    out_path: Path,
 ) -> dict:
     """Per-mode robust spread (MAD→σ) and per-mode median — log-scaled."""
     set_aa_style()
@@ -451,43 +491,47 @@ def _write_summary(
         p99 = residual_stats["per_subpop_normal_p99"][name]
         lines.append(f"| `{name}` | {n} | {ncat} | {p50:.3e} | {p99:.3e} |")
 
-    lines += [
-        "",
-        "## Residual RMS — NORMAL population (RMS < catastrophic threshold)",
-        "",
-        f"- p50: **{residual_stats['p50_normal']:.3e}**",
-        f"- p90: {residual_stats['p90_normal']:.3e}",
-        f"- p95: {residual_stats['p95_normal']:.3e}",
-        f"- p99 (⇒ `XP_FIT_FLAG_RESIDUAL_HIGH` threshold candidate): "
-        f"**{residual_stats['p99_normal']:.3e}**",
-        "",
-        "## Residual RMS — including catastrophic Ye failures",
-        "",
-        f"- p50: {residual_stats['p50_all']:.3e}",
-        f"- p99: {residual_stats['p99_all']:.3e}  "
-        "(pulled far above normal p99 by the catastrophic tail)",
-        "",
-        "## PCA explained variance (110-dim standardised coeffs, catastrophic rows removed)",
-        "",
-    ] + [f"- PC{i + 1}: {pca_stats[f'pc{i + 1}_var']:.3%}" for i in range(5)] + [
-        "",
-        "## Noise-floor check",
-        "",
-        f"- BP σ_MAD median, modes 0–9:   {floor_stats['bp_sigma_median_n0_10']:.3e}",
-        f"- BP σ_MAD median, modes 40–54: {floor_stats['bp_sigma_median_n40_55']:.3e}",
-        f"- RP σ_MAD median, modes 0–9:   {floor_stats['rp_sigma_median_n0_10']:.3e}",
-        f"- RP σ_MAD median, modes 25–54: {floor_stats['rp_sigma_median_n25_55']:.3e}",
-        "",
-        "## Figures",
-        "",
-        "- `residual_rms.png` — residual RMS histograms overall + per sub-pop, "
-        "with the catastrophic cutoff and normal-p99 marked.",
-        "- `c0_vs_g.png` — signed log|c₀| vs G per band.",
-        "- `pca_110d.png` — PC1/PC2 of the 110-coefficient vector coloured by "
-        "Teff, [Fe/H], log g, A_V, G (catastrophic rows excluded).",
-        "- `noise_floor.png` — per-mode |median| and σ_MAD for BP and RP.",
-        "",
-    ]
+    lines += (
+        [
+            "",
+            "## Residual RMS — NORMAL population (RMS < catastrophic threshold)",
+            "",
+            f"- p50: **{residual_stats['p50_normal']:.3e}**",
+            f"- p90: {residual_stats['p90_normal']:.3e}",
+            f"- p95: {residual_stats['p95_normal']:.3e}",
+            f"- p99 (⇒ `XP_FIT_FLAG_RESIDUAL_HIGH` threshold candidate): "
+            f"**{residual_stats['p99_normal']:.3e}**",
+            "",
+            "## Residual RMS — including catastrophic Ye failures",
+            "",
+            f"- p50: {residual_stats['p50_all']:.3e}",
+            f"- p99: {residual_stats['p99_all']:.3e}  "
+            "(pulled far above normal p99 by the catastrophic tail)",
+            "",
+            "## PCA explained variance (110-dim standardised coeffs, catastrophic rows removed)",
+            "",
+        ]
+        + [f"- PC{i + 1}: {pca_stats[f'pc{i + 1}_var']:.3%}" for i in range(5)]
+        + [
+            "",
+            "## Noise-floor check",
+            "",
+            f"- BP σ_MAD median, modes 0–9:   {floor_stats['bp_sigma_median_n0_10']:.3e}",
+            f"- BP σ_MAD median, modes 40–54: {floor_stats['bp_sigma_median_n40_55']:.3e}",
+            f"- RP σ_MAD median, modes 0–9:   {floor_stats['rp_sigma_median_n0_10']:.3e}",
+            f"- RP σ_MAD median, modes 25–54: {floor_stats['rp_sigma_median_n25_55']:.3e}",
+            "",
+            "## Figures",
+            "",
+            "- `residual_rms.png` — residual RMS histograms overall + per sub-pop, "
+            "with the catastrophic cutoff and normal-p99 marked.",
+            "- `c0_vs_g.png` — signed log|c₀| vs G per band.",
+            "- `pca_110d.png` — PC1/PC2 of the 110-coefficient vector coloured by "
+            "Teff, [Fe/H], log g, A_V, G (catastrophic rows excluded).",
+            "- `noise_floor.png` — per-mode |median| and σ_MAD for BP and RP.",
+            "",
+        ]
+    )
     md.write_text("\n".join(lines))
     logger.info("Wrote %s", md)
 
@@ -504,15 +548,21 @@ def main() -> None:
     coeffs = repro["coeffs"]
 
     residual_stats = _plot_residual_distribution(
-        residuals, sub_masks, args.out_dir / "residual_rms.png",
+        residuals,
+        sub_masks,
+        args.out_dir / "residual_rms.png",
     )
     _plot_c0_vs_g(sample, bp, rp, args.out_dir / "c0_vs_g.png")
     pca_stats = _plot_pca(sample, coeffs, residuals, args.out_dir / "pca_110d.png")
     floor_stats = _plot_noise_floor(bp, rp, args.out_dir / "noise_floor.png")
 
     _write_summary(
-        args.out_dir, sample, sub_masks,
-        residual_stats, pca_stats, floor_stats,
+        args.out_dir,
+        sample,
+        sub_masks,
+        residual_stats,
+        pca_stats,
+        floor_stats,
         basis_version=repro["basis_version"],
         basis_fingerprint=repro["basis_fingerprint_sha256"],
     )

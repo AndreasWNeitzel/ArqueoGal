@@ -88,9 +88,7 @@ class NeighborhoodAvFeatures:
         return pd.DataFrame(cols)
 
 
-def galactic_to_xyz(
-    ra_deg: np.ndarray, dec_deg: np.ndarray, distance_pc: np.ndarray
-) -> np.ndarray:
+def galactic_to_xyz(ra_deg: np.ndarray, dec_deg: np.ndarray, distance_pc: np.ndarray) -> np.ndarray:
     """Convert (RA, Dec, d) → heliocentric Cartesian (x, y, z) in pc.
 
     Uses the direct spherical-to-Cartesian transform on *equatorial* angles
@@ -327,9 +325,13 @@ def compose_av(  # noqa: PLR0913 — keyword-only tuning knobs with safe default
     logger.info(
         "compose_av: %d near (<%.2f kpc), %d mid (%.2f–%.2f kpc), %d far (≥%.2f kpc), "
         "%d excluded (bad distance)",
-        int(near_mask.sum()), near_boundary_kpc,
-        int(mid_mask.sum()), near_boundary_kpc, far_boundary_kpc,
-        int(far_mask.sum()), far_boundary_kpc,
+        int(near_mask.sum()),
+        near_boundary_kpc,
+        int(mid_mask.sum()),
+        near_boundary_kpc,
+        far_boundary_kpc,
+        int(far_mask.sum()),
+        far_boundary_kpc,
         int((~has_pos).sum()),
     )
 
@@ -517,9 +519,12 @@ def lallement2022_query(
         k_vox = z_pc / voxel_step_pc + sun_k
         # Bail on LOS exits cube — NaN to the ML so it picks up the signal.
         if (
-            i_vox.min() < 0 or i_vox.max() > nx - 1
-            or j_vox.min() < 0 or j_vox.max() > ny - 1
-            or k_vox.min() < 0 or k_vox.max() > nz - 1
+            i_vox.min() < 0
+            or i_vox.max() > nx - 1
+            or j_vox.min() < 0
+            or j_vox.max() > ny - 1
+            or k_vox.min() < 0
+            or k_vox.max() > nz - 1
         ):
             continue
         # map_coordinates expects a (ndim, N) array in FITS numpy order [k, j, i].

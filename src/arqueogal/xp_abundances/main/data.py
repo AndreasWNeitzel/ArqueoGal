@@ -72,18 +72,36 @@ attribution is auditable via the heteroscedastic head output.
 
 DEFAULT_AUX_COLS: Final[tuple[str, ...]] = (
     # Gaia photometry (Riello+2021-corrected)
-    "g_mag", "bp_mag", "rp_mag",
-    "bp_rp", "bp_g", "g_rp",
+    "g_mag",
+    "bp_mag",
+    "rp_mag",
+    "bp_rp",
+    "bp_g",
+    "g_rp",
     # Gaia astrometry (Lindegren+2021 zpt-corrected variant)
-    "parallax", "parallax_error", "parallax_corr", "ruwe",
+    "parallax",
+    "parallax_error",
+    "parallax_corr",
+    "ruwe",
     # Bailer-Jones+2021 photogeometric distance triple
-    "r_med_photogeo", "r_lo_photogeo", "r_hi_photogeo",
+    "r_med_photogeo",
+    "r_lo_photogeo",
+    "r_hi_photogeo",
     # IR photometry
-    "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
+    "j_mag",
+    "h_mag",
+    "k_mag",
+    "w1_mag",
+    "w2_mag",
     # Extinction priors (multi-column — model picks which prior to trust per star)
-    "av_edenhofer", "av_sfd", "av_lallement",
-    "av_nbhd_median", "av_nbhd_std",
-    "ag_gspphot", "ag_gspphot_lower", "ag_gspphot_upper",
+    "av_edenhofer",
+    "av_sfd",
+    "av_lallement",
+    "av_nbhd_median",
+    "av_nbhd_std",
+    "ag_gspphot",
+    "ag_gspphot_lower",
+    "ag_gspphot_upper",
 )
 """Scalar auxiliary columns appended after XP features.
 
@@ -151,15 +169,30 @@ class FeatureLayout:
 # --- Label tiers -------------------------------------------------------------
 
 _TIER1_APOGEE: Final[tuple[str, ...]] = (
-    "teff_apogee", "logg_apogee", "mh_apogee",
+    "teff_apogee",
+    "logg_apogee",
+    "mh_apogee",
 )
 _TIER2_APOGEE: Final[tuple[str, ...]] = (
-    "fe_h_apogee", "alpha_m_apogee", "mg_h_apogee", "c_h_apogee", "n_h_apogee",
+    "fe_h_apogee",
+    "alpha_m_apogee",
+    "mg_h_apogee",
+    "c_h_apogee",
+    "n_h_apogee",
 )
 _TIER3_APOGEE: Final[tuple[str, ...]] = (
-    "o_h_apogee", "na_h_apogee", "al_h_apogee", "si_h_apogee",
-    "s_h_apogee", "k_h_apogee", "ca_h_apogee", "ti_h_apogee",
-    "v_h_apogee", "cr_h_apogee", "mn_h_apogee", "ni_h_apogee",
+    "o_h_apogee",
+    "na_h_apogee",
+    "al_h_apogee",
+    "si_h_apogee",
+    "s_h_apogee",
+    "k_h_apogee",
+    "ca_h_apogee",
+    "ti_h_apogee",
+    "v_h_apogee",
+    "cr_h_apogee",
+    "mn_h_apogee",
+    "ni_h_apogee",
     "ce_h_apogee",
 )
 """Per-element [X/H]_APOGEE labels classified by research_brief §3.2.
@@ -237,6 +270,7 @@ class LabelTiers:
 
 # --- Selective column loading ------------------------------------------------
 
+
 def load_arrays(
     parquet_path: Path | str,
     layout: FeatureLayout,
@@ -267,9 +301,11 @@ def load_arrays(
 
     df = pd.read_parquet(parquet_path, columns=cols)
 
-    X = np.column_stack(
-        [df[c].to_numpy(dtype=dtype) for c in feature_cols]
-    ) if feature_cols else np.empty((len(df), 0), dtype=dtype)
+    X = (
+        np.column_stack([df[c].to_numpy(dtype=dtype) for c in feature_cols])
+        if feature_cols
+        else np.empty((len(df), 0), dtype=dtype)
+    )
     Y = np.column_stack([df[c].to_numpy(dtype=dtype) for c in label_cols])
 
     out: dict[str, np.ndarray] = {"X": X, "Y": Y}
@@ -335,14 +371,11 @@ def stratified_split_ids(
         n_train = int(round(n_cell * f_train))
         n_val = int(round(n_cell * (f_train + f_val))) - n_train
         assignments[idx[:n_train]] = "train"
-        assignments[idx[n_train:n_train + n_val]] = "val"
-        assignments[idx[n_train + n_val:]] = "test"
+        assignments[idx[n_train : n_train + n_val]] = "val"
+        assignments[idx[n_train + n_val :]] = "test"
 
     source_ids = df["source_id"].to_numpy(dtype=np.int64)
-    return {
-        split: source_ids[assignments == split].copy()
-        for split in ("train", "val", "test")
-    }
+    return {split: source_ids[assignments == split].copy() for split in ("train", "val", "test")}
 
 
 def _lookup_strat_column(df: pd.DataFrame, col: str) -> np.ndarray:
@@ -370,6 +403,7 @@ def _quantile_bin(values: np.ndarray, n_bins: int, rng: np.random.Generator) -> 
 
 
 # --- Label scaler ------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class LabelScaler:
@@ -464,6 +498,7 @@ class LabelScaler:
 
 # --- Map-style Dataset -------------------------------------------------------
 
+
 @dataclass
 class XpAbundanceDataset(Dataset):
     """In-memory Dataset over preloaded arrays from :func:`load_arrays`.
@@ -494,23 +529,21 @@ class XpAbundanceDataset(Dataset):
         if len(self.X) != len(self.Y):
             raise ValueError(f"X/Y length mismatch: {len(self.X)} vs {len(self.Y)}")
         if self.sigma_Y is not None and len(self.sigma_Y) != len(self.X):
-            raise ValueError(
-                f"sigma_Y length mismatch: {len(self.sigma_Y)} vs {len(self.X)}"
-            )
+            raise ValueError(f"sigma_Y length mismatch: {len(self.sigma_Y)} vs {len(self.X)}")
         if self.weights is not None and len(self.weights) != len(self.X):
-            raise ValueError(
-                f"weights length mismatch: {len(self.weights)} vs {len(self.X)}"
-            )
+            raise ValueError(f"weights length mismatch: {len(self.weights)} vs {len(self.X)}")
         dev = torch.device(self.device)
         self._cache["X"] = torch.as_tensor(self.X, dtype=self.dtype).to(dev)
         self._cache["Y"] = torch.as_tensor(self.Y, dtype=self.dtype).to(dev)
         if self.weights is not None:
             self._cache["weights"] = torch.as_tensor(
-                self.weights, dtype=self.dtype,
+                self.weights,
+                dtype=self.dtype,
             ).to(dev)
         elif self.sigma_Y is not None:
             self._cache["sigma_Y"] = torch.as_tensor(
-                self.sigma_Y, dtype=self.dtype,
+                self.sigma_Y,
+                dtype=self.dtype,
             ).to(dev)
 
     def __len__(self) -> int:

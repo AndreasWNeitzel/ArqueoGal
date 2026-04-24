@@ -110,8 +110,13 @@ _APOGEE_RENAMES: dict[str, str] = {
 
 # Identifier / audit columns (DESIGN §Identifiers & audit).
 _IDENT_COLS = [
-    "source_id", "spectrum_pk", "apogee_id", "v_astra",
-    "snr", "ra_deg", "dec_deg",
+    "source_id",
+    "spectrum_pk",
+    "apogee_id",
+    "v_astra",
+    "snr",
+    "ra_deg",
+    "dec_deg",
     # n_aspcap_tasks and b_deg are derived below
 ]
 
@@ -119,9 +124,18 @@ _IDENT_COLS = [
 _APOGEE_LABELS_TIER1 = ["teff_apogee", "logg_apogee", "mh_apogee", "fe_h_apogee"]
 _APOGEE_LABELS_TIER2 = ["alpha_m_apogee", "mg_h_apogee", "c_h_apogee", "n_h_apogee"]
 _APOGEE_LABELS_TIER3 = [
-    "o_h_apogee", "na_h_apogee", "al_h_apogee", "si_h_apogee",
-    "s_h_apogee", "k_h_apogee", "ca_h_apogee", "ti_h_apogee",
-    "v_h_apogee", "cr_h_apogee", "mn_h_apogee", "ni_h_apogee",
+    "o_h_apogee",
+    "na_h_apogee",
+    "al_h_apogee",
+    "si_h_apogee",
+    "s_h_apogee",
+    "k_h_apogee",
+    "ca_h_apogee",
+    "ti_h_apogee",
+    "v_h_apogee",
+    "cr_h_apogee",
+    "mn_h_apogee",
+    "ni_h_apogee",
     "ce_h_apogee",
 ]
 _APOGEE_LABELS_ALL = _APOGEE_LABELS_TIER1 + _APOGEE_LABELS_TIER2 + _APOGEE_LABELS_TIER3
@@ -135,8 +149,16 @@ _GAIA_PHOTOMETRY_COLS = ["g_mag", "bp_mag", "rp_mag", "bp_rp", "bp_g", "g_rp"]
 
 # IR photometry — 2MASS + WISE with errors (DESIGN §IR photometry).
 _IR_PHOTOMETRY_COLS = [
-    "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
-    "e_j_mag", "e_h_mag", "e_k_mag", "e_w1_mag", "e_w2_mag",
+    "j_mag",
+    "h_mag",
+    "k_mag",
+    "w1_mag",
+    "w2_mag",
+    "e_j_mag",
+    "e_h_mag",
+    "e_k_mag",
+    "e_w1_mag",
+    "e_w2_mag",
 ]
 
 # Distance triple (DESIGN §Distance).
@@ -147,9 +169,13 @@ _DISTANCE_COLS = ["r_med_photogeo", "r_lo_photogeo", "r_hi_photogeo"]
 # a_v_sfd in the source. av_lallement is renamed from av_lallement_xcheck
 # after the Lallement lookup. av_nbhd_* is computed here.
 _EXTINCTION_RAW_COLS = [
-    "ebv_edenhofer_2023", "e_ebv_edenhofer_2023",
-    "ebv_sfd", "e_ebv_sfd",
-    "ag_gspphot", "ag_gspphot_lower", "ag_gspphot_upper",
+    "ebv_edenhofer_2023",
+    "e_ebv_edenhofer_2023",
+    "ebv_sfd",
+    "e_ebv_sfd",
+    "ag_gspphot",
+    "ag_gspphot_lower",
+    "ag_gspphot_upper",
 ]
 
 # APOGEE quality flags (DESIGN §Flags).
@@ -212,20 +238,28 @@ def main() -> None:
 
     logger.info(
         "applying RGB scope cut: Teff ∈ [%.0f, %.0f] K AND logg ∈ [%.1f, %.1f]",
-        RGB_TEFF_MIN_K, RGB_TEFF_MAX_K, RGB_LOGG_MIN, RGB_LOGG_MAX,
+        RGB_TEFF_MIN_K,
+        RGB_TEFF_MAX_K,
+        RGB_LOGG_MIN,
+        RGB_LOGG_MAX,
     )
     teff = merged["teff_apogee"].to_numpy(dtype=np.float64)
     logg = merged["logg_apogee"].to_numpy(dtype=np.float64)
     rgb_mask = (
-        np.isfinite(teff) & (teff >= RGB_TEFF_MIN_K) & (teff <= RGB_TEFF_MAX_K)
-        & np.isfinite(logg) & (logg >= RGB_LOGG_MIN) & (logg <= RGB_LOGG_MAX)
+        np.isfinite(teff)
+        & (teff >= RGB_TEFF_MIN_K)
+        & (teff <= RGB_TEFF_MAX_K)
+        & np.isfinite(logg)
+        & (logg >= RGB_LOGG_MIN)
+        & (logg <= RGB_LOGG_MAX)
     )
     n_rgb_before = len(merged)
     merged = merged.loc[rgb_mask].reset_index(drop=True)
     n_rgb_dropped = n_rgb_before - len(merged)
     logger.info(
         "  dropped %d rows outside RGB window (keep %d)",
-        n_rgb_dropped, len(merged),
+        n_rgb_dropped,
+        len(merged),
     )
 
     logger.info("computing derived column: b_deg (Galactic latitude via astropy)")
@@ -236,9 +270,7 @@ def main() -> None:
 
     logger.info("computing derived column: n_aspcap_tasks (rows per source_id)")
     tasks_per_star = merged.groupby("source_id").size()
-    merged["n_aspcap_tasks"] = (
-        merged["source_id"].map(tasks_per_star).astype(np.int32)
-    )
+    merged["n_aspcap_tasks"] = merged["source_id"].map(tasks_per_star).astype(np.int32)
 
     logger.info("computing derived column: av_edenhofer = %.2f × ebv_edenhofer_2023", EBV_TO_AV)
     merged["av_edenhofer"] = (EBV_TO_AV * merged["ebv_edenhofer_2023"]).astype(np.float32)
@@ -269,6 +301,7 @@ def main() -> None:
     lallement_valid: int | None = None
     if LALLEMENT_CUBE_PATH.exists():
         from arqueogal.data.dust_maps import lallement2022_query, load_lallement2022_cube
+
         logger.info("loading Lallement+2022 cube for A_V feature")
         cube = load_lallement2022_cube(LALLEMENT_CUBE_PATH)
         av_lall = lallement2022_query(
@@ -294,7 +327,8 @@ def main() -> None:
     keep = [
         # Identifiers & audit (8 cols)
         *_IDENT_COLS,
-        "n_aspcap_tasks", "b_deg",
+        "n_aspcap_tasks",
+        "b_deg",
         # APOGEE labels + errors (21 + 21 cols)
         *_APOGEE_LABELS_ALL,
         *_APOGEE_ERROR_COLS,
@@ -307,8 +341,12 @@ def main() -> None:
         # Distance
         *_DISTANCE_COLS,
         # Extinction priors — multi-column
-        "av_edenhofer", "av_sfd", "av_lallement",
-        "av_nbhd_median", "av_nbhd_std", "n_neighbors_75pc",
+        "av_edenhofer",
+        "av_sfd",
+        "av_lallement",
+        "av_nbhd_median",
+        "av_nbhd_std",
+        "n_neighbors_75pc",
         *_EXTINCTION_RAW_COLS,
         # APOGEE flags (Ye + xp_fit flags attached in stage B)
         *_APOGEE_FLAG_COLS,
@@ -317,7 +355,8 @@ def main() -> None:
         # computed against this column). Not an ML input; retained for audit.
         "teff_gspphot",
         # Sampled flux — replaced by Hermite coefficients in stage B
-        "corrected_flux", "ye2024_flag",
+        "corrected_flux",
+        "ye2024_flag",
     ]
     missing = [c for c in keep if c not in merged.columns]
     if missing:
@@ -344,12 +383,15 @@ def main() -> None:
                 sha256=_sha256_of(xp_path),
             ),
             *(
-                [LocalSource(
-                    name="Lallement+2022 3D extinction cube",
-                    path=str(LALLEMENT_CUBE_PATH),
-                    sha256=_sha256_of(LALLEMENT_CUBE_PATH),
-                )]
-                if LALLEMENT_CUBE_PATH.exists() else []
+                [
+                    LocalSource(
+                        name="Lallement+2022 3D extinction cube",
+                        path=str(LALLEMENT_CUBE_PATH),
+                        sha256=_sha256_of(LALLEMENT_CUBE_PATH),
+                    )
+                ]
+                if LALLEMENT_CUBE_PATH.exists()
+                else []
             ),
         ],
         cuts_applied=[
@@ -371,8 +413,11 @@ def main() -> None:
             "Derived §8.3 neighborhood-median A_V from ag_gspphot + Gaia 3D "
             f"positions (radius={NEIGHBORHOOD_RADIUS_PC} pc, "
             f"min_neighbors={MIN_NEIGHBORS_FOR_MEDIAN})",
-            *( ["Computed av_lallement from Lallement+2022 cube via trilinear LOS integration"]
-               if LALLEMENT_CUBE_PATH.exists() else [] ),
+            *(
+                ["Computed av_lallement from Lallement+2022 cube via trilinear LOS integration"]
+                if LALLEMENT_CUBE_PATH.exists()
+                else []
+            ),
         ],
         row_count_before=n_before,
         row_count_after=int(len(features)),
@@ -412,9 +457,7 @@ def main() -> None:
             "n_ye2024_no_synth_phot": int((features["ye2024_flag"] == 1).sum()),
             "n_ye2024_calibrate_fail": int((features["ye2024_flag"] == 2).sum()),
             "n_unique_source_ids": int(features["source_id"].nunique()),
-            "n_duplicate_source_ids": int(
-                (features["source_id"].value_counts() > 1).sum()
-            ),
+            "n_duplicate_source_ids": int((features["source_id"].value_counts() > 1).sum()),
             "max_aspcap_tasks_per_star": int(features["n_aspcap_tasks"].max()),
             "feature_columns": list(features.columns),
         },

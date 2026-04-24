@@ -101,24 +101,19 @@ class CovarianceBlockLayout:
         if any(k <= 0 for k in self.block_sizes):
             raise ValueError(f"block_sizes must all be positive, got {self.block_sizes}")
         if self.n_diagonal_only < 0:
-            raise ValueError(
-                f"n_diagonal_only must be >= 0, got {self.n_diagonal_only}"
-            )
+            raise ValueError(f"n_diagonal_only must be >= 0, got {self.n_diagonal_only}")
         n = sum(self.block_sizes) + self.n_diagonal_only
         if len(self.label_order_block) != n:
             raise ValueError(
-                f"label_order_block length {len(self.label_order_block)} != "
-                f"total labels {n}"
+                f"label_order_block length {len(self.label_order_block)} != total labels {n}"
             )
         if len(self.label_order_human) != n:
             raise ValueError(
-                f"label_order_human length {len(self.label_order_human)} != "
-                f"total labels {n}"
+                f"label_order_human length {len(self.label_order_human)} != total labels {n}"
             )
         if set(self.label_order_block) != set(self.label_order_human):
             raise ValueError(
-                "label_order_block and label_order_human must be permutations "
-                "of each other"
+                "label_order_block and label_order_human must be permutations of each other"
             )
         if len(set(self.label_order_block)) != n:
             raise ValueError("label_order_block contains duplicates")
@@ -145,7 +140,8 @@ class CovarianceBlockLayout:
         """
         lookup = {name: i for i, name in enumerate(self.label_order_block)}
         return torch.tensor(
-            [lookup[name] for name in self.label_order_human], dtype=torch.long,
+            [lookup[name] for name in self.label_order_human],
+            dtype=torch.long,
         )
 
     @property
@@ -156,18 +152,23 @@ class CovarianceBlockLayout:
         """
         lookup = {name: i for i, name in enumerate(self.label_order_human)}
         return torch.tensor(
-            [lookup[name] for name in self.label_order_block], dtype=torch.long,
+            [lookup[name] for name in self.label_order_block],
+            dtype=torch.long,
         )
 
     def reorder_block_to_human(
-        self, tensor: torch.Tensor, dim: int = -1,
+        self,
+        tensor: torch.Tensor,
+        dim: int = -1,
     ) -> torch.Tensor:
         """Reorder a block-ordered tensor along ``dim`` to human order."""
         perm = self.block_to_human_perm.to(tensor.device)
         return tensor.index_select(dim, perm)
 
     def reorder_human_to_block(
-        self, tensor: torch.Tensor, dim: int = -1,
+        self,
+        tensor: torch.Tensor,
+        dim: int = -1,
     ) -> torch.Tensor:
         """Reorder a human-ordered tensor along ``dim`` to model/block order."""
         perm = self.human_to_block_perm.to(tensor.device)
@@ -192,13 +193,16 @@ class CovarianceBlockLayout:
             label_order_human=tuple(blob["label_order_human"]),  # type: ignore[arg-type]
             block_names=(
                 tuple(blob["block_names"])  # type: ignore[arg-type]
-                if blob.get("block_names") else None
+                if blob.get("block_names")
+                else None
             ),
         )
 
     @classmethod
     def anonymous(
-        cls, block_sizes: Sequence[int], n_diagonal_only: int = 0,
+        cls,
+        block_sizes: Sequence[int],
+        n_diagonal_only: int = 0,
     ) -> "CovarianceBlockLayout":
         """Build a layout with placeholder label names — for tests / sizing only.
 
@@ -220,17 +224,30 @@ class CovarianceBlockLayout:
 
 _ATMOSPHERIC: tuple[str, ...] = ("teff_apogee", "logg_apogee", "mh_apogee")
 _ALPHA: tuple[str, ...] = (
-    "mg_h_apogee", "si_h_apogee", "ca_h_apogee", "ti_h_apogee",
+    "mg_h_apogee",
+    "si_h_apogee",
+    "ca_h_apogee",
+    "ti_h_apogee",
 )
 _FE_PEAK: tuple[str, ...] = (
-    "fe_h_apogee", "mn_h_apogee", "ni_h_apogee", "cr_h_apogee",
+    "fe_h_apogee",
+    "mn_h_apogee",
+    "ni_h_apogee",
+    "cr_h_apogee",
 )
 _LIGHT: tuple[str, ...] = (
-    "c_h_apogee", "n_h_apogee", "o_h_apogee",
-    "na_h_apogee", "al_h_apogee", "k_h_apogee",
+    "c_h_apogee",
+    "n_h_apogee",
+    "o_h_apogee",
+    "na_h_apogee",
+    "al_h_apogee",
+    "k_h_apogee",
 )
 _DIAGONAL_ONLY: tuple[str, ...] = (
-    "alpha_m_apogee", "s_h_apogee", "v_h_apogee", "ce_h_apogee",
+    "alpha_m_apogee",
+    "s_h_apogee",
+    "v_h_apogee",
+    "ce_h_apogee",
 )
 
 # Human / documentation order mirrors ``data.LabelTiers`` (Tier 1 + 2 + 3).
@@ -238,12 +255,26 @@ _DIAGONAL_ONLY: tuple[str, ...] = (
 # validated against LabelTiers at test time.
 _TIER1_HUMAN: tuple[str, ...] = ("teff_apogee", "logg_apogee", "mh_apogee")
 _TIER2_HUMAN: tuple[str, ...] = (
-    "fe_h_apogee", "alpha_m_apogee", "mg_h_apogee", "c_h_apogee", "n_h_apogee",
+    "fe_h_apogee",
+    "alpha_m_apogee",
+    "mg_h_apogee",
+    "c_h_apogee",
+    "n_h_apogee",
 )
 _TIER3_HUMAN: tuple[str, ...] = (
-    "o_h_apogee", "na_h_apogee", "al_h_apogee", "si_h_apogee", "s_h_apogee",
-    "k_h_apogee", "ca_h_apogee", "ti_h_apogee", "v_h_apogee", "cr_h_apogee",
-    "mn_h_apogee", "ni_h_apogee", "ce_h_apogee",
+    "o_h_apogee",
+    "na_h_apogee",
+    "al_h_apogee",
+    "si_h_apogee",
+    "s_h_apogee",
+    "k_h_apogee",
+    "ca_h_apogee",
+    "ti_h_apogee",
+    "v_h_apogee",
+    "cr_h_apogee",
+    "mn_h_apogee",
+    "ni_h_apogee",
+    "ce_h_apogee",
 )
 
 
@@ -275,7 +306,11 @@ def default_pipeline1_layout() -> CovarianceBlockLayout:
 # [Mg/H] rather than [Mg/Fe] because the APOGEE native output is [Mg/H];
 # [Fe/H] is still implicit via [M/H].
 _FIVE_LABEL: tuple[str, ...] = (
-    "teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apogee",
+    "teff_apogee",
+    "logg_apogee",
+    "mh_apogee",
+    "alpha_m_apogee",
+    "mg_h_apogee",
 )
 
 
@@ -316,6 +351,7 @@ def two_label_block_layout() -> CovarianceBlockLayout:
 
 
 # --- ModelConfig / Encoder / Head / Wrapper ---------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class ModelConfig:
@@ -428,9 +464,13 @@ class BlockCholeskyHead(nn.Module):
 
         # Head trunk: widened two-layer MLP at ``hidden`` width.
         self.trunk = nn.Sequential(
-            nn.Linear(latent_dim, hidden), nn.LayerNorm(hidden), nn.GELU(),
+            nn.Linear(latent_dim, hidden),
+            nn.LayerNorm(hidden),
+            nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden, hidden), nn.LayerNorm(hidden), nn.GELU(),
+            nn.Linear(hidden, hidden),
+            nn.LayerNorm(hidden),
+            nn.GELU(),
         )
         self.mean_head = nn.Linear(hidden, self.n_labels)
 
@@ -481,7 +521,9 @@ class BlockCholeskyHead(nn.Module):
             block_raw = raw[:, : self._n_block_params]
             pos_diag = F.softplus(block_raw) + _MIN_CHOLESKY_DIAG
             vals = torch.where(
-                self._all_diag_mask, pos_diag, block_raw.to(pos_diag.dtype),
+                self._all_diag_mask,
+                pos_diag,
+                block_raw.to(pos_diag.dtype),
             )
             out_dtype = vals.dtype
         else:
@@ -532,7 +574,8 @@ class XpAbundanceModel(nn.Module):
         return self.config.block_layout
 
     def forward(
-        self, x: torch.Tensor,
+        self,
+        x: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         h, z = self.encoder(x)
         mu, L = self.head(h)

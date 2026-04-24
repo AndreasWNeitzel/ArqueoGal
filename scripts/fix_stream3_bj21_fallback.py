@@ -11,6 +11,7 @@ ensemble never required BJ21 lower/upper bounds as features).
 Writes atomically (temp file → rename). Updates the provenance JSON with
 the fill counts.
 """
+
 from __future__ import annotations
 
 import json
@@ -62,9 +63,7 @@ def main() -> None:
             meta = json.load(f)
         extra = meta.setdefault("extra", {})
         extra["bj21_fallback_fills_from_union_distance_pc"] = n_fill
-        extra["r_med_photogeo_finite_after_fallback"] = int(
-            np.isfinite(df["r_med_photogeo"]).sum()
-        )
+        extra["r_med_photogeo_finite_after_fallback"] = int(np.isfinite(df["r_med_photogeo"]).sum())
         corr = meta.setdefault("corrections", [])
         corr.append(
             "r_med_photogeo fallback: filled from union distance_pc where "

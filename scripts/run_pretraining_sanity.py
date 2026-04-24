@@ -35,6 +35,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -63,8 +64,12 @@ def _plot_kiel(df: pd.DataFrame, out_path: Path) -> None:
     logg = df["logg_apogee"].to_numpy()
     mask = np.isfinite(teff) & np.isfinite(logg)
     h = ax.hexbin(
-        teff[mask], logg[mask], gridsize=100, bins="log",
-        cmap="viridis", mincnt=1,
+        teff[mask],
+        logg[mask],
+        gridsize=100,
+        bins="log",
+        cmap="viridis",
+        mincnt=1,
     )
     ax.invert_xaxis()
     ax.invert_yaxis()
@@ -85,8 +90,12 @@ def _plot_tinsley_wallerstein(df: pd.DataFrame, out_path: Path) -> None:
     am = df["alpha_m_apogee"].to_numpy()
     mask = np.isfinite(feh) & np.isfinite(am)
     h = ax.hexbin(
-        feh[mask], am[mask], gridsize=100, bins="log",
-        cmap="viridis", mincnt=1,
+        feh[mask],
+        am[mask],
+        gridsize=100,
+        bins="log",
+        cmap="viridis",
+        mincnt=1,
     )
     ax.set_xlabel(r"$[\mathrm{Fe/H}]_\mathrm{APOGEE}$")
     ax.set_ylabel(r"$[\alpha/\mathrm{M}]_\mathrm{APOGEE}$")
@@ -107,22 +116,21 @@ def _umap_embedding_43d(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, int]:
     to umap-learn if cuML fails.
     """
     trunc = FeatureLayout.truncated_43d()
-    cols = (
-        list(trunc.bp_coef_cols) + list(trunc.rp_coef_cols)
-        + list(trunc.xp_scalar_cols)
-    )
+    cols = list(trunc.bp_coef_cols) + list(trunc.rp_coef_cols) + list(trunc.xp_scalar_cols)
     X = np.column_stack([df[c].to_numpy(np.float32) for c in cols])
     finite = np.isfinite(X).all(axis=1)
     X = X[finite]
     teff = df.loc[finite, "teff_apogee"].to_numpy(np.float32)
-    logger.info("UMAP input: %d rows × %d cols (of %d total)",
-                X.shape[0], X.shape[1], len(df))
+    logger.info("UMAP input: %d rows × %d cols (of %d total)", X.shape[0], X.shape[1], len(df))
 
     try:
         from cuml.manifold import UMAP as cuUMAP
+
         logger.info("using cuml.UMAP on GPU")
         reducer = cuUMAP(
-            n_neighbors=25, min_dist=0.1, n_components=2,
+            n_neighbors=25,
+            min_dist=0.1,
+            n_components=2,
             random_state=0,
         )
         emb = reducer.fit_transform(X)
@@ -130,9 +138,13 @@ def _umap_embedding_43d(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, int]:
     except Exception as e:  # noqa: BLE001 — fallback path
         logger.warning("cuML UMAP failed (%s); falling back to umap-learn CPU", e)
         import umap
+
         reducer = umap.UMAP(
-            n_neighbors=25, min_dist=0.1, n_components=2,
-            random_state=0, n_jobs=-1,
+            n_neighbors=25,
+            min_dist=0.1,
+            n_components=2,
+            random_state=0,
+            n_jobs=-1,
         )
         emb = reducer.fit_transform(X)
 
@@ -144,16 +156,17 @@ def _plot_umap_continuity(emb: np.ndarray, teff: np.ndarray, n_used: int, out_pa
     fig, ax = plt.subplots(figsize=(8, 7), dpi=150)
     finite_teff = np.isfinite(teff)
     sc = ax.scatter(
-        emb[finite_teff, 0], emb[finite_teff, 1],
-        c=teff[finite_teff], cmap="plasma",
-        s=1.0, alpha=0.35, rasterized=True,
+        emb[finite_teff, 0],
+        emb[finite_teff, 1],
+        c=teff[finite_teff],
+        cmap="plasma",
+        s=1.0,
+        alpha=0.35,
+        rasterized=True,
     )
     ax.set_xlabel("UMAP 1")
     ax.set_ylabel("UMAP 2")
-    ax.set_title(
-        f"43-D XP UMAP continuity check "
-        f"(n={n_used:,}, colour = Teff_apogee)"
-    )
+    ax.set_title(f"43-D XP UMAP continuity check (n={n_used:,}, colour = Teff_apogee)")
     cbar = fig.colorbar(sc, ax=ax)
     cbar.set_label(r"$T_\mathrm{eff,\,APOGEE}$ / K")
     fig.tight_layout()
@@ -183,9 +196,7 @@ def _render_markdown(
     lines.append(f"- Input: `{parquet_path}` ({n_rows:,} rows × {n_cols} cols)")
     n_hard = sum(1 for r in verdict.results if r.level == "HARD")
     n_soft = sum(1 for r in verdict.results if r.level == "SOFT")
-    lines.append(
-        f"- Checks: {len(verdict.results)} ({n_hard} hard-fail, {n_soft} soft-fail)"
-    )
+    lines.append(f"- Checks: {len(verdict.results)} ({n_hard} hard-fail, {n_soft} soft-fail)")
     lines.append(f"- Any hard-fail: **{verdict.any_hard_fail}**")
     lines.append(f"- Any soft-fail: **{verdict.any_soft_fail}**")
     lines.append("")
@@ -195,9 +206,7 @@ def _render_markdown(
     lines.append("|---|---|---|---|---|")
     for i, r in enumerate(verdict.results, start=1):
         mark = "PASS" if r.passed else "FAIL"
-        lines.append(
-            f"| {i} | `{r.name}` | {r.level} | **{mark}** | {r.summary} |"
-        )
+        lines.append(f"| {i} | `{r.name}` | {r.level} | **{mark}** | {r.summary} |")
     lines.append("")
 
     # Details subsection per check
@@ -342,7 +351,9 @@ def main() -> None:
     # Battery (checks 1, 2, 3, 5, 6)
     tiers = LabelTiers()
     verdict = run_battery(
-        df, expected_dedup_rows=EXPECTED_DEDUP_ROWS_OUT, tiers=tiers,
+        df,
+        expected_dedup_rows=EXPECTED_DEDUP_ROWS_OUT,
+        tiers=tiers,
     )
     for r in verdict.results:
         mark = "PASS" if r.passed else "FAIL"
@@ -367,14 +378,19 @@ def main() -> None:
     # Markdown report
     report_path = out_dir / "pretraining_audit.md"
     figures = {
-        "kiel": kiel_path, "tinsley_wallerstein": tw_path,
+        "kiel": kiel_path,
+        "tinsley_wallerstein": tw_path,
         "umap_continuity": umap_path,
     }
     # Make figure paths relative to report directory for the markdown link
     rel_figures = {k: Path("figures") / v.name for k, v in figures.items()}
     _render_markdown(
-        verdict=verdict, figures=rel_figures, report_path=report_path,
-        parquet_path=parquet.relative_to(repo), n_rows=len(df), n_cols=len(df.columns),
+        verdict=verdict,
+        figures=rel_figures,
+        report_path=report_path,
+        parquet_path=parquet.relative_to(repo),
+        n_rows=len(df),
+        n_cols=len(df.columns),
     )
     logger.info("wrote %s", report_path)
 
@@ -385,7 +401,8 @@ def main() -> None:
         "any_hard_fail": verdict.any_hard_fail,
         "any_soft_fail": verdict.any_soft_fail,
         "parquet": str(parquet.relative_to(repo)),
-        "n_rows": len(df), "n_cols": len(df.columns),
+        "n_rows": len(df),
+        "n_cols": len(df.columns),
         "checks": [asdict(r) for r in verdict.results],
     }
     results_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")

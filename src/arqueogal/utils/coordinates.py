@@ -132,8 +132,7 @@ def galactic_velocities_to_cylindrical(  # noqa: PLR0913 — (U,V,W,R,phi) vecto
 
     if not (U_kms.shape == V_kms.shape == W_kms.shape == phi_rad.shape):
         raise ValueError(
-            "U/V/W/phi shape mismatch: "
-            f"{U_kms.shape}/{V_kms.shape}/{W_kms.shape}/{phi_rad.shape}",
+            f"U/V/W/phi shape mismatch: {U_kms.shape}/{V_kms.shape}/{W_kms.shape}/{phi_rad.shape}",
         )
 
     cos_phi = np.cos(phi_rad)

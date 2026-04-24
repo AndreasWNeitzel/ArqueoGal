@@ -111,8 +111,7 @@ def fetch_starhorse2(  # noqa: PLR0913 — keyword-only tuning knobs with safe d
     """
     if sample not in STARHORSE2_SAMPLE_TABLES:
         raise ValueError(
-            f"unknown StarHorse2 sample {sample!r}; "
-            f"supported: {sorted(STARHORSE2_SAMPLE_TABLES)}"
+            f"unknown StarHorse2 sample {sample!r}; supported: {sorted(STARHORSE2_SAMPLE_TABLES)}"
         )
     adql = STARHORSE2_ADQL_TEMPLATE.format(
         table=STARHORSE2_SAMPLE_TABLES[sample], placeholder=BATCH_PLACEHOLDER
@@ -157,8 +156,8 @@ def merge_distances(
     out = bailerjones.copy()
     out["dist_primary_pc"] = out["r_med_photogeo"].astype(float)
     out["dist_sigma_sym_pc"] = (
-        (out["r_hi_photogeo"].astype(float) - out["r_lo_photogeo"].astype(float)) / 2.0
-    )
+        out["r_hi_photogeo"].astype(float) - out["r_lo_photogeo"].astype(float)
+    ) / 2.0
 
     if starhorse2 is None or starhorse2.empty:
         return out
@@ -178,7 +177,9 @@ def merge_distances(
     if n_conflict:
         logger.info(
             "%d/%d stars flagged dist_conflict (|Δlog10| > %.2f)",
-            n_conflict, len(merged), log_threshold,
+            n_conflict,
+            len(merged),
+            log_threshold,
         )
     return merged
 

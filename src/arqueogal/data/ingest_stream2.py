@@ -125,7 +125,10 @@ def ingest_stream2(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
 
     logger.info("Stream 2: TIC v8.2 lookup for %d TICs", n_hon)
     tic = fetch_tic_v82(
-        vz, hon["TIC"].tolist(), batch_size=tic_batch_size, checkpoint_dir=tic_ckpt,
+        vz,
+        hon["TIC"].tolist(),
+        batch_size=tic_batch_size,
+        checkpoint_dir=tic_ckpt,
     )
     # Drop TICs without a DR2 counterpart before we spend a TAP batch on NaNs.
     tic_valid = tic.dropna(subset=["GAIA"]).copy()
@@ -134,12 +137,14 @@ def ingest_stream2(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     n_tic_with_dr2 = len(tic_valid)
     logger.info(
         "Stream 2: TIC rows with DR2: %d / %d",
-        n_tic_with_dr2, n_tic_total,
+        n_tic_with_dr2,
+        n_tic_total,
     )
 
     logger.info(
         "Stream 2: DR2→DR3 (angular<%s mas, |Δmag|<%s)",
-        max_angular_distance_mas, max_mag_diff,
+        max_angular_distance_mas,
+        max_mag_diff,
     )
     xmatch = crossmatch_dr2_to_dr3(
         ap,
@@ -165,10 +170,16 @@ def ingest_stream2(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     # ── Gaia enrichment (on dr3_source_id == source_id).
     joined = hon.merge(tic_valid, on="TIC", how="inner", suffixes=("", "_tic"))
     joined = joined.merge(
-        xmatch, left_on="GAIA", right_on="dr2_source_id", how="inner",
+        xmatch,
+        left_on="GAIA",
+        right_on="dr2_source_id",
+        how="inner",
     )
     joined = joined.merge(
-        enriched, left_on="dr3_source_id", right_on="source_id", how="inner",
+        enriched,
+        left_on="dr3_source_id",
+        right_on="source_id",
+        how="inner",
     )
     n_joined = len(joined)
     logger.info("Stream 2: joined %d rows", n_joined)

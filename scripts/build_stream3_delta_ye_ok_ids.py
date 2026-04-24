@@ -72,21 +72,23 @@ def main() -> None:
     if len(merged) != row_before:
         log.warning(
             "join dropped %d source_ids (delta %d -> %d); expected full coverage",
-            row_before - len(merged), row_before, len(merged),
+            row_before - len(merged),
+            row_before,
+            len(merged),
         )
 
     ok = merged[merged["ye2024_flag"] == YE2024_FLAG_OK][["source_id"]]
     ok = ok.sort_values("source_id").reset_index(drop=True)
-    log.info("  Ye-OK: %d / %d (%.2f%%)", len(ok), len(merged),
-             100.0 * len(ok) / max(len(merged), 1))
+    log.info(
+        "  Ye-OK: %d / %d (%.2f%%)", len(ok), len(merged), 100.0 * len(ok) / max(len(merged), 1)
+    )
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     tmp = OUTPUT.with_suffix(OUTPUT.suffix + ".part")
     ok.to_parquet(tmp, index=False, compression="snappy")
     tmp.replace(OUTPUT)
     out_sha = _sha256(OUTPUT)
-    log.info("wrote %s (%d rows, sha256=%s…)",
-             OUTPUT, len(ok), out_sha[:12])
+    log.info("wrote %s (%d rows, sha256=%s…)", OUTPUT, len(ok), out_sha[:12])
 
     prov = Provenance(
         output_file=str(OUTPUT.relative_to(REPO_ROOT)),

@@ -1,4 +1,5 @@
 """Shared helpers for gallery plotting scripts."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,30 +16,32 @@ GALLERY = ROOT / "reports" / "gallery"
 
 
 def apply_style() -> None:
-    mpl.rcParams.update({
-        "text.usetex": False,
-        # Use matplotlib's default mathtext (italic-serif) so $T_{\rm eff}$,
-        # $\log g$, $\in$ and friends render as proper math. "regular" was
-        # making math look like plain text.
-        "mathtext.fontset": "dejavuserif",
-        "mathtext.default": "it",
-        "figure.dpi": 110,
-        "savefig.dpi": 150,
-        "font.family": "DejaVu Sans",
-        "font.size": 10.0,
-        "axes.unicode_minus": False,
-        "axes.labelsize": 10.0,
-        "axes.titlesize": 11.0,
-        "axes.titleweight": "semibold",
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "axes.grid": True,
-        "grid.alpha": 0.25,
-        "grid.linewidth": 0.5,
-        "legend.frameon": False,
-        "legend.fontsize": 9.0,
-        "figure.autolayout": False,
-    })
+    mpl.rcParams.update(
+        {
+            "text.usetex": False,
+            # Use matplotlib's default mathtext (italic-serif) so $T_{\rm eff}$,
+            # $\log g$, $\in$ and friends render as proper math. "regular" was
+            # making math look like plain text.
+            "mathtext.fontset": "dejavuserif",
+            "mathtext.default": "it",
+            "figure.dpi": 110,
+            "savefig.dpi": 150,
+            "font.family": "DejaVu Sans",
+            "font.size": 10.0,
+            "axes.unicode_minus": False,
+            "axes.labelsize": 10.0,
+            "axes.titlesize": 11.0,
+            "axes.titleweight": "semibold",
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.grid": True,
+            "grid.alpha": 0.25,
+            "grid.linewidth": 0.5,
+            "legend.frameon": False,
+            "legend.fontsize": 9.0,
+            "figure.autolayout": False,
+        }
+    )
 
 
 PALETTE = {
@@ -63,8 +66,12 @@ def radec_to_galactic(ra_deg: np.ndarray, dec_deg: np.ndarray) -> tuple[np.ndarr
     """Convert ICRS (ra, dec) in degrees to Galactic (l, b) in degrees."""
     from astropy.coordinates import SkyCoord
     import astropy.units as u
-    c = SkyCoord(ra=np.asarray(ra_deg, dtype=float) * u.deg,
-                 dec=np.asarray(dec_deg, dtype=float) * u.deg, frame="icrs")
+
+    c = SkyCoord(
+        ra=np.asarray(ra_deg, dtype=float) * u.deg,
+        dec=np.asarray(dec_deg, dtype=float) * u.deg,
+        frame="icrs",
+    )
     g = c.galactic
     return g.l.degree, g.b.degree
 
@@ -81,7 +88,9 @@ def galactic_mollweide(l_deg: np.ndarray, b_deg: np.ndarray) -> tuple[np.ndarray
     return -np.deg2rad(lon), np.deg2rad(np.asarray(b_deg, dtype=float))
 
 
-def radec_to_galactic_mollweide(ra_deg: np.ndarray, dec_deg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def radec_to_galactic_mollweide(
+    ra_deg: np.ndarray, dec_deg: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     l, b = radec_to_galactic(ra_deg, dec_deg)
     return galactic_mollweide(l, b)
 

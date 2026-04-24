@@ -43,9 +43,7 @@ from arqueogal.data.tap import BATCH_PLACEHOLDER
 # ---- helpers -----------------------------------------------------------------
 
 
-def _fake_xp_row(
-    source_id: int, c0_bp: float = 1e-15, c0_rp: float = 2e-15
-) -> dict[str, object]:
+def _fake_xp_row(source_id: int, c0_bp: float = 1e-15, c0_rp: float = 2e-15) -> dict[str, object]:
     """Build one §6.3-shaped row with deterministic coefficients."""
     bp = np.zeros(XP_COEFF_LEN, dtype=np.float64)
     rp = np.zeros(XP_COEFF_LEN, dtype=np.float64)
@@ -91,6 +89,7 @@ def test_fetch_rejects_zero_batch_size() -> None:
 
 def test_fetch_empty_input_short_circuits() -> None:
     service = MagicMock(spec=TAPService)
+
     # Poison the TAP runners so any call blows up — proves we never hit them.
     def boom(*_a, **_kw):
         raise AssertionError("TAP runner should not be called for empty input")
@@ -112,9 +111,7 @@ def test_fetch_batches_correctly_and_concatenates(
         return Table.from_pandas(_fake_xp_df(ids))
 
     monkeypatch.setattr(tap_mod, "run_async", fake_async)
-    monkeypatch.setattr(
-        tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire")
-    )
+    monkeypatch.setattr(tap_mod, "run_sync", lambda *_a, **_kw: pytest.fail("sync should not fire"))
 
     service = MagicMock(spec=TAPService)
     out = fetch_xp_coefficients(service, list(range(1, 8)), batch_size=3, mode="async")
@@ -124,9 +121,7 @@ def test_fetch_batches_correctly_and_concatenates(
     assert list(out["source_id"]) == [1, 2, 3, 4, 5, 6, 7]
 
 
-def test_fetch_checkpoint_reuse(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_fetch_checkpoint_reuse(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Once a batch_NNNN.parquet exists, the TAP runner must be skipped."""
     ckpt = tmp_path / "xp_batches"
     ckpt.mkdir()
@@ -183,11 +178,13 @@ def test_align_to_batch_restores_dropped_rows_as_nan() -> None:
 
     batch = pd.DataFrame({"source_id": np.array([10, 20, 30, 40], dtype=np.int64)})
     # Simulate gaiaxpy dropping rows 20 and 40 and reordering the rest.
-    syn = pd.DataFrame({
-        "source_id": np.array([30, 10], dtype=np.int64),
-        "SkyMapper_mag_u": [15.0, 14.0],
-        "SkyMapper_mag_g": [14.5, 13.5],
-    })
+    syn = pd.DataFrame(
+        {
+            "source_id": np.array([30, 10], dtype=np.int64),
+            "SkyMapper_mag_u": [15.0, 14.0],
+            "SkyMapper_mag_g": [14.5, 13.5],
+        }
+    )
     out = _align_to_batch(batch, syn)
     assert len(out) == len(batch)
     assert out["source_id"].tolist() == [10, 20, 30, 40]
@@ -203,10 +200,12 @@ def test_align_to_batch_tolerates_na_source_id() -> None:
     from arqueogal.data.gaia_xp import _align_to_batch
 
     batch = pd.DataFrame({"source_id": np.array([100, 200, 300], dtype=np.int64)})
-    syn = pd.DataFrame({
-        "source_id": pd.array([100, pd.NA, 300], dtype="Int64"),
-        "GaiaDr3Vega_mag_G": [11.0, 99.0, 12.0],  # NA row has junk photometry
-    })
+    syn = pd.DataFrame(
+        {
+            "source_id": pd.array([100, pd.NA, 300], dtype="Int64"),
+            "GaiaDr3Vega_mag_G": [11.0, 99.0, 12.0],  # NA row has junk photometry
+        }
+    )
     out = _align_to_batch(batch, syn)
     assert len(out) == 3
     assert out["source_id"].tolist() == [100, 200, 300]
@@ -247,9 +246,7 @@ def test_normalise_error_propagation_exact() -> None:
     assert np.isclose(errs_norm[0], expected_log_err, rtol=1e-5)
 
     # Index i ≥ 1.
-    expected_ratio_errs = np.sqrt(
-        (sig[1:] / c0) ** 2 + (raw[1:] * sig0 / c0**2) ** 2
-    )
+    expected_ratio_errs = np.sqrt((sig[1:] / c0) ** 2 + (raw[1:] * sig0 / c0**2) ** 2)
     assert np.allclose(errs_norm[1:], expected_ratio_errs, rtol=1e-5)
 
 
@@ -260,9 +257,12 @@ def test_normalise_drops_raw_coefficient_columns() -> None:
     assert "rp_coefficient_errors" not in norm.columns
     # Analysis-ready columns present.
     for col in (
-        "bp_coeffs_norm", "bp_coeff_errs_norm",
-        "rp_coeffs_norm", "rp_coeff_errs_norm",
-        "bp_c0_log", "rp_c0_log",
+        "bp_coeffs_norm",
+        "bp_coeff_errs_norm",
+        "rp_coeffs_norm",
+        "rp_coeff_errs_norm",
+        "bp_c0_log",
+        "rp_c0_log",
     ):
         assert col in norm.columns
 
@@ -317,9 +317,7 @@ def test_zscore_fit_and_apply() -> None:
 
 def test_zscore_with_varied_c0() -> None:
     rows = [
-        _fake_xp_row(
-            sid, c0_bp=10 ** (-15 + sid * 0.1), c0_rp=10 ** (-14 + sid * 0.05)
-        )
+        _fake_xp_row(sid, c0_bp=10 ** (-15 + sid * 0.1), c0_rp=10 ** (-14 + sid * 0.05))
         for sid in range(1, 6)
     ]
     df = normalise_xp(pd.DataFrame(rows))
@@ -336,9 +334,7 @@ def test_zscore_with_varied_c0() -> None:
 def test_zscore_applied_with_fixed_stats_is_not_refit() -> None:
     """Inference path: saved stats must not shift when re-applied."""
     rows = [
-        _fake_xp_row(
-            sid, c0_bp=10 ** (-15 + sid * 0.1), c0_rp=10 ** (-14 + sid * 0.05)
-        )
+        _fake_xp_row(sid, c0_bp=10 ** (-15 + sid * 0.1), c0_rp=10 ** (-14 + sid * 0.05))
         for sid in range(1, 6)
     ]
     train = normalise_xp(pd.DataFrame(rows))
@@ -346,9 +342,7 @@ def test_zscore_applied_with_fixed_stats_is_not_refit() -> None:
 
     # Simulate inference on a shifted dataset.
     rows2 = [
-        _fake_xp_row(
-            sid, c0_bp=10 ** (-10 + sid * 0.1), c0_rp=10 ** (-14 + sid * 0.05)
-        )
+        _fake_xp_row(sid, c0_bp=10 ** (-10 + sid * 0.1), c0_rp=10 ** (-14 + sid * 0.05))
         for sid in range(1, 6)
     ]
     inf = normalise_xp(pd.DataFrame(rows2))

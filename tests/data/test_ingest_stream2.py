@@ -170,9 +170,7 @@ def test_inner_joins_drop_unresolved_rows(
     assert set(df["dr3_source_id"]) == {1001, 2001}
 
 
-def test_corrections_ran_after_join(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_corrections_ran_after_join(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     vz = MagicMock(spec=TAPService)
     ap = MagicMock(spec=TAPService)
     out = mod.ingest_stream2(tmp_path, vizier=vz, aip=ap)
@@ -192,9 +190,7 @@ def test_custom_prob_threshold_propagates(
     mod.ingest_stream2(tmp_path, vizier=vz, aip=ap, prob_threshold=0.99)
     assert patched_pipeline["hon_prob"] == 0.99
 
-    meta = json.loads(
-        (tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text())
     assert "Hon+2021 Prob > 0.99" in meta["cuts_applied"]
 
 
@@ -204,12 +200,13 @@ def test_xmatch_cuts_recorded_in_provenance(
     vz = MagicMock(spec=TAPService)
     ap = MagicMock(spec=TAPService)
     mod.ingest_stream2(
-        tmp_path, vizier=vz, aip=ap,
-        max_angular_distance_mas=200.0, max_mag_diff=0.05,
+        tmp_path,
+        vizier=vz,
+        aip=ap,
+        max_angular_distance_mas=200.0,
+        max_mag_diff=0.05,
     )
-    meta = json.loads(
-        (tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text())
     assert "angular_distance < 200.0 mas" in meta["cuts_applied"]
     assert "|magnitude_difference| < 0.05" in meta["cuts_applied"]
 
@@ -220,9 +217,7 @@ def test_provenance_has_all_four_tap_sources(
     vz = MagicMock(spec=TAPService)
     ap = MagicMock(spec=TAPService)
     mod.ingest_stream2(tmp_path, vizier=vz, aip=ap)
-    meta = json.loads(
-        (tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text())
     tap_names = [s["name"] for s in meta["sources"] if s["kind"] == "tap"]
     assert len(tap_names) == 4
     joined = " | ".join(tap_names).lower()
@@ -230,15 +225,11 @@ def test_provenance_has_all_four_tap_sources(
         assert kw in joined
 
 
-def test_provenance_row_counts(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_provenance_row_counts(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     vz = MagicMock(spec=TAPService)
     ap = MagicMock(spec=TAPService)
     mod.ingest_stream2(tmp_path, vizier=vz, aip=ap)
-    meta = json.loads(
-        (tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text())
     extra = meta["extra"]
     assert meta["row_count_before"] == 4
     assert meta["row_count_after"] == 2
@@ -268,15 +259,11 @@ def test_atomic_write_no_part_file_left(
     assert not leftover
 
 
-def test_checkpoint_dirs_recorded(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_checkpoint_dirs_recorded(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     vz = MagicMock(spec=TAPService)
     ap = MagicMock(spec=TAPService)
     mod.ingest_stream2(tmp_path, vizier=vz, aip=ap)
-    meta = json.loads(
-        (tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text())
     extra = meta["extra"]
     assert extra["tic_checkpoint_dir"].endswith("stream2_tic")
     assert extra["dr2_xmatch_checkpoint_dir"].endswith("stream2_dr2_nbh")

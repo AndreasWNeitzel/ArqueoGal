@@ -33,8 +33,12 @@ logger = logging.getLogger("fetch_bailerjones_stream3")
 
 BATCH_SIZE = 10_000
 FLOAT32_COLS = (
-    "r_med_geo", "r_lo_geo", "r_hi_geo",
-    "r_med_photogeo", "r_lo_photogeo", "r_hi_photogeo",
+    "r_med_geo",
+    "r_lo_geo",
+    "r_hi_geo",
+    "r_med_photogeo",
+    "r_lo_photogeo",
+    "r_hi_photogeo",
 )
 
 
@@ -63,8 +67,12 @@ def main() -> None:
     src_ids = pd.read_parquet(ids_path)["source_id"].astype("int64").to_list()
     n_src = len(src_ids)
     n_batches = (n_src + BATCH_SIZE - 1) // BATCH_SIZE
-    logger.info("%d Stream 3 source_ids → GAVO Bailer-Jones (%d batches of %d)",
-                n_src, n_batches, BATCH_SIZE)
+    logger.info(
+        "%d Stream 3 source_ids → GAVO Bailer-Jones (%d batches of %d)",
+        n_src,
+        n_batches,
+        BATCH_SIZE,
+    )
 
     svc = gavo_service()
     df = fetch_bailerjones(

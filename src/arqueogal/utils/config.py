@@ -31,7 +31,9 @@ class ConfigValidationError(ValueError):
 
 
 def _resolve_paths(
-    value: Any, base_dir: Path, field_type: Any,
+    value: Any,
+    base_dir: Path,
+    field_type: Any,
 ) -> Any:
     """Resolve relative paths against ``base_dir`` if field expects Path."""
     if value is None:
@@ -50,7 +52,10 @@ def _resolve_paths(
 
 
 def _coerce_and_validate(  # noqa: PLR0911, PLR0912 — dispatch over type-system variants
-    value: Any, field_type: Any, field_name: str, base_dir: Path,
+    value: Any,
+    field_type: Any,
+    field_name: str,
+    base_dir: Path,
 ) -> Any:
     """Coerce ``value`` to ``field_type`` and run basic type validation.
 
@@ -123,8 +128,7 @@ def _coerce_and_validate(  # noqa: PLR0911, PLR0912 — dispatch over type-syste
             return float(value)
         if not isinstance(value, field_type):
             raise ConfigValidationError(
-                f"{field_name}: expected {field_type.__name__}, got "
-                f"{type(value).__name__}",
+                f"{field_name}: expected {field_type.__name__}, got {type(value).__name__}",
             )
         return value
 
@@ -133,7 +137,10 @@ def _coerce_and_validate(  # noqa: PLR0911, PLR0912 — dispatch over type-syste
 
 
 def _from_dict[T](
-    cls: type[T], data: dict[str, Any], base_dir: Path, prefix: str = "",
+    cls: type[T],
+    data: dict[str, Any],
+    base_dir: Path,
+    prefix: str = "",
 ) -> T:
     """Build a dataclass instance from a dict with unknown-key warnings."""
     if not dataclasses.is_dataclass(cls):
@@ -195,8 +202,7 @@ def to_yaml(obj: Any) -> str:
 
 def _to_plain(obj: Any) -> Any:
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
-        return {f.name: _to_plain(getattr(obj, f.name))
-                for f in dataclasses.fields(obj)}
+        return {f.name: _to_plain(getattr(obj, f.name)) for f in dataclasses.fields(obj)}
     if isinstance(obj, Path):
         return str(obj)
     if isinstance(obj, (list, tuple)):

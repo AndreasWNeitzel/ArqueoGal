@@ -81,8 +81,9 @@ def main() -> None:
 
     ids_df = sample[["source_id"]].drop_duplicates().reset_index(drop=True)
     _write_parquet_atomic(ids_df, out_ids)
-    logger.info("wrote %s (%.1f MB, %d unique ids)",
-                out_ids, out_ids.stat().st_size / 1024**2, len(ids_df))
+    logger.info(
+        "wrote %s (%.1f MB, %d unique ids)", out_ids, out_ids.stat().st_size / 1024**2, len(ids_df)
+    )
 
     src = LocalSource(
         name=f"Andrae+2023 VizieR parquet (reissue of Zenodo {ANDRAE2023_ZENODO_RECORD})",

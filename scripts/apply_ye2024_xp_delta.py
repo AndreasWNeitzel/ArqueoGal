@@ -189,7 +189,10 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     no_synth_rate = n_no_synth / max(n_total, 1)
     log.info(
         "Ye+2024 flag totals: OK=%d NO_SYNTH_PHOT=%d CAL_FAIL=%d (rate=%.4f%%)",
-        n_ok, n_no_synth, n_cal_fail, no_synth_rate * 100.0,
+        n_ok,
+        n_no_synth,
+        n_cal_fail,
+        no_synth_rate * 100.0,
     )
 
     # Halt check.
@@ -205,7 +208,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     else:
         log.info(
             "Ye NO_SYNTH_PHOT rate within ±%.1f pp of baseline (delta=%.3f pp)",
-            HALT_DELTA_PP * 100, delta_pp * 100,
+            HALT_DELTA_PP * 100,
+            delta_pp * 100,
         )
 
     _write_parquet_atomic(corrected, args.output_parquet)
@@ -213,7 +217,10 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     out_sha = _sha256_of(args.output_parquet)
     log.info(
         "wrote %s (%.1f MB, %d cols, sha256=%s…)",
-        args.output_parquet, size_mb, len(corrected.columns), out_sha[:12],
+        args.output_parquet,
+        size_mb,
+        len(corrected.columns),
+        out_sha[:12],
     )
 
     # Drop checkpoints on success (§12 budget).

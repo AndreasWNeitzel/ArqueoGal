@@ -31,6 +31,7 @@ Summary stats over matched columns::
     python scripts/inspect_parquet.py data/interim/stream1_apogee_gaia.parquet \\
         --match mag parallax --describe
 """
+
 from __future__ import annotations
 
 import argparse
@@ -79,14 +80,11 @@ def resolve_target(
         raise SystemExit(f"Unknown --chunk-sort: {chunk_sort}")
 
     if not (0 <= chunk_index < len(chunks)):
-        raise SystemExit(
-            f"--chunk-index {chunk_index} out of range (found {len(chunks)} chunks)."
-        )
+        raise SystemExit(f"--chunk-index {chunk_index} out of range (found {len(chunks)} chunks).")
 
     target = chunks[chunk_index]
     print(
-        f"[chunk-dir] {chunk_dir}  "
-        f"({len(chunks)} files, sort={chunk_sort}, index={chunk_index})",
+        f"[chunk-dir] {chunk_dir}  ({len(chunks)} files, sort={chunk_sort}, index={chunk_index})",
         file=sys.stderr,
     )
     print(f"[chunk-dir] -> {target.name}", file=sys.stderr)
@@ -216,8 +214,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--chunk-sort",
         choices=("alpha", "mtime", "size"),
         default="alpha",
-        help="Sort order for chunks: alpha (default), mtime (newest first), "
-             "size (largest first).",
+        help="Sort order for chunks: alpha (default), mtime (newest first), size (largest first).",
     )
 
     # Column filters ---------------------------------------------------------
@@ -274,7 +271,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--columns-only",
         action="store_true",
         help="Read only the matched columns (requires pyarrow). "
-             "Useful for very wide tables; loads everything first to resolve names.",
+        "Useful for very wide tables; loads everything first to resolve names.",
     )
 
     return p

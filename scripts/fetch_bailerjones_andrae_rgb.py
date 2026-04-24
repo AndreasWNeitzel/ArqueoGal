@@ -183,7 +183,8 @@ def _load_existing_bj(log: logging.Logger) -> pd.DataFrame:
     combined = combined.drop_duplicates(subset="source_id", keep="first")
     log.info(
         "existing BJ21 union: %d rows (%d dupes dropped)",
-        len(combined), n_before - len(combined),
+        len(combined),
+        n_before - len(combined),
     )
     return combined
 
@@ -238,9 +239,7 @@ def _fetch_chunk_upload(
                 try:
                     job.delete()
                 except Exception as exc:  # noqa: BLE001 — deletion is best-effort
-                    log.warning(
-                        "chunk %d: failed to delete async job: %r", chunk_idx, exc
-                    )
+                    log.warning("chunk %d: failed to delete async job: %r", chunk_idx, exc)
             return _cast_chunk_df(table.to_pandas()), retries
         except (DALQueryError, RuntimeError, TimeoutError, OSError) as exc:
             last_exc = exc
@@ -248,7 +247,10 @@ def _fetch_chunk_upload(
             wait = min(30 * retries, 120)
             log.warning(
                 "chunk %d UPLOAD attempt %d failed: %r — sleeping %ds before retry",
-                chunk_idx, retries, exc, wait,
+                chunk_idx,
+                retries,
+                exc,
+                wait,
             )
             time.sleep(wait)
     raise RuntimeError(
@@ -269,9 +271,7 @@ def _fetch_chunk_inlist(
     last_exc: Exception | None = None
     while retries <= MAX_RETRIES_PER_BATCH:
         try:
-            adql = IN_LIST_ADQL.replace(
-                BATCH_PLACEHOLDER, ",".join(str(i) for i in source_ids)
-            )
+            adql = IN_LIST_ADQL.replace(BATCH_PLACEHOLDER, ",".join(str(i) for i in source_ids))
             job: AsyncTAPJob = svc.submit_job(adql, language="ADQL", maxrec=GAVO_MAXREC)
             try:
                 job.run()
@@ -292,9 +292,7 @@ def _fetch_chunk_inlist(
                 try:
                     job.delete()
                 except Exception as exc:  # noqa: BLE001
-                    log.warning(
-                        "chunk %d: failed to delete async job: %r", chunk_idx, exc
-                    )
+                    log.warning("chunk %d: failed to delete async job: %r", chunk_idx, exc)
             return _cast_chunk_df(table.to_pandas()), retries
         except (DALQueryError, RuntimeError, TimeoutError, OSError) as exc:
             last_exc = exc
@@ -302,7 +300,10 @@ def _fetch_chunk_inlist(
             wait = min(30 * retries, 120)
             log.warning(
                 "chunk %d IN-list attempt %d failed: %r — sleeping %ds before retry",
-                chunk_idx, retries, exc, wait,
+                chunk_idx,
+                retries,
+                exc,
+                wait,
             )
             time.sleep(wait)
     raise RuntimeError(
@@ -316,8 +317,14 @@ def _summary_stats(df: pd.DataFrame) -> dict[str, Any]:
     d = d[np.isfinite(d)]
     if d.size == 0:
         return {
-            "min": None, "q25": None, "median": None, "q75": None, "max": None,
-            "count_le_2500pc": 0, "frac_le_2500pc": 0.0, "n_finite": 0,
+            "min": None,
+            "q25": None,
+            "median": None,
+            "q75": None,
+            "max": None,
+            "count_le_2500pc": 0,
+            "frac_le_2500pc": 0.0,
+            "n_finite": 0,
         }
     q25, q50, q75 = np.quantile(d, [0.25, 0.5, 0.75])
     n_le = int((d <= 2500.0).sum())
@@ -354,20 +361,25 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
     n_andrae_unique = int(andrae_ids.shape[0])
     log.info(
         "Andrae catalog: %d rows, %d unique source_ids",
-        n_andrae_total, n_andrae_unique,
+        n_andrae_total,
+        n_andrae_unique,
     )
 
     # 2. Existing BJ21 ∩ Andrae.
     existing = _load_existing_bj(log)
     andrae_set = set(andrae_ids.tolist())
-    existing_mask = existing["source_id"].isin(andrae_set) if len(existing) else pd.Series(dtype=bool)
+    existing_mask = (
+        existing["source_id"].isin(andrae_set) if len(existing) else pd.Series(dtype=bool)
+    )
     existing_reused = (
         existing.loc[existing_mask, list(KEEP_COLS)].reset_index(drop=True)
-        if len(existing) else pd.DataFrame(columns=list(KEEP_COLS))
+        if len(existing)
+        else pd.DataFrame(columns=list(KEEP_COLS))
     )
     log.info(
         "existing BJ21 rows reusable for Andrae: %d / %d",
-        len(existing_reused), len(existing),
+        len(existing_reused),
+        len(existing),
     )
 
     # 3. Delta to fetch.
@@ -399,8 +411,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
         wall_elapsed = time.time() - t0
         if wall_elapsed > MAX_WALLCLOCK_SEC:
             halt_reason = (
-                f"wall-clock {wall_elapsed/3600:.2f} h exceeds "
-                f"{MAX_WALLCLOCK_SEC/3600:.1f} h budget"
+                f"wall-clock {wall_elapsed / 3600:.2f} h exceeds "
+                f"{MAX_WALLCLOCK_SEC / 3600:.1f} h budget"
             )
             log.error("HALT: %s", halt_reason)
             break
@@ -426,7 +438,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
             except Exception as exc:  # noqa: BLE001 — corrupt ckpt → refetch
                 log.warning(
                     "batch %d: checkpoint %s unreadable (%r); refetching",
-                    idx, chunk_file.name, exc,
+                    idx,
+                    chunk_file.name,
+                    exc,
                 )
                 chunk_file.unlink(missing_ok=True)
 
@@ -439,12 +453,13 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
                 n_fallback_chunks += 1
         except Exception as exc:  # noqa: BLE001 — surface, escalate, decide
             consecutive_failures += 1
-            msg = (
-                f"batch {idx}: {strategy_used} unrecoverable after retries — {exc!r}"
-            )
+            msg = f"batch {idx}: {strategy_used} unrecoverable after retries — {exc!r}"
             chunk_failure_docs.append(msg)
             log.error(msg)
-            if strategy_used == "upload" and consecutive_failures >= MAX_CONSECUTIVE_FAILURES_BEFORE_FALLBACK:
+            if (
+                strategy_used == "upload"
+                and consecutive_failures >= MAX_CONSECUTIVE_FAILURES_BEFORE_FALLBACK
+            ):
                 log.error(
                     "FALLBACK: %d consecutive UPLOAD failures — switching to IN-list",
                     consecutive_failures,
@@ -453,9 +468,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
                 consecutive_failures = 0
                 # Retry this chunk with the fallback strategy.
                 try:
-                    df_batch, retries = _fetch_chunk_inlist(
-                        svc, chunk, log=log, chunk_idx=idx
-                    )
+                    df_batch, retries = _fetch_chunk_inlist(svc, chunk, log=log, chunk_idx=idx)
                     n_fallback_chunks += 1
                 except Exception as exc2:  # noqa: BLE001
                     chunk_failure_docs.append(
@@ -465,7 +478,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
                     pbar.update(1)
                     continue
             elif strategy_used == "fallback_full_table" and consecutive_failures >= 3:
-                halt_reason = "3 consecutive failures on IN-list fallback — both strategies exhausted"
+                halt_reason = (
+                    "3 consecutive failures on IN-list fallback — both strategies exhausted"
+                )
                 log.error("HALT: %s", halt_reason)
                 break
             else:
@@ -495,12 +510,19 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
 
         pbar.set_postfix(
             strategy=strategy_used,
-            rows=n_out, s=f"{elapsed:.1f}", retries=retries,
+            rows=n_out,
+            s=f"{elapsed:.1f}",
+            retries=retries,
         )
         pbar.update(1)
         log.info(
             "batch %d/%d done: %d rows in %.1f s (retries=%d, strategy=%s)",
-            idx + 1, n_batches, n_out, elapsed, retries, strategy_used,
+            idx + 1,
+            n_batches,
+            n_out,
+            elapsed,
+            retries,
+            strategy_used,
         )
 
     pbar.close()
@@ -519,7 +541,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
     combined = combined.drop_duplicates(subset="source_id", keep="first").reset_index(drop=True)
     log.info(
         "final combined: %d rows (%d dupes dropped)",
-        len(combined), n_before_dedupe - len(combined),
+        len(combined),
+        n_before_dedupe - len(combined),
     )
     combined = combined.sort_values("source_id").reset_index(drop=True)
 
@@ -532,9 +555,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
     # 7. Provenance sidecar.
     andrae_sha = _sha256_of(ANDRAE_PARQUET)
     existing_shas = [
-        (str(p.relative_to(REPO)), _sha256_of(p))
-        for p in EXISTING_BJ_PATHS
-        if p.is_file()
+        (str(p.relative_to(REPO)), _sha256_of(p)) for p in EXISTING_BJ_PATHS if p.is_file()
     ]
     prov_sources: list[Any] = [
         LocalSource(
@@ -621,20 +642,23 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver; splitting hurts
             "halt_conditions_tripped": {
                 "wallclock_exceeded": total_wall > MAX_WALLCLOCK_SEC,
                 "footprint_exceeded": _data_footprint_gb() > DATA_FOOTPRINT_CEILING_GB,
-                "n_chunks_incomplete": int(n_batches - len(chunk_wallclocks) - sum(
-                    1 for idx in range(n_batches)
-                    if (CHUNK_DIR / f"chunk_{idx:06d}.parquet").is_file()
-                    and (idx * batch_size) >= (len(existing_reused) - 1)
-                )),
+                "n_chunks_incomplete": int(
+                    n_batches
+                    - len(chunk_wallclocks)
+                    - sum(
+                        1
+                        for idx in range(n_batches)
+                        if (CHUNK_DIR / f"chunk_{idx:06d}.parquet").is_file()
+                        and (idx * batch_size) >= (len(existing_reused) - 1)
+                    )
+                ),
             },
         },
     )
     write_sidecar(prov)
 
     # 8. Cleanup if chunks > 0.5 GB.
-    total_chunk_size_gb = sum(
-        p.stat().st_size for p in CHUNK_DIR.glob("chunk_*.parquet")
-    ) / 1024**3
+    total_chunk_size_gb = sum(p.stat().st_size for p in CHUNK_DIR.glob("chunk_*.parquet")) / 1024**3
     footprint_after = _data_footprint_gb()
     chunk_dir_removed = False
     if total_chunk_size_gb > 0.5 and len(combined) > 0 and OUT_PARQUET.is_file():
@@ -716,7 +740,11 @@ def _write_report(  # noqa: PLR0913, PLR0915 — operator report
         f"- Primary strategy: **TAP UPLOAD** (VOTable join against `TAP_UPLOAD.sidlist`).",
         f"  Validated against GAVO live service with a 10 k smoke test before the run.",
         f"- Actual strategy used: **`{strategy_used}`**"
-        + (" (no fallback needed)" if strategy_used == "upload" else f" ({n_fallback_chunks} IN-list fallback chunks)"),
+        + (
+            " (no fallback needed)"
+            if strategy_used == "upload"
+            else f" ({n_fallback_chunks} IN-list fallback chunks)"
+        ),
         "  > UPLOAD keeps request body small and sidesteps the ~100 KB IN-list ceiling "
         "that would otherwise push 10k-ID lists into HTTP-header territory on some TAP "
         "gateways.",
@@ -786,17 +814,11 @@ def _write_report(  # noqa: PLR0913, PLR0915 — operator report
     anomalies: list[str] = []
     miss_frac = missing_from_bj21 / max(n_andrae_unique, 1)
     if miss_frac > 0.01:
-        anomalies.append(
-            f"BJ21 miss rate {miss_frac:.2%} exceeds 1% rule-of-thumb — investigate"
-        )
+        anomalies.append(f"BJ21 miss rate {miss_frac:.2%} exceeds 1% rule-of-thumb — investigate")
     if total_h > 2.5:
-        anomalies.append(
-            f"Wall-clock {total_h:.2f} h exceeded 2 h estimate — GAVO rate-limiting?"
-        )
+        anomalies.append(f"Wall-clock {total_h:.2f} h exceeded 2 h estimate — GAVO rate-limiting?")
     if strategy_used != "upload":
-        anomalies.append(
-            f"UPLOAD fallback tripped: {n_fallback_chunks} chunks used IN-list"
-        )
+        anomalies.append(f"UPLOAD fallback tripped: {n_fallback_chunks} chunks used IN-list")
     if halt_reason:
         anomalies.append(f"Halt condition fired: {halt_reason}")
     if not anomalies:

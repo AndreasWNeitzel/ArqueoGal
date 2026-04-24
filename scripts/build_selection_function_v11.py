@@ -66,7 +66,7 @@ L_EDGES: Final[np.ndarray] = np.array([0.0, 2.5, 5.0], dtype=np.float64)
 
 IR_COLS: Final[tuple[str, ...]] = ("j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag")
 
-SPARSE_CELL_THRESHOLD_4D: Final[int] = 100    # cells below → marginal fallback
+SPARSE_CELL_THRESHOLD_4D: Final[int] = 100  # cells below → marginal fallback
 LAPLACE_NUM: Final[float] = 1.0
 LAPLACE_DEN: Final[float] = 2.0
 PROB_FLOOR: Final[float] = 0.01
@@ -224,8 +224,10 @@ def build_ir_completeness_grid(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
     grid_4d = pd.DataFrame(grid_rows)
     logger.info(
         "built 4-D grid: %d populated cells (of %d possible), %d dense (n>=%d), %d sparse",
-        len(grid_4d), n_b * n_g * n_t * n_l,
-        int(grid_4d["dense"].sum()), SPARSE_CELL_THRESHOLD_4D,
+        len(grid_4d),
+        n_b * n_g * n_t * n_l,
+        int(grid_4d["dense"].sum()),
+        SPARSE_CELL_THRESHOLD_4D,
         int((~grid_4d["dense"]).sum()),
     )
     return grid_4d, marginal_bg
@@ -238,16 +240,14 @@ def build_compound_grid(ir_grid: pd.DataFrame, ye_v1_grid: pd.DataFrame) -> pd.D
     compositional |b|×G view in a single read.
     """
     key = ["b_lo", "b_hi", "g_lo", "g_hi"]
-    ye = ye_v1_grid[key + ["selection_prob"]].rename(
-        columns={"selection_prob": "p_ye_retained"}
-    )
+    ye = ye_v1_grid[key + ["selection_prob"]].rename(columns={"selection_prob": "p_ye_retained"})
     ir_bg = ir_grid[key + ["n_total", "n_complete", "p_ir_complete"]].rename(
         columns={"n_total": "n_total_bg", "n_complete": "n_complete_bg"}
     )
     out = ye.merge(ir_bg, on=key, how="inner", validate="one_to_one")
     out["p_compound_bg"] = np.clip(
         out["p_ye_retained"].to_numpy() * out["p_ir_complete"].to_numpy(),
-        PROB_FLOOR * PROB_FLOOR,   # joint floor = product of the two floors
+        PROB_FLOOR * PROB_FLOOR,  # joint floor = product of the two floors
         PROB_CEIL,
     )
     return out
@@ -285,7 +285,7 @@ def _format_ir_md(
         "A row is **IR-complete** iff all of `j_mag`, `h_mag`, `k_mag`, `w1_mag`, `w2_mag` "
         "are finite and non-zero. The zero-sentinel is excluded because downstream "
         "inference uses `nan_to_num(0.0)` on missing IR rows, so at inference time "
-        "`mag == 0` is indistinguishable from \"no counterpart\"; both conditions are "
+        '`mag == 0` is indistinguishable from "no counterpart"; both conditions are '
         "enforced for definitional transferability from training to inference domains.",
         "",
         f"**Stream 1 global P(IR-complete) = {global_rate:.4f} %** "
@@ -297,17 +297,15 @@ def _format_ir_md(
         "",
         "## 2. Binning",
         "",
-        "Four-dimensional grid, matching the v1 Ye-retention |b|×G axes for "
-        "compositional ease:",
+        "Four-dimensional grid, matching the v1 Ye-retention |b|×G axes for compositional ease:",
         "",
-        f"- `|b|` (deg): {B_EDGES.tolist()}  → {len(B_EDGES)-1} bins",
-        f"- `G`   (mag): {G_EDGES.tolist()}  → {len(G_EDGES)-1} bins",
-        f"- `Teff` (K):  {T_EDGES.tolist()}  → {len(T_EDGES)-1} bins "
-        "(cool / mid / warm giants)",
-        f"- `log g`:     {L_EDGES.tolist()}  → {len(L_EDGES)-1} bins "
+        f"- `|b|` (deg): {B_EDGES.tolist()}  → {len(B_EDGES) - 1} bins",
+        f"- `G`   (mag): {G_EDGES.tolist()}  → {len(G_EDGES) - 1} bins",
+        f"- `Teff` (K):  {T_EDGES.tolist()}  → {len(T_EDGES) - 1} bins (cool / mid / warm giants)",
+        f"- `log g`:     {L_EDGES.tolist()}  → {len(L_EDGES) - 1} bins "
         "(luminous giants / lower-RGB+RC)",
         "",
-        f"Total possible cells: {(len(B_EDGES)-1)*(len(G_EDGES)-1)*(len(T_EDGES)-1)*(len(L_EDGES)-1)} "
+        f"Total possible cells: {(len(B_EDGES) - 1) * (len(G_EDGES) - 1) * (len(T_EDGES) - 1) * (len(L_EDGES) - 1)} "
         f"(5×5×3×2). Populated cells: **{len(grid_4d)}**. "
         f"Dense cells (n ≥ {SPARSE_CELL_THRESHOLD_4D}): "
         f"**{int(grid_4d['dense'].sum())}**. "
@@ -507,10 +505,8 @@ def _format_compound_md(
         "",
         "## References",
         "",
-        "- Full IR-completeness methodology: "
-        "`reports/selection_function/ir_completeness_v1.md`.",
-        "- v1 Ye-retention methodology: "
-        "`reports/selection_function/selection_function_v1.md`.",
+        "- Full IR-completeness methodology: `reports/selection_function/ir_completeness_v1.md`.",
+        "- v1 Ye-retention methodology: `reports/selection_function/selection_function_v1.md`.",
         "- Pipeline context: `docs/data_acquisition.md` §6.4 and §6.6.",
         "",
     ]
@@ -534,7 +530,9 @@ def main() -> None:
     ir_ok = _compute_ir_complete_mask(df)
     logger.info(
         "global IR-complete: %d / %d (%.4f %%)",
-        int(ir_ok.sum()), len(df), 100.0 * ir_ok.mean(),
+        int(ir_ok.sum()),
+        len(df),
+        100.0 * ir_ok.mean(),
     )
 
     grid_4d, marginal_bg = build_ir_completeness_grid(df)
@@ -548,7 +546,7 @@ def main() -> None:
     for col in ("teff_lo", "teff_hi", "logg_lo", "logg_hi"):
         ir_bg[col] = np.nan
     ir_bg["rate"] = ir_bg["rate"].astype(float)
-    ir_bg["dense"] = True   # |b|×G marginal is always the backstop
+    ir_bg["dense"] = True  # |b|×G marginal is always the backstop
     ir_bg["grid"] = "bg"
     ir_all = pd.concat([ir_4d, ir_bg], ignore_index=True)
     _atomic_write_parquet(ir_all, IR_GRID_PARQUET)

@@ -165,13 +165,9 @@ def test_enrich_receives_post_cut_source_ids(
     assert patched_pipeline["enrich_kwargs"]["batch_size"] == 10_000
 
 
-def test_custom_batch_size_propagates(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_custom_batch_size_propagates(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     service = MagicMock(spec=TAPService)
-    mod.ingest_stream1(
-        tmp_path, service=service, enrich_batch_size=2500, download_progress=False
-    )
+    mod.ingest_stream1(tmp_path, service=service, enrich_batch_size=2500, download_progress=False)
     assert patched_pipeline["enrich_kwargs"]["batch_size"] == 2500
 
 
@@ -207,9 +203,7 @@ def test_provenance_records_http_and_tap_sources(
 ) -> None:
     service = MagicMock(spec=TAPService)
     mod.ingest_stream1(tmp_path, service=service, download_progress=False)
-    meta = json.loads(
-        (tmp_path / "interim" / "stream1_apogee_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream1_apogee_gaia.provenance.json").read_text())
     kinds = {s["kind"] for s in meta["sources"]}
     assert {"http", "tap", "local"} <= kinds
     http = next(s for s in meta["sources"] if s["kind"] == "http")
@@ -219,14 +213,10 @@ def test_provenance_records_http_and_tap_sources(
     assert tap["endpoint"].endswith("/tap")
 
 
-def test_provenance_row_counts(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_provenance_row_counts(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     service = MagicMock(spec=TAPService)
     mod.ingest_stream1(tmp_path, service=service, download_progress=False)
-    meta = json.loads(
-        (tmp_path / "interim" / "stream1_apogee_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream1_apogee_gaia.provenance.json").read_text())
     assert meta["row_count_before"] == 5  # fake_load_dr19 synthesizes 5 rows
     assert meta["row_count_after"] == 4  # post-merge
     assert meta["extra"]["apogee_post_cut"] == 5
@@ -294,9 +284,7 @@ def test_checkpoint_dir_recorded_in_provenance(
 ) -> None:
     service = MagicMock(spec=TAPService)
     mod.ingest_stream1(tmp_path, service=service, download_progress=False)
-    meta = json.loads(
-        (tmp_path / "interim" / "stream1_apogee_gaia.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream1_apogee_gaia.provenance.json").read_text())
     expected = tmp_path / "interim" / "enrich_batches" / "stream1"
     assert meta["extra"]["enrich_checkpoint_dir"] == str(expected)
     # enrich was called with this as its checkpoint_dir

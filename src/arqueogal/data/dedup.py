@@ -155,7 +155,8 @@ def dedup_by_source_id(
     if n_dup_stars == 0:
         logger.info(
             "dedup_by_source_id: no duplicates in %d rows (unique %d)",
-            rows_in, n_unique,
+            rows_in,
+            n_unique,
         )
         stats = DedupStats(
             rows_in=rows_in,
@@ -181,9 +182,7 @@ def dedup_by_source_id(
         )
 
     sorted_df = df.sort_values(sort_by, ascending=ascending, kind="mergesort")
-    deduped = (
-        sorted_df.drop_duplicates(subset=source_id_col, keep="first").reset_index(drop=True)
-    )
+    deduped = sorted_df.drop_duplicates(subset=source_id_col, keep="first").reset_index(drop=True)
 
     histogram = {int(k): int(v) for k, v in counts.value_counts().sort_index().items()}
     stats = DedupStats(
@@ -199,8 +198,11 @@ def dedup_by_source_id(
     )
     logger.info(
         "dedup_by_source_id: %d → %d rows (%d unique, %d dup-stars, max=%d)",
-        stats.rows_in, stats.rows_out, stats.unique_source_ids,
-        stats.n_duplicate_stars, stats.max_duplicates_per_star,
+        stats.rows_in,
+        stats.rows_out,
+        stats.unique_source_ids,
+        stats.n_duplicate_stars,
+        stats.max_duplicates_per_star,
     )
     return deduped, stats
 

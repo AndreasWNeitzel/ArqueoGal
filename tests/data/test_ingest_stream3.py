@@ -93,7 +93,10 @@ def test_happy_path_writes_parquet_and_sidecar(
 ) -> None:
     svc = MagicMock(spec=TAPService)
     out = mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
     assert out == tmp_path / "interim" / "stream3_gaia_rgbrc.parquet"
     assert out.is_file()
@@ -105,7 +108,10 @@ def test_enrich_called_with_stratified_source_ids(
 ) -> None:
     svc = MagicMock(spec=TAPService)
     mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
     # Subset of the 300 synthetic Andrae sources.
     sent = patched_pipeline["enrich_source_ids"]
@@ -118,7 +124,10 @@ def test_inner_merge_drops_missing_gaia_row(
 ) -> None:
     svc = MagicMock(spec=TAPService)
     out = mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
     df = pd.read_parquet(out)
     # fake_enrich drops the last source_id; merged must have exactly (sent − 1).
@@ -126,12 +135,13 @@ def test_inner_merge_drops_missing_gaia_row(
     assert len(df) == n_sent - 1
 
 
-def test_corrections_fire_after_merge(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_corrections_fire_after_merge(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     out = mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
     df = pd.read_parquet(out)
     assert "parallax_corr" in df.columns
@@ -144,12 +154,13 @@ def test_per_cell_and_seed_recorded_in_provenance(
 ) -> None:
     svc = MagicMock(spec=TAPService)
     mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits",
-        service=svc, per_cell=3, rng_seed=42,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=3,
+        rng_seed=42,
     )
-    meta = json.loads(
-        (tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text())
     assert "stratified_subsample per_cell=3" in meta["cuts_applied"]
     assert "stratified_subsample rng_seed=42" in meta["cuts_applied"]
     strat = meta["extra"]["stratification"]
@@ -162,11 +173,12 @@ def test_provenance_has_local_and_tap_sources(
 ) -> None:
     svc = MagicMock(spec=TAPService)
     mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
-    meta = json.loads(
-        (tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text())
     kinds = {s["kind"] for s in meta["sources"]}
     assert {"local", "tap"} <= kinds
     local = next(s for s in meta["sources"] if s["kind"] == "local")
@@ -179,11 +191,12 @@ def test_provenance_row_counts_thread_correctly(
 ) -> None:
     svc = MagicMock(spec=TAPService)
     mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
-    meta = json.loads(
-        (tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text())
     extra = meta["extra"]
     assert meta["row_count_before"] == 300
     assert extra["andrae_rows_loaded"] == 300
@@ -192,13 +205,14 @@ def test_provenance_row_counts_thread_correctly(
     assert meta["row_count_after"] == extra["merged"]
 
 
-def test_custom_batch_size_propagates(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_custom_batch_size_propagates(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc,
-        per_cell=1, enrich_batch_size=250,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
+        enrich_batch_size=250,
     )
     assert patched_pipeline["enrich_kwargs"]["batch_size"] == 250
 
@@ -208,22 +222,24 @@ def test_atomic_write_no_part_file_left(
 ) -> None:
     svc = MagicMock(spec=TAPService)
     mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
     leftover = list((tmp_path / "interim").glob("*.part"))
     assert not leftover
 
 
-def test_checkpoint_dir_recorded(
-    tmp_path: Path, patched_pipeline: dict[str, object]
-) -> None:
+def test_checkpoint_dir_recorded(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
     svc = MagicMock(spec=TAPService)
     mod.ingest_stream3(
-        tmp_path, andrae_fits=tmp_path / "andrae.fits", service=svc, per_cell=1,
+        tmp_path,
+        andrae_fits=tmp_path / "andrae.fits",
+        service=svc,
+        per_cell=1,
     )
-    meta = json.loads(
-        (tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text()
-    )
+    meta = json.loads((tmp_path / "interim" / "stream3_gaia_rgbrc.provenance.json").read_text())
     expected = tmp_path / "interim" / "enrich_batches" / "stream3"
     assert meta["extra"]["enrich_checkpoint_dir"] == str(expected)
     assert patched_pipeline["enrich_kwargs"]["checkpoint_dir"] == expected

@@ -71,7 +71,10 @@ def test_supcon_nan_labels_masked_not_propagated() -> None:
 
 
 def _fake_cholesky_batch(
-    B: int, n: int, block_sizes: tuple[int, ...], n_diagonal_only: int = 0,
+    B: int,
+    n: int,
+    block_sizes: tuple[int, ...],
+    n_diagonal_only: int = 0,
     seed: int = 0,
 ) -> torch.Tensor:
     """Produce a batch of lower-triangular L with block structure for tests.
@@ -91,8 +94,9 @@ def _fake_cholesky_batch(
             offset += k
         if n_diagonal_only > 0:
             d = F.softplus(torch.randn(n_diagonal_only, generator=g)) + 0.1
-            L[b, offset : offset + n_diagonal_only,
-              offset : offset + n_diagonal_only] = torch.diag(d)
+            L[b, offset : offset + n_diagonal_only, offset : offset + n_diagonal_only] = torch.diag(
+                d
+            )
     return L
 
 
@@ -192,7 +196,11 @@ def test_beta_nll_uniform_weights_equal_unweighted() -> None:
     # No mask path.
     plain = beta_nll_block_cholesky(mu, L, y, beta=0.5).item()
     with_w = beta_nll_block_cholesky(
-        mu, L, y, beta=0.5, sample_weights=torch.ones(B),
+        mu,
+        L,
+        y,
+        beta=0.5,
+        sample_weights=torch.ones(B),
     ).item()
     assert abs(plain - with_w) < 1e-5
 
@@ -200,7 +208,12 @@ def test_beta_nll_uniform_weights_equal_unweighted() -> None:
     mask = torch.ones(B, n)
     plain_m = beta_nll_block_cholesky(mu, L, y, beta=0.5, mask=mask).item()
     with_w_m = beta_nll_block_cholesky(
-        mu, L, y, beta=0.5, mask=mask, sample_weights=torch.ones(B),
+        mu,
+        L,
+        y,
+        beta=0.5,
+        mask=mask,
+        sample_weights=torch.ones(B),
     ).item()
     assert abs(plain_m - with_w_m) < 1e-5
 
@@ -223,7 +236,11 @@ def test_beta_nll_weighted_average_matches_manual() -> None:
     expected = (w * nll_per_star).sum() / w.sum() / n
 
     got = beta_nll_block_cholesky(
-        mu, L, y, beta=0.0, sample_weights=w,
+        mu,
+        L,
+        y,
+        beta=0.0,
+        sample_weights=w,
     ).item()
     assert abs(got - expected.item()) < 1e-5
 
@@ -235,12 +252,15 @@ def test_beta_nll_weighted_mask_path_matches_manual() -> None:
     L = _fake_cholesky_batch(B, n, blocks, n_diag, seed=11)
     mu = torch.randn(B, n)
     y = torch.randn(B, n)
-    mask = torch.tensor([
-        [1, 1, 1, 1, 1, 1],
-        [1, 1, 0, 0, 1, 1],
-        [1, 1, 1, 1, 0, 0],
-        [1, 0, 1, 0, 1, 0],
-    ], dtype=torch.float32)
+    mask = torch.tensor(
+        [
+            [1, 1, 1, 1, 1, 1],
+            [1, 1, 0, 0, 1, 1],
+            [1, 1, 1, 1, 0, 0],
+            [1, 0, 1, 0, 1, 0],
+        ],
+        dtype=torch.float32,
+    )
     w = torch.tensor([1.0, 3.0, 0.5, 2.0])
 
     # Manual (β=0).
@@ -254,7 +274,12 @@ def test_beta_nll_weighted_mask_path_matches_manual() -> None:
     expected = scaled.sum() / (mask * w.unsqueeze(-1)).sum()
 
     got = beta_nll_block_cholesky(
-        mu, L, y, beta=0.0, mask=mask, sample_weights=w,
+        mu,
+        L,
+        y,
+        beta=0.0,
+        mask=mask,
+        sample_weights=w,
     ).item()
     assert abs(got - expected.item()) < 1e-5
 
@@ -279,7 +304,11 @@ def test_beta_nll_upweighting_shifts_gradient_toward_weighted_star() -> None:
 
     mu_uniform = torch.randn(B, n, requires_grad=True)
     loss_uniform = beta_nll_block_cholesky(
-        mu_uniform, L, y, beta=0.5, sample_weights=torch.ones(B),
+        mu_uniform,
+        L,
+        y,
+        beta=0.5,
+        sample_weights=torch.ones(B),
     )
     loss_uniform.backward()
     g_uniform = mu_uniform.grad.clone()
@@ -287,7 +316,11 @@ def test_beta_nll_upweighting_shifts_gradient_toward_weighted_star() -> None:
     mu_weighted = mu_uniform.detach().clone().requires_grad_(True)
     w = torch.tensor([10.0, 0.1, 0.1])
     loss_weighted = beta_nll_block_cholesky(
-        mu_weighted, L, y, beta=0.5, sample_weights=w,
+        mu_weighted,
+        L,
+        y,
+        beta=0.5,
+        sample_weights=w,
     )
     loss_weighted.backward()
     g_weighted = mu_weighted.grad

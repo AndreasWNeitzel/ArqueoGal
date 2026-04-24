@@ -90,7 +90,9 @@ def test_label_tiers_shape() -> None:
     tiers = LabelTiers()
     assert tiers.n_labels == sum(tiers.tier_sizes)
     assert tiers.tier_sizes == (
-        len(tiers.tier1), len(tiers.tier2), len(tiers.tier3),
+        len(tiers.tier1),
+        len(tiers.tier2),
+        len(tiers.tier3),
     )
     assert len(tiers.all_labels) == tiers.n_labels
 
@@ -184,12 +186,14 @@ def test_load_arrays_missing_column_raises(tmp_path: Path) -> None:
         aux_cols=(),
     )
     tiers = LabelTiers(tier1=("teff_apogee",), tier2=(), tier3=())
-    df = pd.DataFrame({
-        "source_id": [1, 2, 3],
-        # missing bp_coef_norm_1
-        "teff_apogee": [1.0, 2.0, 3.0],
-        "e_teff_apogee": [0.1, 0.2, 0.3],
-    })
+    df = pd.DataFrame(
+        {
+            "source_id": [1, 2, 3],
+            # missing bp_coef_norm_1
+            "teff_apogee": [1.0, 2.0, 3.0],
+            "e_teff_apogee": [0.1, 0.2, 0.3],
+        }
+    )
     path = tmp_path / "t.parquet"
     df.to_parquet(path, index=False)
     with pytest.raises((KeyError, ValueError)):
@@ -199,12 +203,14 @@ def test_load_arrays_missing_column_raises(tmp_path: Path) -> None:
 def test_stratified_split_partitions_all_source_ids() -> None:
     rng = np.random.default_rng(42)
     n = 400
-    df = pd.DataFrame({
-        "source_id": np.arange(1, n + 1, dtype=np.int64),
-        "fe_h_apogee": rng.normal(-0.2, 0.3, n),
-        "teff_apogee": rng.uniform(4000, 5500, n),
-        "b_deg": rng.uniform(-60, 60, n),
-    })
+    df = pd.DataFrame(
+        {
+            "source_id": np.arange(1, n + 1, dtype=np.int64),
+            "fe_h_apogee": rng.normal(-0.2, 0.3, n),
+            "teff_apogee": rng.uniform(4000, 5500, n),
+            "b_deg": rng.uniform(-60, 60, n),
+        }
+    )
     splits = stratified_split_ids(df, seed=0)
     total = sum(len(v) for v in splits.values())
     assert total == n
@@ -216,12 +222,14 @@ def test_stratified_split_partitions_all_source_ids() -> None:
 def test_stratified_split_reproducible() -> None:
     rng = np.random.default_rng(42)
     n = 200
-    df = pd.DataFrame({
-        "source_id": np.arange(1, n + 1, dtype=np.int64),
-        "fe_h_apogee": rng.normal(-0.2, 0.3, n),
-        "teff_apogee": rng.uniform(4000, 5500, n),
-        "b_deg": rng.uniform(-60, 60, n),
-    })
+    df = pd.DataFrame(
+        {
+            "source_id": np.arange(1, n + 1, dtype=np.int64),
+            "fe_h_apogee": rng.normal(-0.2, 0.3, n),
+            "teff_apogee": rng.uniform(4000, 5500, n),
+            "b_deg": rng.uniform(-60, 60, n),
+        }
+    )
     a = stratified_split_ids(df, seed=123)
     b = stratified_split_ids(df, seed=123)
     for k in ("train", "val", "test"):
@@ -231,12 +239,14 @@ def test_stratified_split_reproducible() -> None:
 def test_stratified_split_fracs_approximate() -> None:
     rng = np.random.default_rng(42)
     n = 2000
-    df = pd.DataFrame({
-        "source_id": np.arange(1, n + 1, dtype=np.int64),
-        "fe_h_apogee": rng.normal(-0.2, 0.3, n),
-        "teff_apogee": rng.uniform(4000, 5500, n),
-        "b_deg": rng.uniform(-60, 60, n),
-    })
+    df = pd.DataFrame(
+        {
+            "source_id": np.arange(1, n + 1, dtype=np.int64),
+            "fe_h_apogee": rng.normal(-0.2, 0.3, n),
+            "teff_apogee": rng.uniform(4000, 5500, n),
+            "b_deg": rng.uniform(-60, 60, n),
+        }
+    )
     splits = stratified_split_ids(df, fracs=(0.70, 0.15, 0.15), seed=0)
     assert abs(len(splits["train"]) / n - 0.70) < 0.03
     assert abs(len(splits["val"]) / n - 0.15) < 0.03
@@ -244,8 +254,14 @@ def test_stratified_split_fracs_approximate() -> None:
 
 
 def test_stratified_split_rejects_bad_fracs() -> None:
-    df = pd.DataFrame({"source_id": [1, 2, 3], "fe_h_apogee": [0.0, 0.1, 0.2],
-                       "teff_apogee": [4800, 4900, 5000], "b_deg": [10, 20, 30]})
+    df = pd.DataFrame(
+        {
+            "source_id": [1, 2, 3],
+            "fe_h_apogee": [0.0, 0.1, 0.2],
+            "teff_apogee": [4800, 4900, 5000],
+            "b_deg": [10, 20, 30],
+        }
+    )
     with pytest.raises(ValueError, match="fracs must sum"):
         stratified_split_ids(df, fracs=(0.6, 0.2, 0.1))
 
@@ -253,12 +269,14 @@ def test_stratified_split_rejects_bad_fracs() -> None:
 def test_stratified_split_handles_dec_deg_fallback_for_latitude() -> None:
     rng = np.random.default_rng(42)
     n = 80
-    df = pd.DataFrame({
-        "source_id": np.arange(1, n + 1, dtype=np.int64),
-        "fe_h_apogee": rng.normal(-0.2, 0.3, n),
-        "teff_apogee": rng.uniform(4000, 5500, n),
-        "dec_deg": rng.uniform(-60, 60, n),  # b_deg missing → falls back to dec_deg
-    })
+    df = pd.DataFrame(
+        {
+            "source_id": np.arange(1, n + 1, dtype=np.int64),
+            "fe_h_apogee": rng.normal(-0.2, 0.3, n),
+            "teff_apogee": rng.uniform(4000, 5500, n),
+            "dec_deg": rng.uniform(-60, 60, n),  # b_deg missing → falls back to dec_deg
+        }
+    )
     splits = stratified_split_ids(df, seed=0)
     assert sum(len(v) for v in splits.values()) == n
 
@@ -303,6 +321,7 @@ def test_default_residual_cols_exposed() -> None:
 
 
 # --- LabelScaler ------------------------------------------------------------
+
 
 def _synthetic_labels(seed: int = 0) -> tuple[np.ndarray, tuple[str, ...]]:
     """Three-label matrix with heterogeneous scales and some NaN."""

@@ -48,7 +48,8 @@ def _attach_galactic_coords(df: pd.DataFrame, features_path: Path) -> pd.DataFra
     import astropy.units as u
 
     feats = pd.read_parquet(
-        features_path, columns=["source_id", "ra_deg", "dec_deg", "b_deg"],
+        features_path,
+        columns=["source_id", "ra_deg", "dec_deg", "b_deg"],
     )
     df = df.merge(feats, on="source_id", how="left")
     m = np.isfinite(df["ra_deg"].to_numpy()) & np.isfinite(df["dec_deg"].to_numpy())
@@ -93,11 +94,26 @@ def _sky_rate(ax, l_deg, b_deg, flag, title, cmap="magma") -> None:
 def _chem_scatter(ax, mh, am, flag, title) -> None:
     m = np.isfinite(mh) & np.isfinite(am)
     mh, am, flag = mh[m], am[m], flag[m].astype(bool)
-    ax.scatter(mh[~flag], am[~flag], s=0.5, c="tab:blue", alpha=0.25,
-               label=f"in-support (n={(~flag).sum():,})", rasterized=True)
-    ax.scatter(mh[flag], am[flag], s=0.5, c="tab:red", alpha=0.5,
-               label=f"flagged (n={flag.sum():,})", rasterized=True)
-    ax.set_xlim(-2.0, 0.5); ax.set_ylim(-0.2, 0.5)
+    ax.scatter(
+        mh[~flag],
+        am[~flag],
+        s=0.5,
+        c="tab:blue",
+        alpha=0.25,
+        label=f"in-support (n={(~flag).sum():,})",
+        rasterized=True,
+    )
+    ax.scatter(
+        mh[flag],
+        am[flag],
+        s=0.5,
+        c="tab:red",
+        alpha=0.5,
+        label=f"flagged (n={flag.sum():,})",
+        rasterized=True,
+    )
+    ax.set_xlim(-2.0, 0.5)
+    ax.set_ylim(-0.2, 0.5)
     ax.set_xlabel(r"$[{\rm M/H}]$ [dex]")
     ax.set_ylabel(r"$[\alpha/{\rm M}]$ [dex]")
     ax.set_title(title)
@@ -110,8 +126,12 @@ def main() -> None:
     ap.add_argument("--gate-provenance", type=Path, default=_DEF_GATE_PROV)
     ap.add_argument("--volume", type=Path, default=_DEF_VOL)
     ap.add_argument("--uniform", type=Path, default=_DEF_UNI)
-    ap.add_argument("--features", type=Path, default=_DEF_FEATURES,
-                    help="Stream-3 features parquet — source of ra/dec/b_deg for sky panel")
+    ap.add_argument(
+        "--features",
+        type=Path,
+        default=_DEF_FEATURES,
+        help="Stream-3 features parquet — source of ra/dec/b_deg for sky panel",
+    )
     ap.add_argument("--output", type=Path, default=_DEF_OUT)
     args = ap.parse_args()
 
@@ -130,12 +150,14 @@ def main() -> None:
     if not all(c in vol.columns for c in _gate_cols):
         vol = vol.merge(
             gate[["source_id", *_gate_cols]],
-            on="source_id", how="left",
+            on="source_id",
+            how="left",
         )
     if not all(c in uni.columns for c in _gate_cols):
         uni = uni.merge(
             gate[["source_id", *_gate_cols]],
-            on="source_id", how="left",
+            on="source_id",
+            how="left",
         )
 
     # Attach l_deg / b_deg for the Mollweide panel.
@@ -153,14 +175,27 @@ def main() -> None:
     # Stream-3 full-union distribution (both arms concatenated) — proxy for score spread.
     d_all = gate["latent_knn_dist"].to_numpy()
     d_all = d_all[np.isfinite(d_all)]
-    ax.hist(d_all, bins=80, histtype="stepfilled", color="tab:gray", alpha=0.6,
-            label=f"Stream-3 all (n={len(d_all):,})")
-    ax.axvline(tau, color="tab:red", linestyle="--", linewidth=2.0,
-               label=f"τ = val p{q*100:.0f} = {tau:.3f}")
-    ax.axvline(val_stats["p50"], color="tab:blue", linewidth=1.0,
-               label=f"val p50 = {val_stats['p50']:.3f}")
-    ax.axvline(val_stats["p95"], color="tab:blue", linestyle=":",
-               label=f"val p95 = {val_stats['p95']:.3f}")
+    ax.hist(
+        d_all,
+        bins=80,
+        histtype="stepfilled",
+        color="tab:gray",
+        alpha=0.6,
+        label=f"Stream-3 all (n={len(d_all):,})",
+    )
+    ax.axvline(
+        tau,
+        color="tab:red",
+        linestyle="--",
+        linewidth=2.0,
+        label=f"τ = val p{q * 100:.0f} = {tau:.3f}",
+    )
+    ax.axvline(
+        val_stats["p50"], color="tab:blue", linewidth=1.0, label=f"val p50 = {val_stats['p50']:.3f}"
+    )
+    ax.axvline(
+        val_stats["p95"], color="tab:blue", linestyle=":", label=f"val p95 = {val_stats['p95']:.3f}"
+    )
     ax.set_xlabel(f"kNN-mean distance in latent (k={k})")
     ax.set_ylabel("count")
     ax.set_title("Latent kNN-dist — Stream-3 + val thresholds")
@@ -172,10 +207,24 @@ def main() -> None:
     d_u = uni["latent_knn_dist"].to_numpy()
     d_v = d_v[np.isfinite(d_v)]
     d_u = d_u[np.isfinite(d_u)]
-    ax.hist(d_v, bins=80, histtype="step", color="tab:blue", linewidth=1.5,
-            density=True, label=f"volume (n={len(d_v):,})")
-    ax.hist(d_u, bins=80, histtype="step", color="tab:orange", linewidth=1.5,
-            density=True, label=f"uniform (n={len(d_u):,})")
+    ax.hist(
+        d_v,
+        bins=80,
+        histtype="step",
+        color="tab:blue",
+        linewidth=1.5,
+        density=True,
+        label=f"volume (n={len(d_v):,})",
+    )
+    ax.hist(
+        d_u,
+        bins=80,
+        histtype="step",
+        color="tab:orange",
+        linewidth=1.5,
+        density=True,
+        label=f"uniform (n={len(d_u):,})",
+    )
     ax.axvline(tau, color="tab:red", linestyle="--", linewidth=2.0, label=f"τ = {tau:.3f}")
     ax.set_xlabel(f"kNN-mean distance (k={k})")
     ax.set_ylabel("density")
@@ -195,17 +244,30 @@ def main() -> None:
         mat = np.array([[tn, fp], [fn, tp]])
         im = ax.imshow(mat, cmap="Blues", aspect="auto")
         for (i, j), v in np.ndenumerate(mat):
-            ax.text(j, i, f"{v:,}", ha="center", va="center",
-                    color="black" if mat[i, j] < mat.max() * 0.5 else "white",
-                    fontsize=11)
-        ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
+            ax.text(
+                j,
+                i,
+                f"{v:,}",
+                ha="center",
+                va="center",
+                color="black" if mat[i, j] < mat.max() * 0.5 else "white",
+                fontsize=11,
+            )
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
         ax.set_xticklabels(["OOD-joint=0", "OOD-joint=1"])
         ax.set_yticklabels(["latent=0", "latent=1"])
         ax.set_title("Overlap: latent-support × OOD-joint (union)")
         plt.colorbar(im, ax=ax, shrink=0.75)
     else:
-        ax.text(0.5, 0.5, "ood_joint_flag not in prediction parquet",
-                ha="center", va="center", transform=ax.transAxes)
+        ax.text(
+            0.5,
+            0.5,
+            "ood_joint_flag not in prediction parquet",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+        )
         ax.set_axis_off()
 
     # Row 2 — sky + chemistry.
@@ -216,44 +278,53 @@ def main() -> None:
         full = pd.concat([vol, uni], ignore_index=True)
         _sky_rate(
             ax_sky,
-            full["l_deg"].to_numpy(), full["b_deg"].to_numpy(),
+            full["l_deg"].to_numpy(),
+            full["b_deg"].to_numpy(),
             full["latent_support_flag"].to_numpy(),
             "latent_support_flag rate by sky pixel (union)",
         )
     else:
-        ax_sky.text(0.5, 0.5, "l_deg/b_deg not in predictions",
-                    ha="center", va="center", transform=ax_sky.transAxes)
+        ax_sky.text(
+            0.5,
+            0.5,
+            "l_deg/b_deg not in predictions",
+            ha="center",
+            va="center",
+            transform=ax_sky.transAxes,
+        )
         ax_sky.set_title("sky — unavailable")
 
     mh_col = "mh_pred"
     am_col = "alpha_m_pred"
     _chem_scatter(
         axes[1, 1],
-        vol[mh_col].to_numpy(), vol[am_col].to_numpy(),
+        vol[mh_col].to_numpy(),
+        vol[am_col].to_numpy(),
         vol["latent_support_flag"].to_numpy(),
         "[M/H]–[α/M] — volume arm",
     )
     _chem_scatter(
         axes[1, 2],
-        uni[mh_col].to_numpy(), uni[am_col].to_numpy(),
+        uni[mh_col].to_numpy(),
+        uni[am_col].to_numpy(),
         uni["latent_support_flag"].to_numpy(),
         "[M/H]–[α/M] — uniform arm",
     )
 
     flag_rate_union = float(
-        pd.concat([vol, uni], ignore_index=True)["latent_support_flag"]
-        .astype(bool).mean()
+        pd.concat([vol, uni], ignore_index=True)["latent_support_flag"].astype(bool).mean()
     )
     fig.suptitle(
-        f"Latent-support gate (k={k}, τ = val-p{q*100:.0f} = {tau:.3f}): "
+        f"Latent-support gate (k={k}, τ = val-p{q * 100:.0f} = {tau:.3f}): "
         f"flag rate — volume {float(vol['latent_support_flag'].astype(bool).mean()):.1%}, "
         f"uniform {float(uni['latent_support_flag'].astype(bool).mean()):.1%}, "
         f"union {flag_rate_union:.1%}",
-        fontsize=13, y=0.995,
+        fontsize=13,
+        y=0.995,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.output, bbox_inches="tight")
-    print(f"wrote {args.output} ({args.output.stat().st_size/1024:.0f} KiB)")
+    print(f"wrote {args.output} ({args.output.stat().st_size / 1024:.0f} KiB)")
 
 
 if __name__ == "__main__":

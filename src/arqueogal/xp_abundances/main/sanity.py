@@ -72,6 +72,7 @@ class CheckResult:
 
 # --- Check 1 — XP feature NaN invariant --------------------------------------
 
+
 def check_xp_feature_nan_invariant(df: pd.DataFrame) -> CheckResult:
     """NaN in XP feature columns is allowed only on flagged-out rows.
 
@@ -112,10 +113,12 @@ def check_xp_feature_nan_invariant(df: pd.DataFrame) -> CheckResult:
 
     passed = len(per_col_surprise) == 0
     summary = (
-        f"no unexpected NaN in {len(xp_cols)} XP feature columns "
-        f"(flagged-out rows: {n_flagged_out:,}/{len(df):,})"
-    ) if passed else (
-        f"unexpected NaN in {len(per_col_surprise)} XP feature columns"
+        (
+            f"no unexpected NaN in {len(xp_cols)} XP feature columns "
+            f"(flagged-out rows: {n_flagged_out:,}/{len(df):,})"
+        )
+        if passed
+        else (f"unexpected NaN in {len(per_col_surprise)} XP feature columns")
     )
     return CheckResult(
         name="xp_feature_nan_invariant",
@@ -127,7 +130,7 @@ def check_xp_feature_nan_invariant(df: pd.DataFrame) -> CheckResult:
             "n_xp_columns_checked": len(xp_cols),
             "surprise_counts_per_column": per_col_surprise,
             "expected_mask": "ye2024_flag != 0 OR xp_fit_flag_residual_high != 0/NA "
-                             "OR bp_coef_0 <= 0 OR rp_coef_0 <= 0",
+            "OR bp_coef_0 <= 0 OR rp_coef_0 <= 0",
         },
     )
 
@@ -135,7 +138,9 @@ def check_xp_feature_nan_invariant(df: pd.DataFrame) -> CheckResult:
 # --- Check 2 — Tier-1 atmospheric-label completeness -------------------------
 
 TIER1_ATMOSPHERIC: Final[tuple[str, ...]] = (
-    "teff_apogee", "logg_apogee", "mh_apogee",
+    "teff_apogee",
+    "logg_apogee",
+    "mh_apogee",
 )
 """Atmospheric Tier-1 labels: {Teff, log g, [M/H]}.
 
@@ -150,7 +155,8 @@ for the report-only diagnostic that surfaces it.
 
 
 def check_tier1_label_completeness(
-    df: pd.DataFrame, tiers: LabelTiers | None = None  # noqa: ARG001 — kept for API stability
+    df: pd.DataFrame,
+    tiers: LabelTiers | None = None,  # noqa: ARG001 — kept for API stability
 ) -> CheckResult:
     """Atmospheric Tier-1 labels finite for every ``flag_bad == 0`` row.
 
@@ -171,9 +177,8 @@ def check_tier1_label_completeness(
     summary = (
         f"all {len(TIER1_ATMOSPHERIC)} Tier-1 atmospheric labels finite on "
         f"{n_ok:,} flag_bad==0 rows"
-        if passed else
-        f"{len(per_label_missing)} Tier-1 atmospheric label(s) have NaN in "
-        f"flag_bad==0 rows"
+        if passed
+        else f"{len(per_label_missing)} Tier-1 atmospheric label(s) have NaN in flag_bad==0 rows"
     )
     return CheckResult(
         name="tier1_label_completeness",
@@ -191,11 +196,11 @@ def check_tier1_label_completeness(
 # --- Check 3 — Parameter bounds ----------------------------------------------
 
 PARAMETER_BOUNDS: dict[str, tuple[float, float]] = {
-    "teff_apogee": (3000.0, 8000.0),      # K  — RGB envelope; RGB builder-cut is [4000, 5500]
-    "logg_apogee": (-0.5, 5.5),           # dex — RGB builder-cut is [1.0, 3.5]
-    "fe_h_apogee": (-4.0, 1.1),           # dex — widened from +1.0 to cover DR19 metal-rich tail
-    "mh_apogee":   (-4.0, 1.0),           # dex — global [M/H] ASPCAP DR19 range
-    "alpha_m_apogee": (-0.8, 0.8),        # dex — widened to match DR19 α/M dynamic range
+    "teff_apogee": (3000.0, 8000.0),  # K  — RGB envelope; RGB builder-cut is [4000, 5500]
+    "logg_apogee": (-0.5, 5.5),  # dex — RGB builder-cut is [1.0, 3.5]
+    "fe_h_apogee": (-4.0, 1.1),  # dex — widened from +1.0 to cover DR19 metal-rich tail
+    "mh_apogee": (-4.0, 1.0),  # dex — global [M/H] ASPCAP DR19 range
+    "alpha_m_apogee": (-0.8, 0.8),  # dex — widened to match DR19 α/M dynamic range
 }
 """ASPCAP DR19-calibrated sanity bounds.
 
@@ -242,8 +247,8 @@ def check_parameter_bounds(df: pd.DataFrame) -> CheckResult:
     passed = len(violations) == 0
     summary = (
         f"all {len(PARAMETER_BOUNDS)} parameters within physical bounds"
-        if passed else
-        f"{len(violations)} parameter(s) have rows outside physical bounds"
+        if passed
+        else f"{len(violations)} parameter(s) have rows outside physical bounds"
     )
     return CheckResult(
         name="parameter_bounds",
@@ -256,9 +261,8 @@ def check_parameter_bounds(df: pd.DataFrame) -> CheckResult:
 
 # --- Check 2b — Per-element [X/H] NaN rates (SOFT diagnostic) ----------------
 
-def check_per_element_nan_rates(
-    df: pd.DataFrame, tiers: LabelTiers | None = None
-) -> CheckResult:
+
+def check_per_element_nan_rates(df: pd.DataFrame, tiers: LabelTiers | None = None) -> CheckResult:
     """Per-element NaN rates for Tier-2 + Tier-3 APOGEE [X/H] labels.
 
     Report-only diagnostic: always passes. The point is to freeze a baseline
@@ -290,17 +294,14 @@ def check_per_element_nan_rates(
             "rate": (n_nan / n_ok) if n_ok else 0.0,
         }
 
-    top = sorted(
-        per_element_rate.items(), key=lambda kv: -kv[1]["n_nan"]
-    )[:3]
-    summary = (
-        f"per-element NaN baseline on {n_ok:,} flag_bad==0 rows; top-3: "
-        + ", ".join(f"{k} {v['rate']*100:.2f}%" for k, v in top)
+    top = sorted(per_element_rate.items(), key=lambda kv: -kv[1]["n_nan"])[:3]
+    summary = f"per-element NaN baseline on {n_ok:,} flag_bad==0 rows; top-3: " + ", ".join(
+        f"{k} {v['rate'] * 100:.2f}%" for k, v in top
     )
     return CheckResult(
         name="per_element_nan_rates",
         level="SOFT",
-        passed=True,   # diagnostic-only
+        passed=True,  # diagnostic-only
         summary=summary,
         details={
             "n_flag_bad_zero_rows": n_ok,
@@ -359,18 +360,20 @@ def check_zscore_validity(df: pd.DataFrame) -> CheckResult:
         summary=summary,
         details={
             "n_reference_rows": n_ref,
-            "bp_mean": bp_mu, "bp_std": bp_sigma,
-            "rp_mean": rp_mu, "rp_std": rp_sigma,
-            "mean_tol": Z_MEAN_TOL, "std_tol": Z_STD_TOL,
+            "bp_mean": bp_mu,
+            "bp_std": bp_sigma,
+            "rp_mean": rp_mu,
+            "rp_std": rp_sigma,
+            "mean_tol": Z_MEAN_TOL,
+            "std_tol": Z_STD_TOL,
         },
     )
 
 
 # --- Check 6 — Dedup idempotency ---------------------------------------------
 
-def check_dedup_idempotency(
-    df: pd.DataFrame, expected_rows_out: int
-) -> CheckResult:
+
+def check_dedup_idempotency(df: pd.DataFrame, expected_rows_out: int) -> CheckResult:
     """Running ``dedup_by_source_id`` yields the audited row count.
 
     This is a contract-integrity check: the feature matrix has 354,890 ⇒
@@ -384,8 +387,8 @@ def check_dedup_idempotency(
     passed = actual == expected_rows_out
     summary = (
         f"dedup rows_out={actual:,} matches expected {expected_rows_out:,}"
-        if passed else
-        f"dedup rows_out={actual:,} ≠ expected {expected_rows_out:,} "
+        if passed
+        else f"dedup rows_out={actual:,} ≠ expected {expected_rows_out:,} "
         f"(Δ={actual - expected_rows_out:+,})"
     )
     return CheckResult(
@@ -407,9 +410,8 @@ def check_dedup_idempotency(
 
 # --- Check — checkpoint label-scaler correctness -----------------------------
 
-def check_checkpoint_label_scaler(
-    blob: dict, *, tiers: LabelTiers | None = None
-) -> CheckResult:
+
+def check_checkpoint_label_scaler(blob: dict, *, tiers: LabelTiers | None = None) -> CheckResult:
     """Hard-fail if a training checkpoint does not carry a fitted label scaler.
 
     The Run A ensemble trained with placeholder zeros/ones in
@@ -429,8 +431,7 @@ def check_checkpoint_label_scaler(
     tiers = tiers or LabelTiers()
     details: dict = {"n_labels_expected": tiers.n_labels}
     missing = [
-        k for k in ("label_scaler_mean", "label_scaler_scale", "label_names")
-        if k not in blob
+        k for k in ("label_scaler_mean", "label_scaler_scale", "label_names") if k not in blob
     ]
     if missing:
         return CheckResult(
@@ -444,11 +445,13 @@ def check_checkpoint_label_scaler(
     mean = np.asarray(blob["label_scaler_mean"])
     scale = np.asarray(blob["label_scaler_scale"])
     names = tuple(blob["label_names"])
-    details.update({
-        "mean_shape": list(mean.shape),
-        "scale_shape": list(scale.shape),
-        "label_names": list(names),
-    })
+    details.update(
+        {
+            "mean_shape": list(mean.shape),
+            "scale_shape": list(scale.shape),
+            "label_names": list(names),
+        }
+    )
 
     if mean.shape != (tiers.n_labels,) or scale.shape != (tiers.n_labels,):
         return CheckResult(
@@ -493,11 +496,16 @@ def check_checkpoint_label_scaler(
             },
         )
 
-    details.update({
-        "teff_mean": float(mean[0]), "teff_scale": float(scale[0]),
-        "logg_mean": float(mean[1]), "logg_scale": float(scale[1]),
-        "mh_mean": float(mean[2]), "mh_scale": float(scale[2]),
-    })
+    details.update(
+        {
+            "teff_mean": float(mean[0]),
+            "teff_scale": float(scale[0]),
+            "logg_mean": float(mean[1]),
+            "logg_scale": float(scale[1]),
+            "mh_mean": float(mean[2]),
+            "mh_scale": float(scale[2]),
+        }
+    )
     return CheckResult(
         name="checkpoint_label_scaler",
         level="HARD",
@@ -511,6 +519,7 @@ def check_checkpoint_label_scaler(
 
 
 # --- Aggregation -------------------------------------------------------------
+
 
 @dataclass(frozen=True, slots=True)
 class BatteryVerdict:

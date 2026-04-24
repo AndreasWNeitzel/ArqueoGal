@@ -132,9 +132,7 @@ def test_enrich_auto_mode_at_threshold_picks_sync(capture_sync) -> None:
 def test_enrich_writes_checkpoint_parquet(capture_sync, tmp_path: Path) -> None:
     service = MagicMock(spec=TAPService)
     ckpt = tmp_path / "enrich_batches"
-    df = enrich_source_ids(
-        service, [1, 2, 3, 4, 5], batch_size=2, mode="sync", checkpoint_dir=ckpt
-    )
+    df = enrich_source_ids(service, [1, 2, 3, 4, 5], batch_size=2, mode="sync", checkpoint_dir=ckpt)
 
     files = sorted(ckpt.glob("batch_*.parquet"))
     expected = ["batch_0000.parquet", "batch_0001.parquet", "batch_0002.parquet"]
@@ -145,9 +143,7 @@ def test_enrich_writes_checkpoint_parquet(capture_sync, tmp_path: Path) -> None:
     pd.testing.assert_frame_equal(reloaded, df)
 
 
-def test_enrich_reuses_checkpoint_without_requery(
-    capture_sync, tmp_path: Path
-) -> None:
+def test_enrich_reuses_checkpoint_without_requery(capture_sync, tmp_path: Path) -> None:
     service = MagicMock(spec=TAPService)
     ckpt = tmp_path / "enrich_batches"
     ckpt.mkdir()
@@ -156,9 +152,7 @@ def test_enrich_reuses_checkpoint_without_requery(
         ckpt / "batch_0000.parquet", index=False
     )
 
-    df = enrich_source_ids(
-        service, [1, 2, 3, 4], batch_size=2, mode="sync", checkpoint_dir=ckpt
-    )
+    df = enrich_source_ids(service, [1, 2, 3, 4], batch_size=2, mode="sync", checkpoint_dir=ckpt)
 
     # batch 0 was reused → only batch 1 hit the fake TAP.
     assert capture_sync == [[3, 4]]

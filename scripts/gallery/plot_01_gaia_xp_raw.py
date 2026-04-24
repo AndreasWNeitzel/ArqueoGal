@@ -9,6 +9,7 @@ Uses data/interim/xp_sampled_corrected.parquet (corrected_flux: 330 samples per 
 the continuous SED on the Gaia XP wavelength grid) JOINed on source_id with
 pipeline1_features_stream1.parquet for Teff/logg/[M/H] labels and A_V/G for filtering.
 """
+
 from __future__ import annotations
 
 import sys
@@ -32,8 +33,7 @@ def _load_xp_subset(n_target: int = 8_000, seed: int = 17) -> dict[str, np.ndarr
         DATA_INTERIM / "xp_sampled_corrected.parquet",
         columns=["source_id", "corrected_flux"],
     )
-    feat_cols = ["source_id", "teff_apogee", "logg_apogee", "mh_apogee",
-                 "g_mag", "bp_rp", "av_sfd"]
+    feat_cols = ["source_id", "teff_apogee", "logg_apogee", "mh_apogee", "g_mag", "bp_rp", "av_sfd"]
     feat = pq.read_table(
         DATA_PROCESSED / "pipeline1_features_stream1.parquet",
         columns=feat_cols,
@@ -61,25 +61,35 @@ def _load_xp_subset(n_target: int = 8_000, seed: int = 17) -> dict[str, np.ndarr
 def sed_atlas_by_hrd(data: dict[str, np.ndarray]) -> None:
     """3×3 grid over (Teff, logg) bins. Each SED peak-normalised for shape comparison."""
     # Bins sized to where APOGEE-RGB/subgiant density actually lives.
-    teff_edges = np.array([4000, 4500, 5000, 5800])   # 3 cols
-    logg_edges = np.array([1.0, 2.0, 3.0, 4.5])       # 3 rows, high→low
+    teff_edges = np.array([4000, 4500, 5000, 5800])  # 3 cols
+    logg_edges = np.array([1.0, 2.0, 3.0, 4.5])  # 3 rows, high→low
 
     fig, axes = plt.subplots(3, 3, figsize=(13, 11), sharex=True, sharey=True)
     cmap = plt.get_cmap("viridis")
 
-    for i in range(3):   # rows: logg high → low (giant → dwarf → subgiant)
+    for i in range(3):  # rows: logg high → low (giant → dwarf → subgiant)
         logg_lo, logg_hi = logg_edges[2 - i], logg_edges[2 - i + 1]
         for j in range(3):  # cols: Teff cool → warm
             teff_lo, teff_hi = teff_edges[j], teff_edges[j + 1]
             mask = (
-                (data["teff"] >= teff_lo) & (data["teff"] < teff_hi)
-                & (data["logg"] >= logg_lo) & (data["logg"] < logg_hi)
+                (data["teff"] >= teff_lo)
+                & (data["teff"] < teff_hi)
+                & (data["logg"] >= logg_lo)
+                & (data["logg"] < logg_hi)
             )
             ax = axes[i, j]
             n = int(mask.sum())
             if n == 0:
-                ax.text(0.5, 0.5, "empty cell", ha="center", va="center",
-                        transform=ax.transAxes, fontsize=9, color="#888")
+                ax.text(
+                    0.5,
+                    0.5,
+                    "empty cell",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                    fontsize=9,
+                    color="#888",
+                )
             else:
                 sub_idx = np.where(mask)[0]
                 if len(sub_idx) > 25:
@@ -95,10 +105,19 @@ def sed_atlas_by_hrd(data: dict[str, np.ndarray]) -> None:
                     f = data["flux"][ii]
                     pk = np.nanmax(np.abs(f))
                     if pk > 0 and np.isfinite(pk):
-                        ax.plot(XP_WAVELENGTHS_NM, f / pk,
-                                color=cmap(mh_norm[k]), alpha=0.55, lw=0.7)
-                ax.text(0.97, 0.93, f"n={n}", transform=ax.transAxes, ha="right",
-                        va="top", fontsize=8, color="#333")
+                        ax.plot(
+                            XP_WAVELENGTHS_NM, f / pk, color=cmap(mh_norm[k]), alpha=0.55, lw=0.7
+                        )
+                ax.text(
+                    0.97,
+                    0.93,
+                    f"n={n}",
+                    transform=ax.transAxes,
+                    ha="right",
+                    va="top",
+                    fontsize=8,
+                    color="#333",
+                )
             ax.set_title(
                 rf"$T_{{\rm eff}} \in [{teff_lo},{teff_hi}]\,$K,  "
                 rf"$\log g \in [{logg_lo},{logg_hi}]$",
@@ -112,8 +131,7 @@ def sed_atlas_by_hrd(data: dict[str, np.ndarray]) -> None:
     for ax in axes[:, 0]:
         ax.set_ylabel("flux (per-star peak-normalised)")
 
-    sm = plt.cm.ScalarMappable(cmap=cmap,
-                                norm=plt.Normalize(vmin=-1.5, vmax=0.5))
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=-1.5, vmax=0.5))
     sm.set_array([])
     cbar = fig.colorbar(sm, ax=axes, shrink=0.75, pad=0.01, aspect=30)
     cbar.set_label(r"[M/H]$_{\mathrm{APOGEE}}$")
@@ -122,7 +140,9 @@ def sed_atlas_by_hrd(data: dict[str, np.ndarray]) -> None:
         r"Gaia XP corrected SEDs by $(T_{\rm eff},\,\log g)$ cell"
         "\n"
         r"per-star peak-normalised, coloured by [M/H]",
-        fontsize=12, fontweight="bold", y=1.00,
+        fontsize=12,
+        fontweight="bold",
+        y=1.00,
     )
     save_fig(fig, OUT / "xp_sed_atlas_by_hrd.png", tight=False)
 
@@ -188,7 +208,9 @@ def coef_distributions() -> None:
 
     fig.suptitle(
         "Gaia XP Hermite coefficients — shape (normalised $c_k/c_0$) + absolute scale $c_0$",
-        y=0.995, fontsize=13, fontweight="bold",
+        y=0.995,
+        fontsize=13,
+        fontweight="bold",
     )
     save_fig(fig, OUT / "xp_coef_distributions.png", tight=False)
 
@@ -213,21 +235,23 @@ def example_stars(data: dict[str, np.ndarray]) -> None:
     """
     pool_mask = (
         (data["av_sfd"] < 0.3)
-        & (data["g_mag"] > 12.0) & (data["g_mag"] < 14.0)
-        & (data["logg"] < 3.5) & (data["logg"] > 1.0)
+        & (data["g_mag"] > 12.0)
+        & (data["g_mag"] < 14.0)
+        & (data["logg"] < 3.5)
+        & (data["logg"] > 1.0)
     )
     if pool_mask.sum() < 9:
         # fall back to full set if the tight filter is too aggressive for the 10k subsample
         pool_mask = np.ones_like(pool_mask, dtype=bool)
 
     types = [
-        ("cool giant",   dict(teff=4200, logg=1.8)),
+        ("cool giant", dict(teff=4200, logg=1.8)),
         ("normal giant", dict(teff=4650, logg=2.4)),
-        ("warm giant",   dict(teff=5100, logg=2.8)),
+        ("warm giant", dict(teff=5100, logg=2.8)),
     ]
     mhs = [
         ("metal-poor", -1.0),
-        ("solar",      +0.0),
+        ("solar", +0.0),
         ("metal-rich", +0.25),
     ]
 
@@ -239,13 +263,20 @@ def example_stars(data: dict[str, np.ndarray]) -> None:
             best = _pick_nearest(data, ref, pool_mask)
             ax = axes[i, j]
             if best < 0:
-                ax.text(0.5, 0.5, "no match in pool", ha="center", va="center",
-                        transform=ax.transAxes, fontsize=9, color="#888")
+                ax.text(
+                    0.5,
+                    0.5,
+                    "no match in pool",
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                    fontsize=9,
+                    color="#888",
+                )
             else:
                 f = data["flux"][best]
                 pk = np.nanmax(np.abs(f))
-                ax.plot(XP_WAVELENGTHS_NM, f / (pk if pk > 0 else 1.0),
-                        color="#1a2c55", lw=1.1)
+                ax.plot(XP_WAVELENGTHS_NM, f / (pk if pk > 0 else 1.0), color="#1a2c55", lw=1.1)
                 ax.set_ylim(-0.05, 1.15)
                 info = (
                     rf"$T_{{\rm eff}}={data['teff'][best]:.0f}$ K,  "
@@ -255,10 +286,21 @@ def example_stars(data: dict[str, np.ndarray]) -> None:
                     rf"$G={data['g_mag'][best]:.2f}$,  "
                     rf"$A_V^{{\rm SFD}}={data['av_sfd'][best]:.2f}$"
                 )
-                ax.text(0.03, 0.97, info, transform=ax.transAxes, ha="left", va="top",
-                        fontsize=8,
-                        bbox=dict(boxstyle="round,pad=0.25", facecolor="white",
-                                  edgecolor="#cccccc", alpha=0.92))
+                ax.text(
+                    0.03,
+                    0.97,
+                    info,
+                    transform=ax.transAxes,
+                    ha="left",
+                    va="top",
+                    fontsize=8,
+                    bbox=dict(
+                        boxstyle="round,pad=0.25",
+                        facecolor="white",
+                        edgecolor="#cccccc",
+                        alpha=0.92,
+                    ),
+                )
             if i == 0:
                 ax.set_title(col_label + rf"  ([M/H]$\approx{mh:+.2f}$)", fontsize=10)
             if j == 0:
@@ -270,7 +312,9 @@ def example_stars(data: dict[str, np.ndarray]) -> None:
     fig.suptitle(
         "Example Stream-1 XP SEDs  —  3 giant types × 3 metallicities, "
         r"$A_V^{\rm SFD}<0.3$, $12<G<14$",
-        fontsize=13, fontweight="bold", y=1.00,
+        fontsize=13,
+        fontweight="bold",
+        y=1.00,
     )
     save_fig(fig, OUT / "xp_example_stars.png")
 

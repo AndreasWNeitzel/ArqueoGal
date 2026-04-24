@@ -11,6 +11,7 @@ Stream 3 (Andrae+2023 RGB deployment) — data/processed/pipeline1_features_stre
 Galactic-coord sky maps follow the convention l=0 at centre, longitude increasing
 right-to-left (see _common.galactic_mollweide).
 """
+
 from __future__ import annotations
 
 import sys
@@ -44,16 +45,21 @@ def _load_stream(path: Path, cols: list[str], n_sample: int) -> dict[str, np.nda
 
 
 def sky_maps() -> None:
-    s1 = _load_stream(DATA_PROCESSED / "pipeline1_features_stream1.parquet",
-                      ["ra_deg", "dec_deg"], 60_000)
-    s3 = _load_stream(DATA_PROCESSED / "pipeline1_features_stream3.parquet",
-                      ["ra_deg", "dec_deg", "sample"], 80_000)
+    s1 = _load_stream(
+        DATA_PROCESSED / "pipeline1_features_stream1.parquet", ["ra_deg", "dec_deg"], 60_000
+    )
+    s3 = _load_stream(
+        DATA_PROCESSED / "pipeline1_features_stream3.parquet",
+        ["ra_deg", "dec_deg", "sample"],
+        80_000,
+    )
     s2_path = DATA_INTERIM / "stream2_tess_gaia.parquet"
     s2 = None
     if s2_path.exists():
         try:
             s2 = _load_stream(s2_path, ["ra", "dec"], 30_000)
-            s2["ra_deg"] = s2.pop("ra"); s2["dec_deg"] = s2.pop("dec")
+            s2["ra_deg"] = s2.pop("ra")
+            s2["dec_deg"] = s2.pop("dec")
         except Exception:
             s2 = None
 
@@ -91,8 +97,12 @@ def sky_maps() -> None:
     for ax in axes:
         style_galactic_mollweide(ax)
 
-    fig.suptitle("Stream footprints on the sky  —  Galactic coordinates (l increasing right-to-left)",
-                 y=1.00, fontsize=13, fontweight="bold")
+    fig.suptitle(
+        "Stream footprints on the sky  —  Galactic coordinates (l increasing right-to-left)",
+        y=1.00,
+        fontsize=13,
+        fontweight="bold",
+    )
     save_fig(fig, OUT / "stream_sky_maps.png")
 
 
@@ -105,10 +115,11 @@ def row_counts() -> None:
         "σ-gated\n(downstream input)": 211_739,
     }
     fig, ax = plt.subplots(figsize=(11, 4.5))
-    bars = ax.bar(counts.keys(), counts.values(),
-                  color="#4c78a8", edgecolor="#222", linewidth=0.6)
+    bars = ax.bar(counts.keys(), counts.values(), color="#4c78a8", edgecolor="#222", linewidth=0.6)
     for b, v in zip(bars, counts.values()):
-        ax.text(b.get_x() + b.get_width()/2, v * 1.04, f"{v:,}", ha="center", va="bottom", fontsize=9)
+        ax.text(
+            b.get_x() + b.get_width() / 2, v * 1.04, f"{v:,}", ha="center", va="bottom", fontsize=9
+        )
     ax.set_ylabel("row count")
     ax.set_yscale("log")
     ax.set_title("Row-count waterfall across the pipeline  (log y)")

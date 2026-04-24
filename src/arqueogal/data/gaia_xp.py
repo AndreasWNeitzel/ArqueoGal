@@ -78,8 +78,10 @@ JOIN tap_upload.ids AS u ON x.source_id = u.source_id
 :func:`arqueogal.data.tap.batched_upload_fetch_df`."""
 
 _COEFF_COLS: Final[tuple[str, ...]] = (
-    "bp_coefficients", "bp_coefficient_errors",
-    "rp_coefficients", "rp_coefficient_errors",
+    "bp_coefficients",
+    "bp_coefficient_errors",
+    "rp_coefficients",
+    "rp_coefficient_errors",
 )
 
 _LN10: Final[float] = math.log(10.0)
@@ -159,10 +161,20 @@ you're porting the NN to a different sampling."""
 YE2024_N_OUTPUT: Final[int] = 330
 
 YE2024_INPUT_FEATURES: Final[tuple[str, ...]] = (
-    "color_skymap_1", "color_skymap_2", "color_skymap_3",
-    "u", "v", "g", "i",
-    "phot_g_mean_mag", "phot_bp_mean_mag", "phot_rp_mean_mag",
-    "bp_rp", "bp_g", "rp_g", "EBV",
+    "color_skymap_1",
+    "color_skymap_2",
+    "color_skymap_3",
+    "u",
+    "v",
+    "g",
+    "i",
+    "phot_g_mean_mag",
+    "phot_bp_mean_mag",
+    "phot_rp_mean_mag",
+    "bp_rp",
+    "bp_g",
+    "rp_g",
+    "EBV",
 )
 """14 NN inputs. Order matches Ye's ``read_nn_model.py`` param list — do
 not permute; the scaler vectors are aligned against this ordering."""
@@ -276,12 +288,13 @@ def apply_ye2024_correction(  # noqa: PLR0913, PLR0915 — tuning knobs + batch 
     picked_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(
         "apply_ye2024_correction: model=%s, device=%s, batch=%d, n=%d",
-        resolved_model_dir, picked_device, batch_size, len(xp_df),
+        resolved_model_dir,
+        picked_device,
+        batch_size,
+        len(xp_df),
     )
 
-    nn_model, scaler_mean, scaler_scale = _load_ye2024_model(
-        resolved_model_dir, picked_device
-    )
+    nn_model, scaler_mean, scaler_scale = _load_ye2024_model(resolved_model_dir, picked_device)
 
     # Align xp_df to coords_df on source_id. We preserve xp_df's ordering.
     coords_trim = coords_df[["source_id", "ra", "dec"]].drop_duplicates("source_id")
@@ -290,18 +303,21 @@ def apply_ye2024_correction(  # noqa: PLR0913, PLR0915 — tuning knobs + batch 
     if missing_coords:
         logger.warning(
             "%d/%d stars have no (ra, dec) in coords_df — dropping",
-            missing_coords, len(joined),
+            missing_coords,
+            len(joined),
         )
         joined = joined.dropna(subset=["ra", "dec"]).reset_index(drop=True)
 
     n = len(joined)
     if n == 0:
-        return pd.DataFrame({
-            "source_id": np.empty(0, dtype=np.int64),
-            "corrected_flux": pd.Series([], dtype=object),
-            "a_v_sfd": np.empty(0, dtype=np.float32),
-            "ye2024_flag": np.empty(0, dtype=np.int8),
-        })
+        return pd.DataFrame(
+            {
+                "source_id": np.empty(0, dtype=np.int64),
+                "corrected_flux": pd.Series([], dtype=object),
+                "a_v_sfd": np.empty(0, dtype=np.float32),
+                "ye2024_flag": np.empty(0, dtype=np.int8),
+            }
+        )
 
     # Pre-compute SFD A_V once — fast, vectorised.
     a_v_sfd = _sfd_av(joined["ra"].to_numpy(), joined["dec"].to_numpy())
@@ -323,7 +339,9 @@ def apply_ye2024_correction(  # noqa: PLR0913, PLR0915 — tuning knobs + batch 
         except Exception as exc:  # noqa: BLE001 — GaiaXPy may raise various types
             logger.warning(
                 "gaiaxpy.calibrate failed on batch %d..%d (%s); marking flag=2",
-                lo, hi, exc,
+                lo,
+                hi,
+                exc,
             )
             out_flag[lo:hi] = YE2024_FLAG_CALIBRATE_FAIL
             continue
@@ -334,12 +352,16 @@ def apply_ye2024_correction(  # noqa: PLR0913, PLR0915 — tuning knobs + batch 
         flux_dered = _ccm89_deredden(flux, sampling_nm, av_batch)
 
         syn_sky = generate(
-            batch, photometric_system=PhotometricSystem.Sky_Mapper,
-            error_correction=True, save_file=False,
+            batch,
+            photometric_system=PhotometricSystem.Sky_Mapper,
+            error_correction=True,
+            save_file=False,
         )
         syn_gaia = generate(
-            batch, photometric_system=PhotometricSystem.Gaia_DR3_Vega,
-            error_correction=True, save_file=False,
+            batch,
+            photometric_system=PhotometricSystem.Gaia_DR3_Vega,
+            error_correction=True,
+            save_file=False,
         )
         # gaiaxpy may drop rows where synthesis fails; re-align to batch on
         # source_id so syn_sky / syn_gaia always have len(batch) rows, with
@@ -371,15 +393,19 @@ def apply_ye2024_correction(  # noqa: PLR0913, PLR0915 — tuning knobs + batch 
     n_failcal = int((out_flag == YE2024_FLAG_CALIBRATE_FAIL).sum())
     logger.info(
         "Ye+2024 done: %d OK, %d no-synth-phot, %d calibrate-failed",
-        n_ok, n_nophot, n_failcal,
+        n_ok,
+        n_nophot,
+        n_failcal,
     )
 
-    return pd.DataFrame({
-        "source_id": joined["source_id"].to_numpy().astype(np.int64),
-        "corrected_flux": [row for row in out_flux],
-        "a_v_sfd": a_v_sfd.astype(np.float32),
-        "ye2024_flag": out_flag,
-    })
+    return pd.DataFrame(
+        {
+            "source_id": joined["source_id"].to_numpy().astype(np.int64),
+            "corrected_flux": [row for row in out_flux],
+            "a_v_sfd": a_v_sfd.astype(np.float32),
+            "ye2024_flag": out_flag,
+        }
+    )
 
 
 def _resolve_ye2024_model_dir(model_dir: Path | str | None) -> Path:
@@ -511,9 +537,7 @@ def _align_to_batch(batch: pd.DataFrame, syn: pd.DataFrame) -> pd.DataFrame:
     left = pd.DataFrame({"source_id": batch_sids})
     out = left.merge(sub, on="source_id", how="left")
     # Guarantee row count matches batch exactly.
-    assert len(out) == len(batch), (
-        f"_align_to_batch row mismatch: {len(out)} != {len(batch)}"
-    )
+    assert len(out) == len(batch), f"_align_to_batch row mismatch: {len(out)} != {len(batch)}"
     # Keep only the photometry columns so downstream .to_numpy() calls see
     # np.nan (object dtype rather than pandas nullable) — matches the pre-
     # patch behavior _build_ye2024_features was written against.
@@ -580,9 +604,7 @@ def _patch_gaiaxpy_cast_output() -> None:
     _GAIAXPY_CAST_PATCHED = True
 
 
-def _ccm89_deredden(
-    flux: np.ndarray, sampling_nm: np.ndarray, a_v: np.ndarray
-) -> np.ndarray:
+def _ccm89_deredden(flux: np.ndarray, sampling_nm: np.ndarray, a_v: np.ndarray) -> np.ndarray:
     """Per-star CCM89 dereddening: `flux * 10^(0.4 * A_lambda)`.
 
     ``flux`` has shape (N, M); ``sampling_nm`` shape (M,); ``a_v`` shape (N,).
@@ -600,9 +622,7 @@ def _ccm89_deredden(
     return out
 
 
-def _ccm89_redden(
-    flux: np.ndarray, sampling_nm: np.ndarray, a_v: np.ndarray
-) -> np.ndarray:
+def _ccm89_redden(flux: np.ndarray, sampling_nm: np.ndarray, a_v: np.ndarray) -> np.ndarray:
     """Inverse of :func:`_ccm89_deredden` — apply extinction back."""
     import extinction
 
@@ -637,12 +657,19 @@ def _build_ye2024_features(
 
     feats = np.stack(
         [
-            g_mag - i_mag,                       # color_skymap_1 = g - i
+            g_mag - i_mag,  # color_skymap_1 = g - i
             v_mag - g_mag - 0.9 * (g_mag - i_mag),  # color_skymap_2
             u_mag - v_mag - 0.9 * (g_mag - i_mag),  # color_skymap_3
-            u_mag, v_mag, g_mag, i_mag,
-            G, BP, RP,
-            BP - RP, BP - G, RP - G,
+            u_mag,
+            v_mag,
+            g_mag,
+            i_mag,
+            G,
+            BP,
+            RP,
+            BP - RP,
+            BP - G,
+            RP - G,
             ebv,
         ],
         axis=1,
@@ -709,9 +736,7 @@ def _normalise_band(
     errs = _stack_arrays(errs_col, label=f"{band}_coefficient_errors")
 
     if coeffs.shape != errs.shape:
-        raise ValueError(
-            f"{band}: coeffs shape {coeffs.shape} != errs shape {errs.shape}"
-        )
+        raise ValueError(f"{band}: coeffs shape {coeffs.shape} != errs shape {errs.shape}")
 
     # §6.5 checks (positive c0, no NaN).
     c0 = coeffs[:, 0]
@@ -753,9 +778,7 @@ def _stack_arrays(col: pd.Series, *, label: str) -> np.ndarray:
     """Turn an object-dtype column of 55-element arrays into a (N, 55) ndarray."""
     stacked = np.stack([np.asarray(x, dtype=np.float64) for x in col])
     if stacked.ndim != 2 or stacked.shape[1] != XP_COEFF_LEN:
-        raise ValueError(
-            f"{label}: expected (N, {XP_COEFF_LEN}) ndarray, got {stacked.shape}"
-        )
+        raise ValueError(f"{label}: expected (N, {XP_COEFF_LEN}) ndarray, got {stacked.shape}")
     return stacked
 
 
@@ -782,9 +805,7 @@ class XpC0Stats:
         }
 
 
-def zscore_c0(
-    df: pd.DataFrame, stats: XpC0Stats | None = None
-) -> tuple[pd.DataFrame, XpC0Stats]:
+def zscore_c0(df: pd.DataFrame, stats: XpC0Stats | None = None) -> tuple[pd.DataFrame, XpC0Stats]:
     """Z-score ``bp_c0_log`` / ``rp_c0_log`` → ``bp_c0_z`` / ``rp_c0_z``.
 
     On training ingestion, call with ``stats=None`` to fit-and-apply (returns
@@ -914,14 +935,11 @@ def _hermite_functions_stable(n_max: int, u: np.ndarray) -> np.ndarray:
         are ``n = 0, 1, …, n_max``.
     """
     phi = np.empty((n_max + 1, u.size), dtype=np.float64)
-    phi[0] = np.exp(-0.5 * u * u) / (np.pi ** 0.25)
+    phi[0] = np.exp(-0.5 * u * u) / (np.pi**0.25)
     if n_max >= 1:
         phi[1] = u * math.sqrt(2.0) * phi[0]
     for n in range(1, n_max):
-        phi[n + 1] = (
-            u * math.sqrt(2.0 / (n + 1)) * phi[n]
-            - math.sqrt(n / (n + 1)) * phi[n - 1]
-        )
+        phi[n + 1] = u * math.sqrt(2.0 / (n + 1)) * phi[n] - math.sqrt(n / (n + 1)) * phi[n - 1]
     return phi.T
 
 
@@ -999,11 +1017,15 @@ def _build_hermite_basis() -> dict:
     h.update(
         np.array(
             [
-                HERMITE_BP_CENTER_NM, HERMITE_BP_SCALE_NM,
-                HERMITE_RP_CENTER_NM, HERMITE_RP_SCALE_NM,
-                *HERMITE_BP_RANGE_NM, *HERMITE_RP_RANGE_NM,
+                HERMITE_BP_CENTER_NM,
+                HERMITE_BP_SCALE_NM,
+                HERMITE_RP_CENTER_NM,
+                HERMITE_RP_SCALE_NM,
+                *HERMITE_BP_RANGE_NM,
+                *HERMITE_RP_RANGE_NM,
                 HERMITE_N_BASIS,
-            ], dtype=np.float64,
+            ],
+            dtype=np.float64,
         ).tobytes()
     )
     h.update(lam_full.astype(np.float64).tobytes())
@@ -1063,9 +1085,9 @@ def reproject_ye_to_hermite(flux_sampled: np.ndarray) -> dict:
         results[f"reprojection_residual_rms_{band}"] = rms.astype(np.float32)
         rms_bands.append(resid)
     resid_all = np.concatenate(rms_bands, axis=1)
-    results["reprojection_residual_rms"] = np.sqrt(
-        np.mean(resid_all * resid_all, axis=1)
-    ).astype(np.float32)
+    results["reprojection_residual_rms"] = np.sqrt(np.mean(resid_all * resid_all, axis=1)).astype(
+        np.float32
+    )
     return results
 
 

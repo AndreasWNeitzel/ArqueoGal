@@ -164,7 +164,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     merged["distance_pc"] = merged["r_med_photogeo"].astype(np.float32)
     logger.info(
         "  n with BJ21 distance: %d / %d",
-        merged["distance_pc"].notna().sum(), len(merged),
+        merged["distance_pc"].notna().sum(),
+        len(merged),
     )
 
     # ------------------------------------------------------------------
@@ -184,7 +185,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     n_fill = N_UNIFORM_TARGET - len(existing_ids)
     logger.info(
         "uniform arm: reuse %d existing + fill %d more → target %d",
-        len(existing_ids), n_fill, N_UNIFORM_TARGET,
+        len(existing_ids),
+        n_fill,
+        N_UNIFORM_TARGET,
     )
 
     # Andrae minus existing — the pool for the fill stratification.
@@ -228,7 +231,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
         fill_sample = _fill_stratify(per_cell_try)
         logger.info(
             "  rebalanced fill at per_cell=%d → %d rows",
-            per_cell_try, len(fill_sample),
+            per_cell_try,
+            len(fill_sample),
         )
 
     # Uniform arm = existing ∪ fill.
@@ -238,7 +242,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     uniform_ids_set = set(uniform_ids.tolist())
     logger.info(
         "uniform arm total: %d (existing reused: %d, fill: %d)",
-        len(uniform_sample_df), len(existing_merged), len(fill_sample),
+        len(uniform_sample_df),
+        len(existing_merged),
+        len(fill_sample),
     )
 
     # Tag.
@@ -248,8 +254,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     # 3. Volume-limited arm: uniform draw from BJ21 d≤2.5kpc \\ uniform
     # ------------------------------------------------------------------
     vol_pool = merged.loc[
-        (~merged["source_id"].isin(uniform_ids_set))
-        & (merged["distance_pc"].notna())
+        (~merged["source_id"].isin(uniform_ids_set)) & (merged["distance_pc"].notna())
     ].reset_index(drop=True)
     # Convert pc → kpc for the subsampler contract (kpc).
     vol_pool["distance_kpc"] = vol_pool["distance_pc"].to_numpy(dtype=np.float32) / 1000.0
@@ -266,17 +271,24 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     vol_sample_df["sample"] = "volume_limited"
     logger.info(
         "volume-limited arm: %d below cut, %d selected (target %d)",
-        vol_result.n_below_cut, vol_result.n_selected, N_VOLUME_TARGET,
+        vol_result.n_below_cut,
+        vol_result.n_selected,
+        N_VOLUME_TARGET,
     )
 
     # ------------------------------------------------------------------
     # 4. Build union + enforce schema
     # ------------------------------------------------------------------
     keep_cols = [
-        "source_id", "sample",
-        "g_mag", "ra_deg", "dec_deg",
+        "source_id",
+        "sample",
+        "g_mag",
+        "ra_deg",
+        "dec_deg",
         "distance_pc",
-        "teff", "logg", "fe_h",
+        "teff",
+        "logg",
+        "fe_h",
     ]
 
     uniform_out = uniform_sample_df[keep_cols].copy()
@@ -287,9 +299,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     # Disjointness sanity check.
     dup = union["source_id"].duplicated().sum()
     if dup:
-        raise SystemExit(
-            f"BUG: {dup} source_ids appear in both uniform and volume_limited arms"
-        )
+        raise SystemExit(f"BUG: {dup} source_ids appear in both uniform and volume_limited arms")
     logger.info("disjointness confirmed: 0 source_ids in both arms")
 
     # Compute Galactic b for the selection-prob stratification downstream.
@@ -310,15 +320,32 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
             "fe_h": "mh_andrae",
         }
     )
-    union = union[[
-        "source_id", "sample",
-        "g_mag", "b_deg", "ra", "dec", "distance_pc",
-        "teff_andrae", "logg_andrae", "mh_andrae",
-    ]]
+    union = union[
+        [
+            "source_id",
+            "sample",
+            "g_mag",
+            "b_deg",
+            "ra",
+            "dec",
+            "distance_pc",
+            "teff_andrae",
+            "logg_andrae",
+            "mh_andrae",
+        ]
+    ]
     # Type tightening.
     union["source_id"] = union["source_id"].astype("int64")
-    for c in ("g_mag", "b_deg", "ra", "dec", "distance_pc",
-              "teff_andrae", "logg_andrae", "mh_andrae"):
+    for c in (
+        "g_mag",
+        "b_deg",
+        "ra",
+        "dec",
+        "distance_pc",
+        "teff_andrae",
+        "logg_andrae",
+        "mh_andrae",
+    ):
         union[c] = union[c].astype(np.float32)
     union["sample"] = union["sample"].astype("category")
 
@@ -329,30 +356,33 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     delta_ids = union.loc[delta_mask, "source_id"].astype("int64").to_numpy()
     n_delta = int(len(delta_ids))
     n_uniform = int((union["sample"] == "uniform").sum())
-    n_uniform_reused = int(union["sample"].eq("uniform").sum() - (delta_mask & union["sample"].eq("uniform")).sum())
+    n_uniform_reused = int(
+        union["sample"].eq("uniform").sum() - (delta_mask & union["sample"].eq("uniform")).sum()
+    )
     n_uniform_new = int((delta_mask & union["sample"].eq("uniform")).sum())
     n_vol = int((union["sample"] == "volume_limited").sum())
     n_vol_new = int((delta_mask & union["sample"].eq("volume_limited")).sum())
 
     logger.info(
-        "delta to fetch (XP+Ye+IR): %d "
-        "(uniform_new=%d, volume_limited_new=%d)",
-        n_delta, n_uniform_new, n_vol_new,
+        "delta to fetch (XP+Ye+IR): %d (uniform_new=%d, volume_limited_new=%d)",
+        n_delta,
+        n_uniform_new,
+        n_vol_new,
     )
     logger.info(
         "breakdown: uniform total=%d (reused=%d + new=%d), volume_limited total=%d (all new=%d)",
-        n_uniform, n_uniform_reused, n_uniform_new, n_vol, n_vol_new,
+        n_uniform,
+        n_uniform_reused,
+        n_uniform_new,
+        n_vol,
+        n_vol_new,
     )
 
     # Halt conditions BEFORE writing outputs.
     if n_delta > DELTA_MAX:
-        raise SystemExit(
-            f"HALT: delta={n_delta} > {DELTA_MAX} — selection went wrong"
-        )
+        raise SystemExit(f"HALT: delta={n_delta} > {DELTA_MAX} — selection went wrong")
     if n_delta < DELTA_MIN:
-        raise SystemExit(
-            f"HALT: delta={n_delta} < {DELTA_MIN} — over-reuse / under-fill"
-        )
+        raise SystemExit(f"HALT: delta={n_delta} < {DELTA_MIN} — over-reuse / under-fill")
     logger.info("halt conditions: all clear (delta in [%d, %d])", DELTA_MIN, DELTA_MAX)
 
     # ------------------------------------------------------------------
@@ -363,16 +393,22 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     union_size_mb = OUT_UNION.stat().st_size / 1024**2
     logger.info(
         "wrote %s (%.2f MB, sha256=%s…)",
-        OUT_UNION, union_size_mb, union_sha[:12],
+        OUT_UNION,
+        union_size_mb,
+        union_sha[:12],
     )
 
-    delta_df = pd.DataFrame({"source_id": delta_ids}).sort_values("source_id").reset_index(drop=True)
+    delta_df = (
+        pd.DataFrame({"source_id": delta_ids}).sort_values("source_id").reset_index(drop=True)
+    )
     _write_parquet_atomic(delta_df, OUT_DELTA_IDS)
     delta_sha = _sha256_of(OUT_DELTA_IDS)
     delta_size_mb = OUT_DELTA_IDS.stat().st_size / 1024**2
     logger.info(
         "wrote %s (%.2f MB, sha256=%s…)",
-        OUT_DELTA_IDS, delta_size_mb, delta_sha[:12],
+        OUT_DELTA_IDS,
+        delta_size_mb,
+        delta_sha[:12],
     )
 
     # ------------------------------------------------------------------

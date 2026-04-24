@@ -51,9 +51,9 @@ def main() -> int:
     mahal_nan = df["ood_mahalanobis_score"].isna()
     joint_true_on_nan_mahal = (df.loc[mahal_nan, "ood_joint_flag"] == True).mean()
     logger.info(
-        "check 1: NaN Mahalanobis → ood_joint=True fraction = %.4f "
-        "(expected 1.0, n_nan=%d)",
-        joint_true_on_nan_mahal, int(mahal_nan.sum()),
+        "check 1: NaN Mahalanobis → ood_joint=True fraction = %.4f (expected 1.0, n_nan=%d)",
+        joint_true_on_nan_mahal,
+        int(mahal_nan.sum()),
     )
     if joint_true_on_nan_mahal < 0.999:
         failures.append(
@@ -71,7 +71,11 @@ def main() -> int:
     logger.info(
         "check 2: uniform ∩ volume overlap = %d (expected 0, |U|=%d, |V|=%d, "
         "|U|+|V|=%d vs |union|=%d)",
-        len(overlap), len(u_ids), len(v_ids), len(u_ids) + len(v_ids), len(df),
+        len(overlap),
+        len(u_ids),
+        len(v_ids),
+        len(u_ids) + len(v_ids),
+        len(df),
     )
     if len(overlap) > 0:
         failures.append(
@@ -94,7 +98,9 @@ def main() -> int:
         gated = int((df.loc[pred_nan, "ood_joint_flag"] == True).sum())
         logger.info(
             "check 3: pred_NaN = %d; of those, ood_joint=True = %d (%.4f)",
-            n_pred_nan, gated, gated / n_pred_nan,
+            n_pred_nan,
+            gated,
+            gated / n_pred_nan,
         )
         if gated < n_pred_nan:
             failures.append(
@@ -116,8 +122,8 @@ def main() -> int:
     )
     frac_in_rgb = float(v_rgb.mean())
     logger.info(
-        "check 4: volume-arm stars inside (Teff in [3900,5400], logg in [1.0,3.7]) "
-        "= %.4f", frac_in_rgb,
+        "check 4: volume-arm stars inside (Teff in [3900,5400], logg in [1.0,3.7]) = %.4f",
+        frac_in_rgb,
     )
     if frac_in_rgb < 0.97:
         failures.append(
@@ -134,7 +140,8 @@ def main() -> int:
     logger.info(
         "check 5: uniform arm [M/H] < -1.0 fraction = %.4f "
         "(training [M/H]<-1 coverage ~5%%; uniform-arm ~20-30%% is expected "
-        "and drives OOD overshoot)", halo_rate,
+        "and drives OOD overshoot)",
+        halo_rate,
     )
     # Informational — not a halt, just prints the rate. Fail only if the rate
     # is implausibly high (would indicate model collapse to metal-poor).

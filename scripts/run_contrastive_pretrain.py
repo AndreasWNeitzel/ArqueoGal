@@ -62,10 +62,14 @@ DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/run_a"
 
 def _git_sha() -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return "nogit"
 
@@ -77,7 +81,11 @@ def _cfg_hash(cfg: TrainingConfig) -> str:
 
 
 def build_contrastive_config(
-    *, parquet: Path, output_dir: Path, epochs: int, batch_size: int,
+    *,
+    parquet: Path,
+    output_dir: Path,
+    epochs: int,
+    batch_size: int,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -98,8 +106,10 @@ def build_contrastive_config(
         checkpoint_every_n_epochs=10,
         output_prefix="xp_abundances_main_contrastive",
         loss_weights=LossWeights(
-            supcon=1.0, beta_nll=0.0,
-            beta=0.5, supcon_sigma=0.10,
+            supcon=1.0,
+            beta_nll=0.0,
+            beta=0.5,
+            supcon_sigma=0.10,
             supcon_label_n_first=None,  # All 5 labels — fixes α/M-blind encoder (2026-04-21).
         ),
         temperature_init=0.10,
@@ -112,20 +122,29 @@ def main() -> None:
     parser.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
-    parser.add_argument("--epochs", type=int, default=100,
-                        help="Hard cap per Run A directive; patience stops earlier.")
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=100,
+        help="Hard cap per Run A directive; patience stops earlier.",
+    )
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
-        "--label-set", choices=("21", "5"), default="5",
+        "--label-set",
+        choices=("21", "5"),
+        default="5",
         help="21 = default LabelTiers (21 columns, several with 1-5%% NaN). "
-             "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} — "
-             "matches the 5-label production head's label space, so the "
-             "SupCon kernel trains the encoder to respect the same geometry "
-             "the supervised head will fine-tune on. Default.",
+        "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} — "
+        "matches the 5-label production head's label space, so the "
+        "SupCon kernel trains the encoder to respect the same geometry "
+        "the supervised head will fine-tune on. Default.",
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Build cfg + model scaffold, skip training (smoke test).")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Build cfg + model scaffold, skip training (smoke test).",
+    )
     args = parser.parse_args()
 
     date_tag = dt.datetime.now(dt.UTC).strftime("%Y%m%d")
@@ -136,16 +155,20 @@ def main() -> None:
 
     # Config scaffold — output_dir is a per-run subdir so checkpoints group.
     tmp_cfg = build_contrastive_config(
-        parquet=args.parquet, output_dir=args.model_dir / "pending",
-        epochs=args.epochs, batch_size=args.batch_size,
+        parquet=args.parquet,
+        output_dir=args.model_dir / "pending",
+        epochs=args.epochs,
+        batch_size=args.batch_size,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
     run_dir = args.model_dir / f"{date_tag}_{sha7}_{cfg_hash}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     cfg = build_contrastive_config(
-        parquet=args.parquet, output_dir=run_dir,
-        epochs=args.epochs, batch_size=args.batch_size,
+        parquet=args.parquet,
+        output_dir=run_dir,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
     )
     layout = FeatureLayout()
     tiers = LabelTiers.five_label() if args.label_set == "5" else LabelTiers()
@@ -170,8 +193,11 @@ def main() -> None:
     # Write the best-val checkpoint with DESIGN-compliant filename.
     best_path = save_checkpoint(
         run_dir / f"{cfg.output_prefix}_seed{args.seed}_best.pt",
-        model=result["model"], log_temp=result["log_temp"],
-        cfg=cfg, layout=layout, tiers=tiers,
+        model=result["model"],
+        log_temp=result["log_temp"],
+        cfg=cfg,
+        layout=layout,
+        tiers=tiers,
         label_scaler=result["label_scaler"],
         seed=args.seed,
         training_metrics={
@@ -195,11 +221,15 @@ def main() -> None:
                 "history": result["history"],
                 "cadence_checkpoints": [str(p) for p in result["cadence_checkpoints"]],
             },
-            f, indent=2, default=str,
+            f,
+            indent=2,
+            default=str,
         )
     _LOG.info(
         "done: best_val_loss=%.4f at epoch %d, saved to %s",
-        result["best_val_loss"], result["best_epoch"], best_path,
+        result["best_val_loss"],
+        result["best_epoch"],
+        best_path,
     )
 
 

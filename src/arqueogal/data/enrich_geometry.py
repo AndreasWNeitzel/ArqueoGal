@@ -129,7 +129,8 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
 
     logger.info("Level-4: fetching Bailer-Jones+2021 for %d sources", n_in)
     bj = fetch_bailerjones(
-        gavo, source_ids,
+        gavo,
+        source_ids,
         batch_size=bj_batch_size,
         checkpoint_dir=bj_checkpoint_dir,
     )
@@ -138,13 +139,11 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
     sh2: pd.DataFrame | None = None
     if include_starhorse2:
         if aip is None:
-            raise ValueError(
-                "include_starhorse2=True requires an AIP TAP service via `aip=...`"
-            )
-        logger.info("Level-4: fetching StarHorse2 (%s) for %d sources",
-                    sh2_sample, n_in)
+            raise ValueError("include_starhorse2=True requires an AIP TAP service via `aip=...`")
+        logger.info("Level-4: fetching StarHorse2 (%s) for %d sources", sh2_sample, n_in)
         sh2 = fetch_starhorse2(
-            aip, source_ids,
+            aip,
+            source_ids,
             sample=sh2_sample,
             batch_size=sh2_batch_size,
             checkpoint_dir=sh2_checkpoint_dir,
@@ -159,6 +158,7 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
     if dust_queries is None:
         # Lazy import so offline tests don't require dustmaps.
         from arqueogal.data.dust_maps import get_default_queries
+
         dust_queries = get_default_queries()
     near_q, mid_q, far_q = dust_queries
 
@@ -167,8 +167,12 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
     dec = enriched["dec"].to_numpy(dtype=float)
     dist_pc = enriched["dist_primary_pc"].to_numpy(dtype=float)
     composed = compose_av(
-        ra, dec, dist_pc,
-        near_query=near_q, mid_query=mid_q, far_query=far_q,
+        ra,
+        dec,
+        dist_pc,
+        near_query=near_q,
+        mid_query=mid_q,
+        far_query=far_q,
     )
     enriched["av_los"] = composed.av
     enriched["av_los_source"] = composed.source
@@ -176,7 +180,9 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
     if ag_gspphot_col in enriched.columns:
         logger.info("Level-4: §8.3 neighborhood-median A_G (r=%.0f pc)", nbhd_radius_pc)
         nbhd = neighborhood_av_features(
-            ra, dec, dist_pc,
+            ra,
+            dec,
+            dist_pc,
             enriched[ag_gspphot_col].to_numpy(dtype=float),
             radius_pc=nbhd_radius_pc,
             min_neighbors=nbhd_min_neighbors,
@@ -210,7 +216,8 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
                 name=f"AIP StarHorse2 v2 ({STARHORSE2_SAMPLE_TABLES[sh2_sample]})",
                 endpoint=AIP_TAP_URL,
                 query=STARHORSE2_ADQL_TEMPLATE.format(
-                    table=STARHORSE2_SAMPLE_TABLES[sh2_sample], placeholder="__batch__",
+                    table=STARHORSE2_SAMPLE_TABLES[sh2_sample],
+                    placeholder="__batch__",
                 ),
                 n_batches=n_sh2_batches,
                 batch_size=sh2_batch_size,

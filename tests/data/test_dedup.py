@@ -128,11 +128,13 @@ def test_nan_in_sort_column_raises() -> None:
 
 def test_non_snr_sort_key_works() -> None:
     # Use an alternate sort key (e.g. an ASPCAP_CHI2 ascending=True scenario)
-    df = pd.DataFrame({
-        "source_id": [1, 1, 2],
-        "snr": [10.0, 20.0, 30.0],
-        "aspcap_chi2": [5.0, 2.0, 3.0],  # lower is better
-    })
+    df = pd.DataFrame(
+        {
+            "source_id": [1, 1, 2],
+            "snr": [10.0, 20.0, 30.0],
+            "aspcap_chi2": [5.0, 2.0, 3.0],  # lower is better
+        }
+    )
     out, stats = dedup_by_source_id(df, sort_by="aspcap_chi2", ascending=True)
     assert stats.sort_column == "aspcap_chi2"
     assert stats.sort_ascending is True
@@ -146,6 +148,7 @@ def test_stats_to_dict_is_json_friendly() -> None:
     d = stats.to_dict()
     # All values must be primitive types so Provenance sidecar can JSON-encode.
     import json
+
     json.dumps(d)  # will raise if not serialisable
     assert d["sort_column"] == DEFAULT_SORT_COLUMN
     assert d["rows_out"] == 2
@@ -160,9 +163,13 @@ def test_index_is_reset_after_dedup() -> None:
 
 def test_dedupstats_is_frozen() -> None:
     stats = DedupStats(
-        rows_in=1, rows_out=1, unique_source_ids=1,
-        n_duplicate_stars=0, max_duplicates_per_star=1,
-        sort_column="snr", sort_ascending=False,
+        rows_in=1,
+        rows_out=1,
+        unique_source_ids=1,
+        n_duplicate_stars=0,
+        max_duplicates_per_star=1,
+        sort_column="snr",
+        sort_ascending=False,
         source_id_column="source_id",
     )
     with pytest.raises((AttributeError, TypeError)):

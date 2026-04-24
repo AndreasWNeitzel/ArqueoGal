@@ -22,9 +22,9 @@ _LOG = logging.getLogger("attractor_plot")
 
 REPO = Path(__file__).resolve().parent.parent
 INPUTS = {
-    "v1":   REPO / "data/processed/pipeline1_predictions_stream3_volume.parquet",
+    "v1": REPO / "data/processed/pipeline1_predictions_stream3_volume.parquet",
     "v1.1": REPO / "data/processed/pipeline1_predictions_stream3_volume_v11.parquet",
-    "v2":   REPO / "data/processed/pipeline1_predictions_stream3_volume_v2.parquet",
+    "v2": REPO / "data/processed/pipeline1_predictions_stream3_volume_v2.parquet",
 }
 OUT_PNG = REPO / "reports/pipeline1/run_a_v2/attractor_stream3_v1_v11_v2.png"
 
@@ -34,7 +34,9 @@ BINS = (180, 120)
 
 
 def _load_release_ok(
-    p: Path, *, apply_mode_ambiguous: bool = False,
+    p: Path,
+    *,
+    apply_mode_ambiguous: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, int, int]:
     cols = ["mh_pred", "alpha_m_pred", "ood_joint_flag", "regime_b_flag"]
     if apply_mode_ambiguous:
@@ -60,23 +62,24 @@ def main() -> None:
     vmax = 0
 
     spec = [
-        ("v1",   INPUTS["v1"],   False),
+        ("v1", INPUTS["v1"], False),
         ("v1.1", INPUTS["v1.1"], False),
-        ("v2",   INPUTS["v2"],   False),
+        ("v2", INPUTS["v2"], False),
         ("v2 (release: ¬mode_ambiguous)", INPUTS["v2"], True),
     ]
     panels = []
     for ax, (tag, path, apply_ma) in zip(axes, spec, strict=True):
         if not path.is_file():
             _LOG.warning("missing %s — skipping %s panel", path, tag)
-            ax.text(0.5, 0.5, f"{tag}\n(missing)", ha="center", va="center",
-                    transform=ax.transAxes)
+            ax.text(0.5, 0.5, f"{tag}\n(missing)", ha="center", va="center", transform=ax.transAxes)
             continue
         mh, am, total, n_ok = _load_release_ok(path, apply_mode_ambiguous=apply_ma)
         finite = np.isfinite(mh) & np.isfinite(am)
         mh, am = mh[finite], am[finite]
         H, xed, yed = np.histogram2d(
-            mh, am, bins=BINS,
+            mh,
+            am,
+            bins=BINS,
             range=[MH_RANGE, ALPHA_RANGE],
         )
         panels.append((ax, tag, H, xed, yed, total, n_ok))
@@ -84,15 +87,19 @@ def main() -> None:
 
     for ax, tag, H, xed, yed, total, n_ok in panels:
         im = ax.imshow(
-            H.T, origin="lower", aspect="auto",
+            H.T,
+            origin="lower",
+            aspect="auto",
             extent=(xed[0], xed[-1], yed[0], yed[-1]),
-            cmap="magma", vmin=0, vmax=vmax,
+            cmap="magma",
+            vmin=0,
+            vmax=vmax,
         )
         ax.axhline(0.11, color="cyan", lw=0.6, ls="--", alpha=0.6)
         ax.axvline(-1.0, color="cyan", lw=0.6, ls="--", alpha=0.6)
         ax.set_xlabel("[M/H]_pred (dex)")
         ax.set_title(
-            f"{tag}\nrelease_ok {n_ok:,} / {total:,}  ({100*n_ok/total:.1f}%)",
+            f"{tag}\nrelease_ok {n_ok:,} / {total:,}  ({100 * n_ok / total:.1f}%)",
             fontsize=10,
         )
     axes[0].set_ylabel("[α/M]_pred (dex)")
@@ -101,7 +108,8 @@ def main() -> None:
     fig.suptitle(
         "Stream-3 volume: [α/M]_pred vs [M/H]_pred — v1 → v1.1 → v2 → v2 released\n"
         "dashed guide at [α/M]=+0.11, [M/H]=-1.0 (reported attractor)",
-        fontsize=12, y=0.98,
+        fontsize=12,
+        y=0.98,
     )
 
     OUT_PNG.parent.mkdir(parents=True, exist_ok=True)

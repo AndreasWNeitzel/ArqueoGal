@@ -165,7 +165,10 @@ def _build_master_catalog(  # noqa: PLR0913 — keyword-only args are all distin
     n_merged = len(merged)
     logger.info(
         "Level-6 [%s]: merged %d rows (stream %d × xp %d)",
-        schema.name, n_merged, n_stream, n_xp,
+        schema.name,
+        n_merged,
+        n_stream,
+        n_xp,
     )
 
     logger.info("Level-6 [%s]: schema validation", schema.name)

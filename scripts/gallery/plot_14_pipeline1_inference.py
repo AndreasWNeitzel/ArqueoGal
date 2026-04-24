@@ -8,6 +8,7 @@ Outputs:
   - reports/gallery/14_pipeline1_inference/stream3_regime_b_sky.png
   - reports/gallery/14_pipeline1_inference/stream3_aux_missingness.png
 """
+
 from __future__ import annotations
 
 import sys
@@ -31,19 +32,29 @@ from _common import (  # noqa: E402
 OUT = GALLERY / "14_pipeline1_inference"
 
 LABELS = ["teff", "logg", "mh", "alpha_m", "mg_h"]
-LABEL_TEX = {"teff": r"$T_{\rm eff}$  [K]", "logg": r"$\log g$",
-             "mh": r"$[{\rm M}/{\rm H}]$",
-             "alpha_m": r"$[\alpha/{\rm M}]$",
-             "mg_h": r"$[{\rm Mg}/{\rm H}]$"}
+LABEL_TEX = {
+    "teff": r"$T_{\rm eff}$  [K]",
+    "logg": r"$\log g$",
+    "mh": r"$[{\rm M}/{\rm H}]$",
+    "alpha_m": r"$[\alpha/{\rm M}]$",
+    "mg_h": r"$[{\rm Mg}/{\rm H}]$",
+}
 
 
 def _load_full(version: str = "v11") -> "pd.DataFrame":
     import pandas as pd  # noqa: F401
+
     pred_path = DATA_PROCESSED / f"pipeline1_predictions_stream3_{version}.parquet"
     feat = DATA_PROCESSED / "pipeline1_features_stream3.parquet"
     preds = pq.read_table(pred_path).to_pandas()
-    meta_cols = ["source_id", "ra_deg", "dec_deg", "g_mag",
-                 "ir_missing_flag", "extinction_missing_flag"]
+    meta_cols = [
+        "source_id",
+        "ra_deg",
+        "dec_deg",
+        "g_mag",
+        "ir_missing_flag",
+        "extinction_missing_flag",
+    ]
     meta_schema = pq.read_schema(feat)
     meta_have = [c for c in meta_cols if c in {f.name for f in meta_schema}]
     meta = pq.read_table(feat, columns=meta_have).to_pandas()
@@ -58,10 +69,15 @@ def stream3_pred_hrd() -> None:
     fig, ax = plt.subplots(figsize=(9, 7))
     hb = ax.hexbin(t[m], g[m], gridsize=80, cmap="magma", bins="log", mincnt=1)
     plt.colorbar(hb, ax=ax, shrink=0.85, pad=0.02, label="log N")
-    ax.set_xlim(5600, 3800); ax.set_ylim(3.8, 0.5)
-    ax.set_xlabel(r"$T_{\rm eff}^{\rm pred}$ [K]"); ax.set_ylabel(r"$\log g^{\rm pred}$")
-    ax.set_title(f"Stream 3 v1.1 — predicted Kiel diagram  (n={int(m.sum()):,})",
-                 fontsize=11, fontweight="semibold")
+    ax.set_xlim(5600, 3800)
+    ax.set_ylim(3.8, 0.5)
+    ax.set_xlabel(r"$T_{\rm eff}^{\rm pred}$ [K]")
+    ax.set_ylabel(r"$\log g^{\rm pred}$")
+    ax.set_title(
+        f"Stream 3 v1.1 — predicted Kiel diagram  (n={int(m.sum()):,})",
+        fontsize=11,
+        fontweight="semibold",
+    )
     save_fig(fig, OUT / "stream3_pred_hrd.png")
 
 
@@ -71,19 +87,32 @@ def stream3_pred_chemistry() -> None:
     for ax, ver in zip(axes.flat, ("", "_v11")):
         p = DATA_PROCESSED / f"pipeline1_predictions_stream3{ver}.parquet"
         if not p.exists():
-            ax.set_visible(False); continue
+            ax.set_visible(False)
+            continue
         df = pq.read_table(p, columns=["mh_pred", "alpha_m_pred"]).to_pandas()
         mh = df["mh_pred"].to_numpy()
         am = df["alpha_m_pred"].to_numpy()
         m = np.isfinite(mh) & np.isfinite(am)
-        hb = ax.hexbin(mh[m], am[m], gridsize=80, cmap="magma", bins="log",
-                       extent=(-2.2, 0.6, -0.3, 0.55), mincnt=1)
+        hb = ax.hexbin(
+            mh[m],
+            am[m],
+            gridsize=80,
+            cmap="magma",
+            bins="log",
+            extent=(-2.2, 0.6, -0.3, 0.55),
+            mincnt=1,
+        )
         plt.colorbar(hb, ax=ax, shrink=0.85, pad=0.02, label="log N")
-        ax.set_xlabel(r"$[{\rm M}/{\rm H}]^{\rm pred}$"); ax.set_ylabel(r"$[\alpha/{\rm M}]^{\rm pred}$")
+        ax.set_xlabel(r"$[{\rm M}/{\rm H}]^{\rm pred}$")
+        ax.set_ylabel(r"$[\alpha/{\rm M}]^{\rm pred}$")
         label = "v1" if ver == "" else "v1.1"
-        ax.set_title(f"Stream 3 chemistry — Pipeline-1 {label}  (n={int(m.sum()):,})",
-                     fontsize=11, fontweight="semibold")
-        ax.set_xlim(-2.2, 0.6); ax.set_ylim(-0.3, 0.55)
+        ax.set_title(
+            f"Stream 3 chemistry — Pipeline-1 {label}  (n={int(m.sum()):,})",
+            fontsize=11,
+            fontweight="semibold",
+        )
+        ax.set_xlim(-2.2, 0.6)
+        ax.set_ylim(-0.3, 0.55)
     save_fig(fig, OUT / "stream3_pred_chemistry.png")
 
 
@@ -99,15 +128,28 @@ def stream3_pred_sky() -> None:
     for ax, lbl in zip(axes.flat, LABELS):
         vals = sub[f"{lbl}_pred"].to_numpy()
         lo, hi = np.nanpercentile(vals, [2, 98])
-        sc = ax.scatter(x, y, c=np.clip(vals, lo, hi), cmap="magma",
-                        s=1.0, alpha=0.7, rasterized=True, vmin=lo, vmax=hi)
+        sc = ax.scatter(
+            x,
+            y,
+            c=np.clip(vals, lo, hi),
+            cmap="magma",
+            s=1.0,
+            alpha=0.7,
+            rasterized=True,
+            vmin=lo,
+            vmax=hi,
+        )
         plt.colorbar(sc, ax=ax, shrink=0.6, pad=0.02, label=LABEL_TEX[lbl])
         ax.set_title(f"{LABEL_TEX[lbl]}  pred", fontsize=10)
         style_galactic_mollweide(ax)
     axes[1, 2].set_visible(False)
-    fig.suptitle(f"Stream 3 predicted labels across the sky  —  Galactic coords "
-                 f"(n={len(sub):,} / {len(df):,})",
-                 fontsize=13, fontweight="bold", y=1.00)
+    fig.suptitle(
+        f"Stream 3 predicted labels across the sky  —  Galactic coords "
+        f"(n={len(sub):,} / {len(df):,})",
+        fontsize=13,
+        fontweight="bold",
+        y=1.00,
+    )
     save_fig(fig, OUT / "stream3_pred_sky.png")
 
 
@@ -118,8 +160,10 @@ def stream3_ood_rate_sky() -> None:
     # Bin on Galactic (l, b) grid
     from astropy.coordinates import SkyCoord
     import astropy.units as u
-    c = SkyCoord(ra=df["ra_deg"].to_numpy() * u.deg,
-                 dec=df["dec_deg"].to_numpy() * u.deg, frame="icrs").galactic
+
+    c = SkyCoord(
+        ra=df["ra_deg"].to_numpy() * u.deg, dec=df["dec_deg"].to_numpy() * u.deg, frame="icrs"
+    ).galactic
     lg = c.l.degree
     bg = c.b.degree
     lg = np.where(lg > 180, lg - 360, lg)
@@ -132,14 +176,24 @@ def stream3_ood_rate_sky() -> None:
 
     fig = plt.figure(figsize=(12, 6))
     ax = fig.add_subplot(111, projection="mollweide")
-    L, B = np.meshgrid(0.5 * (bins_l[:-1] + bins_l[1:]),
-                       0.5 * (bins_b[:-1] + bins_b[1:]), indexing="ij")
-    sc = ax.pcolormesh(-np.deg2rad(L), np.deg2rad(B), rate,
-                       cmap="plasma", vmin=0, vmax=np.nanpercentile(rate, 98),
-                       shading="auto")
+    L, B = np.meshgrid(
+        0.5 * (bins_l[:-1] + bins_l[1:]), 0.5 * (bins_b[:-1] + bins_b[1:]), indexing="ij"
+    )
+    sc = ax.pcolormesh(
+        -np.deg2rad(L),
+        np.deg2rad(B),
+        rate,
+        cmap="plasma",
+        vmin=0,
+        vmax=np.nanpercentile(rate, 98),
+        shading="auto",
+    )
     plt.colorbar(sc, ax=ax, shrink=0.65, pad=0.02, label="ood-joint rate")
-    ax.set_title(f"Stream 3 joint-OOD rate per sky pixel  (n pix $\\geq$ 5)",
-                 fontsize=11, fontweight="semibold")
+    ax.set_title(
+        f"Stream 3 joint-OOD rate per sky pixel  (n pix $\\geq$ 5)",
+        fontsize=11,
+        fontweight="semibold",
+    )
     style_galactic_mollweide(ax)
     save_fig(fig, OUT / "stream3_ood_rate_sky.png")
 
@@ -155,17 +209,29 @@ def stream3_regime_b_sky() -> None:
     idx_flag = np.where(flag)[0]
     if len(idx_flag) > 60_000:
         idx_flag = rng.choice(idx_flag, 60_000, replace=False)
-    x, y = radec_to_galactic_mollweide(df["ra_deg"].to_numpy()[idx_flag],
-                                        df["dec_deg"].to_numpy()[idx_flag])
+    x, y = radec_to_galactic_mollweide(
+        df["ra_deg"].to_numpy()[idx_flag], df["dec_deg"].to_numpy()[idx_flag]
+    )
     # background: all
     idx_all = sample_index(len(df), 80_000, rng)
-    xa, ya = radec_to_galactic_mollweide(df["ra_deg"].to_numpy()[idx_all],
-                                          df["dec_deg"].to_numpy()[idx_all])
+    xa, ya = radec_to_galactic_mollweide(
+        df["ra_deg"].to_numpy()[idx_all], df["dec_deg"].to_numpy()[idx_all]
+    )
     ax.scatter(xa, ya, s=0.4, alpha=0.2, color="#bbb", rasterized=True)
-    ax.scatter(x, y, s=0.8, alpha=0.7, color="#d62728", rasterized=True,
-               label=f"regime B  n={int(flag.sum()):,} ({100*flag.mean():.1f}%)")
-    ax.set_title("Stream 3 Regime-B flag footprint  (warm upper-RGB ∩ $|b|<5°$)",
-                 fontsize=11, fontweight="semibold")
+    ax.scatter(
+        x,
+        y,
+        s=0.8,
+        alpha=0.7,
+        color="#d62728",
+        rasterized=True,
+        label=f"regime B  n={int(flag.sum()):,} ({100 * flag.mean():.1f}%)",
+    )
+    ax.set_title(
+        "Stream 3 Regime-B flag footprint  (warm upper-RGB ∩ $|b|<5°$)",
+        fontsize=11,
+        fontweight="semibold",
+    )
     style_galactic_mollweide(ax)
     ax.legend(loc="lower right")
     save_fig(fig, OUT / "stream3_regime_b_sky.png")
@@ -173,23 +239,44 @@ def stream3_regime_b_sky() -> None:
 
 def stream3_aux_missingness() -> None:
     df = _load_full()
-    flags = [c for c in ("ir_missing_flag", "parallax_missing_flag",
-                         "extinction_missing_flag", "aux_missing_any")
-             if c in df.columns]
+    flags = [
+        c
+        for c in (
+            "ir_missing_flag",
+            "parallax_missing_flag",
+            "extinction_missing_flag",
+            "aux_missing_any",
+        )
+        if c in df.columns
+    ]
     if not flags:
         return
     fig, ax = plt.subplots(figsize=(10, 5))
     rates = {f: 100.0 * df[f].astype(float).mean() for f in flags}
     names = list(rates.keys())
     vals = [rates[n] for n in names]
-    bars = ax.bar(names, vals, color=["#1f77b4", "#ff7f0e", "#9467bd", "#d62728"][:len(names)],
-                  edgecolor="#333", alpha=0.85)
+    bars = ax.bar(
+        names,
+        vals,
+        color=["#1f77b4", "#ff7f0e", "#9467bd", "#d62728"][: len(names)],
+        edgecolor="#333",
+        alpha=0.85,
+    )
     for b, v in zip(bars, vals):
-        ax.text(b.get_x() + b.get_width() / 2, v + 0.2, f"{v:.2f}%",
-                ha="center", va="bottom", fontsize=9)
+        ax.text(
+            b.get_x() + b.get_width() / 2,
+            v + 0.2,
+            f"{v:.2f}%",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
     ax.set_ylabel("rate  [%]")
-    ax.set_title(f"Stream 3 aux-feature missingness rates  (n={len(df):,})",
-                 fontsize=11, fontweight="semibold")
+    ax.set_title(
+        f"Stream 3 aux-feature missingness rates  (n={len(df):,})",
+        fontsize=11,
+        fontweight="semibold",
+    )
     save_fig(fig, OUT / "stream3_aux_missingness.png")
 
 

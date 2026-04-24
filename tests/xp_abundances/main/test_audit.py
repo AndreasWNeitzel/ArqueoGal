@@ -23,6 +23,7 @@ from arqueogal.xp_abundances.main.audit import (
 
 # --- tiny deterministic model ----------------------------------------------
 
+
 class _LinearMockModel(nn.Module):
     """Deterministic ``mu = x @ W + b`` model returning ``(mu, L, h, z)``.
 
@@ -35,7 +36,8 @@ class _LinearMockModel(nn.Module):
         super().__init__()
         W_t = torch.as_tensor(W, dtype=torch.float32)
         b_t = torch.as_tensor(
-            b if b is not None else np.zeros(W.shape[1]), dtype=torch.float32,
+            b if b is not None else np.zeros(W.shape[1]),
+            dtype=torch.float32,
         )
         self.register_buffer("W", W_t)
         self.register_buffer("b", b_t)
@@ -57,6 +59,7 @@ def _loader_from_arrays(X: np.ndarray, Y: np.ndarray, batch_size: int = 32) -> D
 
 
 # --- §9.2 Test 1: LOOCO -----------------------------------------------------
+
 
 def test_leave_one_coeff_out_shapes_and_nonzero_for_relevant_coeff() -> None:
     rng = np.random.default_rng(0)
@@ -81,6 +84,7 @@ def test_leave_one_coeff_out_shapes_and_nonzero_for_relevant_coeff() -> None:
 
 # --- §9.2 Test 2: Permutation feature importance ----------------------------
 
+
 def test_permutation_importance_positive_for_relevant_feature() -> None:
     rng = np.random.default_rng(0)
     N, D = 200, 4
@@ -102,6 +106,7 @@ def test_permutation_importance_positive_for_relevant_feature() -> None:
 
 
 # --- §9.2 Test 4: Shuffled-spectrum null ------------------------------------
+
 
 def test_shuffled_spectrum_null_inflates_rmse_for_spectrum_driven_label() -> None:
     rng = np.random.default_rng(0)
@@ -145,12 +150,15 @@ def test_shuffled_spectrum_null_cell_length_validation() -> None:
     )
     with pytest.raises(ValueError, match="cell_ids length"):
         shuffled_spectrum_null(
-            model, loader, spectrum_indices=[0],
+            model,
+            loader,
+            spectrum_indices=[0],
             cell_ids=np.zeros(999, dtype=np.int64),
         )
 
 
 # --- §9.2 Test 5: KSG mutual information ------------------------------------
+
 
 def test_ksg_mi_linear_gaussian_matches_analytic() -> None:
     """For ρ-correlated bivariate Gaussian, true MI = -0.5 ln(1-ρ²)."""
@@ -206,6 +214,7 @@ def test_conditional_mi_empty_z_equals_unconditional_mi() -> None:
 
 # --- §9.2 Test 6: Decorrelated sub-sample -----------------------------------
 
+
 def test_decorrelated_subsample_smaller_and_reduces_correlation() -> None:
     rng = np.random.default_rng(0)
     N = 2000
@@ -232,6 +241,7 @@ def test_decorrelated_subsample_validates_shapes() -> None:
 
 # --- orchestrator -----------------------------------------------------------
 
+
 def test_audit_report_schema_and_json_serialisable() -> None:
     rng = np.random.default_rng(0)
     N, D, n_labels = 150, 6, 2
@@ -244,7 +254,8 @@ def test_audit_report_schema_and_json_serialisable() -> None:
     loader = _loader_from_arrays(X, Y)
 
     report = audit_report(
-        model, loader,
+        model,
+        loader,
         label_names=("label_a", "label_b"),
         feature_names=tuple(f"f{i}" for i in range(D)),
         coefficient_indices=[0, 1],
@@ -262,9 +273,14 @@ def test_audit_report_schema_and_json_serialisable() -> None:
     blob = report.as_dict()
     round_trip = json.loads(json.dumps(blob))
     assert set(round_trip) == {
-        "label_names", "feature_names", "coefficient_indices",
-        "baseline_rmse", "shuffled_null_rmse", "permutation_importance",
-        "looco_delta_rmse", "mi_conditional",
+        "label_names",
+        "feature_names",
+        "coefficient_indices",
+        "baseline_rmse",
+        "shuffled_null_rmse",
+        "permutation_importance",
+        "looco_delta_rmse",
+        "mi_conditional",
     }
 
 
@@ -280,7 +296,8 @@ def test_audit_report_without_optional_inputs() -> None:
     loader = _loader_from_arrays(X, Y)
 
     report = audit_report(
-        model, loader,
+        model,
+        loader,
         label_names=("only_label",),
         feature_names=("f0", "f1", "f2"),
     )

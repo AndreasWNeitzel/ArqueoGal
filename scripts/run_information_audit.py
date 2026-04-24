@@ -80,10 +80,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("run_information_audit")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_ENSEMBLE = (
-    REPO_ROOT
-    / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
-)
+DEFAULT_ENSEMBLE = REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
 DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
 DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/audit"
 
@@ -160,7 +157,8 @@ class EnsembleMeanWrapper(nn.Module):
         self.n_labels = len(scaler_block.label_names)
 
     def forward(
-        self, x: torch.Tensor,
+        self,
+        x: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         xa = self.adapter(x)
         mus_scaled: list[torch.Tensor] = []
@@ -172,7 +170,9 @@ class EnsembleMeanWrapper(nn.Module):
         mu_unscaled = mu_mean_scaled * self._scale + self._mean
         batch = x.shape[0]
         L_identity = torch.eye(
-            self.n_labels, device=x.device, dtype=x.dtype,
+            self.n_labels,
+            device=x.device,
+            dtype=x.dtype,
         ).expand(batch, -1, -1)
         return mu_unscaled, L_identity, x, x
 
@@ -241,7 +241,9 @@ def _reconstruct_model(
 
 
 def _build_cfg_for_val_loader(
-    parquet: Path, split_seed: int, batch_size: int,
+    parquet: Path,
+    split_seed: int,
+    batch_size: int,
 ) -> TrainingConfig:
     """Minimal TrainingConfig sufficient to reconstruct the val split.
 
@@ -283,15 +285,20 @@ def _feature_family_indices(
     i = 0
     families: dict[str, list[int]] = {}
     n_bp = len(layout.bp_coef_cols)
-    families["bp_shape"] = list(range(i, i + n_bp)); i += n_bp
+    families["bp_shape"] = list(range(i, i + n_bp))
+    i += n_bp
     n_rp = len(layout.rp_coef_cols)
-    families["rp_shape"] = list(range(i, i + n_rp)); i += n_rp
+    families["rp_shape"] = list(range(i, i + n_rp))
+    i += n_rp
     n_c0 = len(layout.xp_scalar_cols)
-    families["xp_c0"] = list(range(i, i + n_c0)); i += n_c0
+    families["xp_c0"] = list(range(i, i + n_c0))
+    i += n_c0
     n_res = len(layout.residual_cols)
-    families["residual"] = list(range(i, i + n_res)); i += n_res
+    families["residual"] = list(range(i, i + n_res))
+    i += n_res
     n_aux = len(layout.aux_cols)
-    families["aux"] = list(range(i, i + n_aux)); i += n_aux
+    families["aux"] = list(range(i, i + n_aux))
+    i += n_aux
     assert i == layout.input_dim, (i, layout.input_dim)
     return families
 
@@ -349,7 +356,9 @@ def _nan_rmse(pred: np.ndarray, truth: np.ndarray) -> np.ndarray:
 
 
 def _collect_mu_y(
-    model: nn.Module, loader, device: torch.device,
+    model: nn.Module,
+    loader,
+    device: torch.device,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Stream model outputs + truth + inputs across a loader."""
     model.eval()
@@ -386,7 +395,8 @@ def _permutation_importance_nan_safe(
     baseline = _nan_rmse(mu0, y)
     x_t = torch.as_tensor(x_all, device=device)
     permuted = np.empty(
-        (len(feature_indices), y.shape[1]), dtype=np.float64,
+        (len(feature_indices), y.shape[1]),
+        dtype=np.float64,
     )
     with torch.no_grad():
         for i, f in enumerate(feature_indices):
@@ -453,9 +463,7 @@ def _shuffled_null_nan_safe(
         if mask.size < 4:  # noqa: PLR2004 — permutation degenerate below 4
             continue
         perm = rng.permutation(mask)
-        x_shuf[np.ix_(mask, spectrum_indices)] = x_all[
-            np.ix_(perm, spectrum_indices)
-        ]
+        x_shuf[np.ix_(mask, spectrum_indices)] = x_all[np.ix_(perm, spectrum_indices)]
     with torch.no_grad():
         mu_null, _L, _h, _z = model(torch.as_tensor(x_shuf, device=device))
     return _nan_rmse(mu_null.cpu().numpy(), y)
@@ -482,6 +490,7 @@ def _collect_val_arrays(
 
 # --- Test 5 harness: conditional MI -----------------------------------------
 
+
 def _xp_dense_summary(X: np.ndarray, families: dict[str, list[int]]) -> np.ndarray:
     """Low-dim summary of the XP shape block used as the ``X`` of KSG CMI.
 
@@ -493,15 +502,18 @@ def _xp_dense_summary(X: np.ndarray, families: dict[str, list[int]]) -> np.ndarr
     """
     bp = X[:, families["bp_shape"]]
     rp = X[:, families["rp_shape"]]
-    out = np.column_stack([
-        np.abs(bp).sum(axis=1),
-        np.abs(rp).sum(axis=1),
-    ]).astype(np.float64)
+    out = np.column_stack(
+        [
+            np.abs(bp).sum(axis=1),
+            np.abs(rp).sum(axis=1),
+        ]
+    ).astype(np.float64)
     return out
 
 
 def _aux_conditioning(
-    parquet_path: Path, source_ids: np.ndarray,
+    parquet_path: Path,
+    source_ids: np.ndarray,
 ) -> tuple[np.ndarray, tuple[str, ...]]:
     """Fetch photometric/astrometric priors for the val stars.
 
@@ -549,10 +561,7 @@ def _conditional_mi_per_label(
     :data:`CMI_MIN`.
     """
     rng = np.random.default_rng(seed)
-    finite_row = (
-        np.isfinite(xp_summary).all(axis=1)
-        & np.isfinite(Z).all(axis=1)
-    )
+    finite_row = np.isfinite(xp_summary).all(axis=1) & np.isfinite(Z).all(axis=1)
     out: dict[str, float] = {}
     for j, name in enumerate(label_names):
         y = Y_block_raw[:, j]
@@ -565,7 +574,10 @@ def _conditional_mi_per_label(
             idx = rng.choice(idx, size=max_samples, replace=False)
         try:
             cmi = conditional_mi_ksg(
-                xp_summary[idx], y[idx], Z[idx], k=k,
+                xp_summary[idx],
+                y[idx],
+                Z[idx],
+                k=k,
             )
         except ValueError as exc:
             _LOG.warning("CMI estimation failed for %s: %s", name, exc)
@@ -713,7 +725,8 @@ def _write_label_card(  # noqa: PLR0913 — all knobs are independent collaborat
     null_skill = payload["null_skill"]
     halt_line = (
         "**HALT TRIGGERED** — null survives at ≥20 % of real skill."
-        if halt_triggered else "No halt triggers."
+        if halt_triggered
+        else "No halt triggers."
     )
 
     with path_md.open("w") as f:
@@ -866,7 +879,9 @@ def main() -> None:
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
     parser.add_argument("--batch-size", type=int, default=1024)
     parser.add_argument(
-        "--mi-max-samples", type=int, default=8000,
+        "--mi-max-samples",
+        type=int,
+        default=8000,
         help="Subsample cap for KSG CMI estimator (per label).",
     )
     args = parser.parse_args()
@@ -880,8 +895,7 @@ def main() -> None:
     )
     if len(member_ckpts) != 5:  # noqa: PLR2004 — 5-label ensemble contract
         raise FileNotFoundError(
-            f"expected 5 member checkpoints under {args.ensemble}, "
-            f"found {len(member_ckpts)}",
+            f"expected 5 member checkpoints under {args.ensemble}, found {len(member_ckpts)}",
         )
     _LOG.info("found %d member checkpoints", len(member_ckpts))
 
@@ -911,15 +925,22 @@ def main() -> None:
     split_seed = int(json.loads(first_blob["config_yaml"]).get("split_seed", 0))
     _LOG.info(
         "labels=%s tier_sizes=%s split_seed=%d",
-        tiers.all_labels, tiers.tier_sizes, split_seed,
+        tiers.all_labels,
+        tiers.tier_sizes,
+        split_seed,
     )
 
     # Rebuild the deterministic val loader used during training.
     cfg = _build_cfg_for_val_loader(
-        parquet=args.parquet, split_seed=split_seed, batch_size=args.batch_size,
+        parquet=args.parquet,
+        split_seed=split_seed,
+        batch_size=args.batch_size,
     )
     _, val_loader, _split_ids, scaler_human = build_dataloaders(
-        cfg, layout, tiers, seed=split_seed,
+        cfg,
+        layout,
+        tiers,
+        seed=split_seed,
     )
     n_val = len(val_loader.dataset)
     _LOG.info("val loader built: %d stars, %d batches", n_val, len(val_loader))
@@ -937,8 +958,10 @@ def main() -> None:
         members.append(_reconstruct_model(blob, layout, block_layout, device))
     adapter = XpFeatureAdapter(layout, use_c0_scalars=True).to(device)
     wrapper = EnsembleMeanWrapper(
-        members=members, adapter=adapter,
-        scaler_block=scaler_block, block_layout=block_layout,
+        members=members,
+        adapter=adapter,
+        scaler_block=scaler_block,
+        block_layout=block_layout,
     ).to(device)
     wrapper.eval()
 
@@ -963,15 +986,16 @@ def main() -> None:
     Z_cond, cond_names = _aux_conditioning(args.parquet, val_source_ids)
     _LOG.info(
         "conditioning matrix Z: %s finite rows in %s",
-        int(np.isfinite(Z_cond).all(axis=1).sum()), cond_names,
+        int(np.isfinite(Z_cond).all(axis=1).sum()),
+        cond_names,
     )
     xp_summary = _xp_dense_summary(X_val, families)
 
     # Sigma of truth per label (raw units) — used to normalise every
     # delta-RMSE, to compute skill, and to detect halt.
-    sigma_y = np.array([
-        float(np.nanstd(Y_val[:, j])) for j in range(Y_val.shape[1])
-    ], dtype=np.float64)
+    sigma_y = np.array(
+        [float(np.nanstd(Y_val[:, j])) for j in range(Y_val.shape[1])], dtype=np.float64
+    )
     _LOG.info("σ(y) per label: %s", dict(zip(ckpt_label_names, sigma_y.round(4))))
 
     # --- Tests 1, 2, 4 on the ensemble wrapper (NaN-safe live impls) ---------
@@ -986,9 +1010,13 @@ def main() -> None:
 
     _LOG.info("test 2: permutation importance on %d features", layout.input_dim)
     perm = _permutation_importance_nan_safe(
-        wrapper, mu0, Y_val, X_val,
+        wrapper,
+        mu0,
+        Y_val,
+        X_val,
         feature_indices=np.arange(layout.input_dim, dtype=np.int64),
-        device=device, seed=0,
+        device=device,
+        seed=0,
     )
     base_rmse = perm["baseline_rmse"]  # (n_labels,) in raw units
     perm_importance = perm["importance"]  # (n_features, n_labels)
@@ -996,27 +1024,35 @@ def main() -> None:
 
     # Test 1 (LOOCO) over XP shape + c0 coefficients only (the 110+2 XP-family
     # indices). Aux / residual are summarised by Test 2.
-    xp_family_idx = (
-        families["bp_shape"] + families["rp_shape"] + families["xp_c0"]
-    )
+    xp_family_idx = families["bp_shape"] + families["rp_shape"] + families["xp_c0"]
     _LOG.info("test 1: LOOCO on %d XP coefficients", len(xp_family_idx))
     looco_delta = _looco_nan_safe(
-        wrapper, mu0, X_val, xp_family_idx, device=device,
+        wrapper,
+        mu0,
+        X_val,
+        xp_family_idx,
+        device=device,
     )
 
     # Test 4 (shuffled-spectrum null) with Teff–log g cell permutation.
     _LOG.info("test 4: shuffled-spectrum null within (Teff, log g) cells")
     null_rmse = _shuffled_null_nan_safe(
-        wrapper, Y_val, X_val,
-        spectrum_indices=spectrum_indices, cell_ids=cell_ids,
-        device=device, seed=0,
+        wrapper,
+        Y_val,
+        X_val,
+        spectrum_indices=spectrum_indices,
+        cell_ids=cell_ids,
+        device=device,
+        seed=0,
     )
     _LOG.info("null RMSE per label: %s", np.round(null_rmse, 4).tolist())
 
     # Test 5: conditional MI per label.
     _LOG.info("test 5: conditional MI (KSG, k=5)")
     cmi_per_label = _conditional_mi_per_label(
-        xp_summary, Y_val, Z_cond,
+        xp_summary,
+        Y_val,
+        Z_cond,
         label_names=ckpt_label_names,
         max_samples=args.mi_max_samples,
     )
@@ -1041,9 +1077,7 @@ def main() -> None:
                 continue
             delta = float(np.nanmean(perm_importance[idxs, j]))
             perm_family_delta[fam] = delta
-            perm_family_frac[fam] = (
-                delta / max(sy, 1e-12) if np.isfinite(sy) else float("nan")
-            )
+            perm_family_frac[fam] = delta / max(sy, 1e-12) if np.isfinite(sy) else float("nan")
 
         # Top-10 individual features by permutation ΔRMSE.
         finite_imp = perm_importance[:, j]
@@ -1055,14 +1089,18 @@ def main() -> None:
         # LOOCO per-family mean — using the XP-coefficient slice only.
         xp_idx_local = {
             "bp_shape": list(range(0, len(families["bp_shape"]))),
-            "rp_shape": list(range(
-                len(families["bp_shape"]),
-                len(families["bp_shape"]) + len(families["rp_shape"]),
-            )),
-            "xp_c0": list(range(
-                len(families["bp_shape"]) + len(families["rp_shape"]),
-                len(xp_family_idx),
-            )),
+            "rp_shape": list(
+                range(
+                    len(families["bp_shape"]),
+                    len(families["bp_shape"]) + len(families["rp_shape"]),
+                )
+            ),
+            "xp_c0": list(
+                range(
+                    len(families["bp_shape"]) + len(families["rp_shape"]),
+                    len(xp_family_idx),
+                )
+            ),
         }
         looco_family_delta = {
             fam: float(np.nanmean(looco_delta[idxs, j])) if idxs else float("nan")
@@ -1078,15 +1116,22 @@ def main() -> None:
         else:
             xp_joint_frac = float("nan")
         verdict, tier, halt = _classify_label(
-            skill_ratio=sr, xp_joint_frac=xp_joint_frac, cmi=cmi_val,
+            skill_ratio=sr,
+            xp_joint_frac=xp_joint_frac,
+            cmi=cmi_val,
         )
         if halt:
             halt_labels.append(name)
 
         per_label[name] = {
-            "base_rmse": bj, "sigma_y": sy, "null_rmse": nj,
-            "skill_ratio": sr, "real_skill": 1.0 - bj / max(sy, 1e-12),
-            "cmi": cmi_val, "verdict": verdict, "tier": tier,
+            "base_rmse": bj,
+            "sigma_y": sy,
+            "null_rmse": nj,
+            "skill_ratio": sr,
+            "real_skill": 1.0 - bj / max(sy, 1e-12),
+            "cmi": cmi_val,
+            "verdict": verdict,
+            "tier": tier,
             "xp_joint_frac": xp_joint_frac,
             "perm_family_delta": perm_family_delta,
             "perm_family_frac": perm_family_frac,
@@ -1098,18 +1143,30 @@ def main() -> None:
         _write_label_card(
             path_md=args.report_dir / f"{name}_report_card.md",
             path_json=args.report_dir / f"{name}_report_card.json",
-            label=name, label_idx=j,
-            base_rmse=bj, sigma_y=sy, null_rmse=nj,
-            skill_ratio=sr, xp_joint_frac=xp_joint_frac,
+            label=name,
+            label_idx=j,
+            base_rmse=bj,
+            sigma_y=sy,
+            null_rmse=nj,
+            skill_ratio=sr,
+            xp_joint_frac=xp_joint_frac,
             perm_family_delta=perm_family_delta,
-            perm_family_frac=perm_family_frac, top_coeffs=top,
-            looco_family_delta=looco_family_delta, cmi=cmi_val,
-            verdict=verdict, tier=tier, halt_triggered=bool(halt),
+            perm_family_frac=perm_family_frac,
+            top_coeffs=top,
+            looco_family_delta=looco_family_delta,
+            cmi=cmi_val,
+            verdict=verdict,
+            tier=tier,
+            halt_triggered=bool(halt),
         )
         _LOG.info(
-            "%s: verdict=%s tier=%s skill_ratio=%.3f xp_joint_frac=%.3f "
-            "CMI=%.3f%s",
-            name, verdict, tier, sr, xp_joint_frac, cmi_val,
+            "%s: verdict=%s tier=%s skill_ratio=%.3f xp_joint_frac=%.3f CMI=%.3f%s",
+            name,
+            verdict,
+            tier,
+            sr,
+            xp_joint_frac,
+            cmi_val,
             "  [HALT]" if halt else "",
         )
 
@@ -1133,7 +1190,9 @@ def main() -> None:
                     "cmi_min": CMI_MIN,
                 },
             },
-            f, indent=2, default=float,
+            f,
+            indent=2,
+            default=float,
         )
 
     _write_summary(
@@ -1147,7 +1206,8 @@ def main() -> None:
     )
     _LOG.info(
         "audit complete — %s → %s",
-        "HALT" if halt_labels else "PASS", args.report_dir,
+        "HALT" if halt_labels else "PASS",
+        args.report_dir,
     )
 
 

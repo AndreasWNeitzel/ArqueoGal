@@ -23,12 +23,8 @@ from arqueogal.data.frozen_stats import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-REAL_PROVENANCE = (
-    REPO_ROOT / "data" / "processed" / "pipeline1_features_stream1.provenance.json"
-)
-REAL_FINGERPRINT = (
-    "0d34b5659e97e5891b57005215a59b0b70fc56f23d8ffb22f442c4ad5101eab7"
-)
+REAL_PROVENANCE = REPO_ROOT / "data" / "processed" / "pipeline1_features_stream1.provenance.json"
+REAL_FINGERPRINT = "0d34b5659e97e5891b57005215a59b0b70fc56f23d8ffb22f442c4ad5101eab7"
 
 
 # ---- fixture: minimal provenance JSON mirroring the real layout --------------
@@ -67,12 +63,10 @@ def _write_minimal_provenance(  # noqa: PLR0913 — keyword-only fixture knobs
             },
             "coef_norm_zscore_frozen": {
                 "bp": {
-                    str(i): {"mu": bp_mu[i], "sigma": bp_sigma[i]}
-                    for i in range(1, XP_COEFF_LEN)
+                    str(i): {"mu": bp_mu[i], "sigma": bp_sigma[i]} for i in range(1, XP_COEFF_LEN)
                 },
                 "rp": {
-                    str(i): {"mu": rp_mu[i], "sigma": rp_sigma[i]}
-                    for i in range(1, XP_COEFF_LEN)
+                    str(i): {"mu": rp_mu[i], "sigma": rp_sigma[i]} for i in range(1, XP_COEFF_LEN)
                 },
                 "n_reference_population": 10_000,
                 "sigma_floor": sigma_floor,
@@ -160,15 +154,21 @@ def test_verify_basis_fingerprint_raises_on_truncated_hex(tmp_path: Path) -> Non
 
 
 def _make_stats(  # noqa: PLR0913 — keyword-only fixture knobs
-    bp_mu_val: float = 0.5, bp_sigma_val: float = 0.2,
-    rp_mu_val: float = -0.3, rp_sigma_val: float = 0.1,
-    c0_bp_mu: float = -14.0, c0_bp_sigma: float = 0.6,
-    c0_rp_mu: float = -14.5, c0_rp_sigma: float = 0.5,
+    bp_mu_val: float = 0.5,
+    bp_sigma_val: float = 0.2,
+    rp_mu_val: float = -0.3,
+    rp_sigma_val: float = 0.1,
+    c0_bp_mu: float = -14.0,
+    c0_bp_sigma: float = 0.6,
+    c0_rp_mu: float = -14.5,
+    c0_rp_sigma: float = 0.5,
 ) -> FrozenZScoreStats:
     return FrozenZScoreStats(
         basis_fingerprint="x" * 64,
-        c0_bp_mean_log10=c0_bp_mu, c0_bp_sigma_log10=c0_bp_sigma,
-        c0_rp_mean_log10=c0_rp_mu, c0_rp_sigma_log10=c0_rp_sigma,
+        c0_bp_mean_log10=c0_bp_mu,
+        c0_bp_sigma_log10=c0_bp_sigma,
+        c0_rp_mean_log10=c0_rp_mu,
+        c0_rp_sigma_log10=c0_rp_sigma,
         coef_norm_bp_mean=np.full(XP_COEFF_LEN - 1, bp_mu_val, dtype=np.float64),
         coef_norm_bp_sigma=np.full(XP_COEFF_LEN - 1, bp_sigma_val, dtype=np.float64),
         coef_norm_rp_mean=np.full(XP_COEFF_LEN - 1, rp_mu_val, dtype=np.float64),
@@ -208,7 +208,11 @@ def test_apply_frozen_zscore_mean_shifts_to_zero_on_match() -> None:
     bp_c0_at_mean = np.full(n, -14.0, dtype=np.float64)
     rp_c0_at_mean = np.full(n, -14.5, dtype=np.float64)
     bp_z, rp_z, bp_c0_z, rp_c0_z = apply_frozen_zscore(
-        bp_at_mean, rp_at_mean, bp_c0_at_mean, rp_c0_at_mean, stats,
+        bp_at_mean,
+        rp_at_mean,
+        bp_c0_at_mean,
+        rp_c0_at_mean,
+        stats,
     )
     np.testing.assert_allclose(bp_z, 0.0, atol=1e-12)
     np.testing.assert_allclose(rp_z, 0.0, atol=1e-12)
@@ -284,13 +288,16 @@ def test_apply_frozen_zscore_rejects_bad_shape() -> None:
 def test_apply_scalar_zscore_rejects_zero_sigma() -> None:
     stats = FrozenZScoreStats(
         basis_fingerprint="x" * 64,
-        c0_bp_mean_log10=0.0, c0_bp_sigma_log10=0.0,  # pathological
-        c0_rp_mean_log10=0.0, c0_rp_sigma_log10=1.0,
+        c0_bp_mean_log10=0.0,
+        c0_bp_sigma_log10=0.0,  # pathological
+        c0_rp_mean_log10=0.0,
+        c0_rp_sigma_log10=1.0,
         coef_norm_bp_mean=np.zeros(XP_COEFF_LEN - 1),
         coef_norm_bp_sigma=np.ones(XP_COEFF_LEN - 1),
         coef_norm_rp_mean=np.zeros(XP_COEFF_LEN - 1),
         coef_norm_rp_sigma=np.ones(XP_COEFF_LEN - 1),
-        sigma_floor=1e-30, n_reference_population=1,
+        sigma_floor=1e-30,
+        n_reference_population=1,
         reference_population_description="",
     )
     bp = np.zeros((2, XP_COEFF_LEN - 1))
@@ -354,10 +361,7 @@ def test_load_raises_on_missing_coefficient(tmp_path: Path) -> None:
             },
             "coef_norm_zscore_frozen": {
                 "bp": {str(i): {"mu": 0.0, "sigma": 0.1} for i in range(1, 30)},  # truncated
-                "rp": {
-                    str(i): {"mu": 0.0, "sigma": 0.1}
-                    for i in range(1, XP_COEFF_LEN)
-                },
+                "rp": {str(i): {"mu": 0.0, "sigma": 0.1} for i in range(1, XP_COEFF_LEN)},
             },
         },
     }

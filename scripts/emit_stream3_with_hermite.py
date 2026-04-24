@@ -104,7 +104,10 @@ def _reproject_all(flux_matrix: np.ndarray) -> dict:
         sel = valid_idx[start:stop]
         logger.info(
             "reprojecting valid rows [%d, %d) / %d (of %d total)",
-            start, stop, valid_idx.size, n_total,
+            start,
+            stop,
+            valid_idx.size,
+            n_total,
         )
         out = reproject_ye_to_hermite(flux_matrix[sel])
         bp[sel] = out["bp_coeffs"]
@@ -115,14 +118,22 @@ def _reproject_all(flux_matrix: np.ndarray) -> dict:
         fingerprint = out["basis_fingerprint_sha256"]
         basis_version = out["basis_version"]
     return {
-        "bp": bp, "rp": rp,
-        "rms": rms_all, "rms_bp": rms_bp, "rms_rp": rms_rp,
-        "valid": valid, "fingerprint": fingerprint, "basis_version": basis_version,
+        "bp": bp,
+        "rp": rp,
+        "rms": rms_all,
+        "rms_bp": rms_bp,
+        "rms_rp": rms_rp,
+        "valid": valid,
+        "fingerprint": fingerprint,
+        "basis_version": basis_version,
     }
 
 
 def _compute_flags(
-    rms: np.ndarray, valid: np.ndarray, teff: np.ndarray, thresholds: dict,
+    rms: np.ndarray,
+    valid: np.ndarray,
+    teff: np.ndarray,
+    thresholds: dict,
 ) -> tuple[pd.arrays.IntegerArray, pd.arrays.IntegerArray]:
     n = rms.size
     mask_na = ~valid
@@ -137,11 +148,13 @@ def _compute_flags(
         per_star_threshold[labels == label] = thr
     strat = np.where(
         valid & (rms > per_star_threshold),
-        XP_FIT_FLAG_RESIDUAL_HIGH, XP_FIT_FLAG_OK,
+        XP_FIT_FLAG_RESIDUAL_HIGH,
+        XP_FIT_FLAG_OK,
     ).astype(np.int8)
     glob = np.where(
         valid & (rms > global_p99),
-        XP_FIT_FLAG_RESIDUAL_HIGH, XP_FIT_FLAG_OK,
+        XP_FIT_FLAG_RESIDUAL_HIGH,
+        XP_FIT_FLAG_OK,
     ).astype(np.int8)
     strat_arr = pd.array(strat, dtype="Int8")
     glob_arr = pd.array(glob, dtype="Int8")
@@ -177,7 +190,8 @@ def main() -> None:
 
     logger.info("stacking sampled flux to (N, 330) matrix")
     flux = np.stack(
-        [np.asarray(row, dtype=np.float32) for row in df["corrected_flux"]], axis=0,
+        [np.asarray(row, dtype=np.float32) for row in df["corrected_flux"]],
+        axis=0,
     )
     logger.info("flux matrix shape: %s", flux.shape)
 
@@ -187,7 +201,10 @@ def main() -> None:
 
     teff = df["teff_gspphot"].to_numpy(dtype=np.float64, na_value=np.nan)
     strat_flag, global_flag = _compute_flags(
-        rms=proj["rms"], valid=proj["valid"], teff=teff, thresholds=thresholds,
+        rms=proj["rms"],
+        valid=proj["valid"],
+        teff=teff,
+        thresholds=thresholds,
     )
     n_valid = int(proj["valid"].sum())
     n_high_strat = int(
@@ -199,28 +216,27 @@ def main() -> None:
     logger.info(
         "flagging: n_valid=%d, n_strat_high=%d (%.3f%%), n_global_high=%d (%.3f%%)",
         n_valid,
-        n_high_strat, 100.0 * n_high_strat / max(n_valid, 1),
-        n_high_global, 100.0 * n_high_global / max(n_valid, 1),
+        n_high_strat,
+        100.0 * n_high_strat / max(n_valid, 1),
+        n_high_global,
+        100.0 * n_high_global / max(n_valid, 1),
     )
 
-    logger.info("computing raw c0-normalized shape ratios + log10(c0) "
-                "on normal-population subset")
+    logger.info("computing raw c0-normalized shape ratios + log10(c0) on normal-population subset")
     ye_ok = (df["ye2024_flag"] == 0).to_numpy(dtype=bool)
     strat_ok = (strat_flag == XP_FIT_FLAG_OK).to_numpy(dtype=bool, na_value=False)
     normal_pop = ye_ok & strat_ok
 
     bp_c0 = proj["bp"][:, 0].astype(np.float64)
     rp_c0 = proj["rp"][:, 0].astype(np.float64)
-    c0_ok = (
-        normal_pop
-        & np.isfinite(bp_c0) & (bp_c0 > 0.0)
-        & np.isfinite(rp_c0) & (rp_c0 > 0.0)
-    )
+    c0_ok = normal_pop & np.isfinite(bp_c0) & (bp_c0 > 0.0) & np.isfinite(rp_c0) & (rp_c0 > 0.0)
     n_c0_ok = int(c0_ok.sum())
     n_c0_rejected_from_normal = int(normal_pop.sum() - n_c0_ok)
     logger.info(
-        "normal-population: %d rows; c0>0 finite in both bands: %d "
-        "(rejected %d)", int(normal_pop.sum()), n_c0_ok, n_c0_rejected_from_normal,
+        "normal-population: %d rows; c0>0 finite in both bands: %d (rejected %d)",
+        int(normal_pop.sum()),
+        n_c0_ok,
+        n_c0_rejected_from_normal,
     )
 
     # Raw ratios c_i / c_0 (NOT z-scored). inference driver handles z-score.
@@ -243,7 +259,10 @@ def main() -> None:
     bp_norm_cols = {f"bp_coef_norm_{n}": bp_norm[:, n] for n in range(1, HERMITE_N_BASIS)}
     rp_norm_cols = {f"rp_coef_norm_{n}": rp_norm[:, n] for n in range(1, HERMITE_N_BASIS)}
     df_out = df_out.assign(
-        **bp_cols, **rp_cols, **bp_norm_cols, **rp_norm_cols,
+        **bp_cols,
+        **rp_cols,
+        **bp_norm_cols,
+        **rp_norm_cols,
         bp_c0_log=bp_c0_log,
         rp_c0_log=rp_c0_log,
         reprojection_residual_rms=proj["rms"],
@@ -317,7 +336,7 @@ def main() -> None:
             "n_c0_ok_normal_population": n_c0_ok,
             "n_c0_rejected_from_normal": n_c0_rejected_from_normal,
             "emit_schema": "raw (bp_c0_log/rp_c0_log + raw c_i/c_0 ratios); "
-                           "inference driver applies frozen z-score from Stream-1",
+            "inference driver applies frozen z-score from Stream-1",
         },
     )
     write_sidecar(prov)

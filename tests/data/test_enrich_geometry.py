@@ -126,17 +126,19 @@ def test_happy_path_adds_distance_and_av_columns(
     assert returned == out_path
     result = pd.read_parquet(out_path)
     for col in (
-        "dist_primary_pc", "dist_sigma_sym_pc",
-        "av_los", "av_los_source",
-        "av_nbhd_median", "av_nbhd_std", "av_nbhd_n_neighbors",
+        "dist_primary_pc",
+        "dist_sigma_sym_pc",
+        "av_los",
+        "av_los_source",
+        "av_nbhd_median",
+        "av_nbhd_std",
+        "av_nbhd_n_neighbors",
     ):
         assert col in result.columns
     assert len(result) == 4
 
 
-def test_av_source_codes_route_by_distance(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_av_source_codes_route_by_distance(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     """Distances 500 / 2000 / 4000 / 900 → sources 0 / 1 / 2 / 0."""
     gavo = MagicMock(spec=TAPService)
     df = _input_df([1, 2, 3, 4])
@@ -158,27 +160,27 @@ def test_av_source_codes_route_by_distance(
     assert np.allclose(far_vals, 0.10 * 2.742, atol=1e-4)
 
 
-def test_missing_required_columns_raises(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_missing_required_columns_raises(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     df = pd.DataFrame({"source_id": [1, 2], "ra": [0.0, 1.0]})  # dec missing
     with pytest.raises(KeyError, match="dec"):
         mod.enrich_geometry(
-            df, output_path=tmp_path / "x.parquet", gavo=gavo,
+            df,
+            output_path=tmp_path / "x.parquet",
+            gavo=gavo,
             dust_queries=(_near_query, _mid_query, _far_query),
         )
 
 
-def test_starhorse2_requires_aip(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_starhorse2_requires_aip(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     df = _input_df([1, 2])
     with pytest.raises(ValueError, match="aip"):
         mod.enrich_geometry(
-            df, output_path=tmp_path / "x.parquet",
-            gavo=gavo, include_starhorse2=True,
+            df,
+            output_path=tmp_path / "x.parquet",
+            gavo=gavo,
+            include_starhorse2=True,
             dust_queries=(_near_query, _mid_query, _far_query),
         )
 
@@ -191,8 +193,11 @@ def test_starhorse2_flow_adds_sh2_columns_and_tap_source(
     df = _input_df([1, 2, 3, 4])
     out_path = tmp_path / "stream_geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path,
-        gavo=gavo, aip=aip, include_starhorse2=True,
+        df,
+        output_path=out_path,
+        gavo=gavo,
+        aip=aip,
+        include_starhorse2=True,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     result = pd.read_parquet(out_path)
@@ -214,7 +219,9 @@ def test_provenance_single_tap_source_without_sh2(
     df = _input_df([1, 2])
     out_path = tmp_path / "stream_geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path, gavo=gavo,
+        df,
+        output_path=out_path,
+        gavo=gavo,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     meta = json.loads(out_path.with_suffix("").with_suffix(".provenance.json").read_text())
@@ -223,14 +230,14 @@ def test_provenance_single_tap_source_without_sh2(
     assert "Bailer-Jones" in tap_kinds[0]["name"]
 
 
-def test_skip_nbhd_when_ag_column_absent(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_skip_nbhd_when_ag_column_absent(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     df = _input_df([1, 2, 3], with_ag=False)
     out_path = tmp_path / "stream_geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path, gavo=gavo,
+        df,
+        output_path=out_path,
+        gavo=gavo,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     result = pd.read_parquet(out_path)
@@ -240,15 +247,15 @@ def test_skip_nbhd_when_ag_column_absent(
     assert "av_nbhd_n_neighbors" not in result.columns
 
 
-def test_custom_ag_column_name_honored(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_custom_ag_column_name_honored(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     df = _input_df([1, 2, 3], with_ag=False)
     df["my_av"] = np.array([0.2, 0.3, 0.4], dtype=np.float32)
     out_path = tmp_path / "stream_geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path, gavo=gavo,
+        df,
+        output_path=out_path,
+        gavo=gavo,
         dust_queries=(_near_query, _mid_query, _far_query),
         ag_gspphot_col="my_av",
     )
@@ -256,30 +263,31 @@ def test_custom_ag_column_name_honored(
     assert "av_nbhd_median" in result.columns
 
 
-def test_atomic_write_no_part_file_left(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_atomic_write_no_part_file_left(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     df = _input_df([1, 2])
     out_path = tmp_path / "stream_geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path, gavo=gavo,
+        df,
+        output_path=out_path,
+        gavo=gavo,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     leftover = list(tmp_path.glob("*.part"))
     assert not leftover
 
 
-def test_provenance_row_counts_and_extras(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_provenance_row_counts_and_extras(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     aip = MagicMock(spec=TAPService)
     df = _input_df([1, 2, 3, 4])
     out_path = tmp_path / "stream_geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path,
-        gavo=gavo, aip=aip, include_starhorse2=True,
+        df,
+        output_path=out_path,
+        gavo=gavo,
+        aip=aip,
+        include_starhorse2=True,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     meta = json.loads(out_path.with_suffix("").with_suffix(".provenance.json").read_text())
@@ -291,26 +299,26 @@ def test_provenance_row_counts_and_extras(
     assert extra["sh2_sample"] == "apogee_dr17"
 
 
-def test_batch_sizes_propagate_to_fetchers(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_batch_sizes_propagate_to_fetchers(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     aip = MagicMock(spec=TAPService)
     df = _input_df([1, 2, 3])
     out_path = tmp_path / "stream_geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path,
-        gavo=gavo, aip=aip, include_starhorse2=True,
-        bj_batch_size=2500, sh2_batch_size=4000,
+        df,
+        output_path=out_path,
+        gavo=gavo,
+        aip=aip,
+        include_starhorse2=True,
+        bj_batch_size=2500,
+        sh2_batch_size=4000,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     assert patched_tap["bj_kwargs"]["batch_size"] == 2500
     assert patched_tap["sh2_kwargs"]["batch_size"] == 4000
 
 
-def test_checkpoint_dirs_propagate(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_checkpoint_dirs_propagate(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     aip = MagicMock(spec=TAPService)
     df = _input_df([1, 2])
@@ -318,23 +326,27 @@ def test_checkpoint_dirs_propagate(
     bj_cp = tmp_path / "cp_bj"
     sh2_cp = tmp_path / "cp_sh2"
     mod.enrich_geometry(
-        df, output_path=out_path,
-        gavo=gavo, aip=aip, include_starhorse2=True,
-        bj_checkpoint_dir=bj_cp, sh2_checkpoint_dir=sh2_cp,
+        df,
+        output_path=out_path,
+        gavo=gavo,
+        aip=aip,
+        include_starhorse2=True,
+        bj_checkpoint_dir=bj_cp,
+        sh2_checkpoint_dir=sh2_cp,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     assert patched_tap["bj_kwargs"]["checkpoint_dir"] == bj_cp
     assert patched_tap["sh2_kwargs"]["checkpoint_dir"] == sh2_cp
 
 
-def test_output_parent_is_created(
-    tmp_path: Path, patched_tap: dict[str, object]
-) -> None:
+def test_output_parent_is_created(tmp_path: Path, patched_tap: dict[str, object]) -> None:
     gavo = MagicMock(spec=TAPService)
     df = _input_df([1, 2])
     out_path = tmp_path / "nested" / "deep" / "geom.parquet"
     mod.enrich_geometry(
-        df, output_path=out_path, gavo=gavo,
+        df,
+        output_path=out_path,
+        gavo=gavo,
         dust_queries=(_near_query, _mid_query, _far_query),
     )
     assert out_path.is_file()
