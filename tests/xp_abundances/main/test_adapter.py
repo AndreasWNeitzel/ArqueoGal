@@ -116,6 +116,43 @@ def test_adapter_batched_and_unbatched() -> None:
     assert out2.shape == x2d.shape
 
 
+# --- assert_finite NaN/Inf guard (inference-driver safety) -------------------
+
+
+def test_adapter_assert_finite_default_off() -> None:
+    """Default behaviour preserves the historical pass-through (no extra cost)."""
+    layout = FeatureLayout()
+    adapter = XpFeatureAdapter(layout)
+    assert adapter.assert_finite is False
+    # NaN passes through silently when assert_finite is off (training-loop semantics
+    # because training.py applies np.nan_to_num upstream).
+    x = torch.zeros(2, layout.input_dim)
+    x[0, 5] = float("nan")
+    out = adapter(x)
+    assert torch.isnan(out[0, 5])
+
+
+def test_adapter_assert_finite_raises_on_nan() -> None:
+    """When the inference driver enables the guard, NaN must raise with column names."""
+    layout = FeatureLayout()
+    adapter = XpFeatureAdapter(layout, assert_finite=True)
+    x = torch.zeros(3, layout.input_dim)
+    bad_idx = layout.all_required_columns.index("bp_c0_z")
+    x[1, bad_idx] = float("nan")
+    with pytest.raises(ValueError, match="non-finite input"):
+        adapter(x)
+
+
+def test_adapter_assert_finite_raises_on_inf_and_names_columns() -> None:
+    layout = FeatureLayout()
+    adapter = XpFeatureAdapter(layout, assert_finite=True)
+    x = torch.zeros(2, layout.input_dim)
+    inf_col = layout.all_required_columns.index("rp_c0_z")
+    x[0, inf_col] = float("inf")
+    with pytest.raises(ValueError, match=r"rp_c0_z"):
+        adapter(x)
+
+
 # --- Integration: adapter → Encoder trunk → projection -----------------------
 
 

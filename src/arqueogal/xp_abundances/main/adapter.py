@@ -76,6 +76,7 @@ class XpFeatureAdapter(nn.Module):
     """
 
     use_c0_scalars: bool
+    assert_finite: bool
     _c0_positions: torch.Tensor  # registered buffer
 
     def __init__(
@@ -83,10 +84,12 @@ class XpFeatureAdapter(nn.Module):
         layout: FeatureLayout,
         *,
         use_c0_scalars: bool = True,
+        assert_finite: bool = False,
     ) -> None:
         super().__init__()
         self.layout = layout
         self.use_c0_scalars = use_c0_scalars
+        self.assert_finite = assert_finite
 
         # Flat column order: BP shape → RP shape → XP scalars → residuals → aux.
         # See FeatureLayout.all_required_columns.
@@ -119,17 +122,52 @@ class XpFeatureAdapter(nn.Module):
 
         The non-identity path clones (so we don't mutate the caller's tensor)
         and scatters zero into the c0 positions. The identity path returns the
-        input tensor as-is — the encoder trunk is free to view-slice it.
+        input tensor as-is, the encoder trunk is free to view-slice it.
+
+        When ``assert_finite=True`` was passed at construction, the input is
+        first checked for NaN/Inf entries; any non-finite value raises
+        :class:`ValueError` with a per-feature breakdown so the inference
+        driver can pinpoint which aux column is the source.
         """
+        if self.assert_finite:
+            self._check_finite(x)
         if self.use_c0_scalars or self._c0_positions.numel() == 0:
             return x
         x_out = x.clone()
         x_out[..., self._c0_positions] = 0.0
         return x_out
 
+    def _check_finite(self, x: torch.Tensor) -> None:
+        """Raise if ``x`` contains NaN or Inf, naming the offending columns.
+
+        Tightly scoped: only runs when ``assert_finite=True`` is set explicitly,
+        so the production training path (which feeds NaN-sanitised data via
+        ``np.nan_to_num`` upstream) pays no cost.
+        """
+        finite = torch.isfinite(x)
+        if bool(finite.all()):
+            return
+        cols = self.layout.all_required_columns
+        per_col_bad = (
+            (~finite).any(dim=tuple(range(x.dim() - 1)))
+            if x.dim() > 1
+            else ~finite
+        )
+        bad_indices = torch.nonzero(per_col_bad, as_tuple=False).flatten().tolist()
+        bad_cols = [cols[i] if i < len(cols) else f"col_{i}" for i in bad_indices]
+        raise ValueError(
+            f"XpFeatureAdapter received non-finite input on "
+            f"{len(bad_cols)} of {x.shape[-1]} columns: {bad_cols[:8]}"
+            f"{'...' if len(bad_cols) > 8 else ''}. "
+            "Inference drivers must apply np.nan_to_num (or equivalent NaN "
+            "sanitisation) upstream of the model, mirroring training.py. "
+            "See CLAUDE.md 'nan_to_num train/inference boundary' footgun."
+        )
+
     def extra_repr(self) -> str:
         return (
             f"input_dim={self.input_dim}, use_c0_scalars={self.use_c0_scalars}, "
+            f"assert_finite={self.assert_finite}, "
             f"n_c0_positions={int(self._c0_positions.numel())}"
         )
 
