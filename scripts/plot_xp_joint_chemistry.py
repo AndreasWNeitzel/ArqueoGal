@@ -45,7 +45,6 @@ from arqueogal.xp_abundances.main.adapter import XpFeatureAdapter
 from arqueogal.xp_abundances.main.config import TrainingConfig
 from arqueogal.xp_abundances.main.data import (
     FeatureLayout,
-    LabelScaler,
     LabelTiers,
 )
 from arqueogal.xp_abundances.main.model import (

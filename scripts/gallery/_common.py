@@ -64,8 +64,8 @@ PALETTE = {
 
 def radec_to_galactic(ra_deg: np.ndarray, dec_deg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Convert ICRS (ra, dec) in degrees to Galactic (l, b) in degrees."""
-    from astropy.coordinates import SkyCoord
     import astropy.units as u
+    from astropy.coordinates import SkyCoord
 
     c = SkyCoord(
         ra=np.asarray(ra_deg, dtype=float) * u.deg,

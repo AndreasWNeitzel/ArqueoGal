@@ -38,10 +38,12 @@ TEST_4_PERMUTATION_SHUFFLE_NULL: Final[str] = "test_4_permutation_shuffle_null"
 TEST_5_CONDITIONAL_MI: Final[str] = "test_5_conditional_mi"
 TEST_6_CROSS_CATALOGUE_CONSISTENCY: Final[str] = "test_6_cross_catalogue_consistency"
 
-STUBBED_TESTS: Final[frozenset[str]] = frozenset({
-    TEST_3_SHAP_FEATURE_IMPORTANCE,
-    TEST_6_CROSS_CATALOGUE_CONSISTENCY,
-})
+STUBBED_TESTS: Final[frozenset[str]] = frozenset(
+    {
+        TEST_3_SHAP_FEATURE_IMPORTANCE,
+        TEST_6_CROSS_CATALOGUE_CONSISTENCY,
+    }
+)
 
 
 class IncompleteProtocolError(Exception):

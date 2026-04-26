@@ -82,16 +82,16 @@ AUDIT_TEST_4_SHUFFLED_NULL: Final[str] = "audit_test_4_shuffled_null"
 AUDIT_TEST_5_CONDITIONAL_MI: Final[str] = "audit_test_5_conditional_mi"
 AUDIT_TEST_6_DECORRELATED_SUBSAMPLE: Final[str] = "audit_test_6_decorrelated_subsample"
 
-STUBBED_AUDIT_TESTS: Final[frozenset[str]] = frozenset({
-    AUDIT_TEST_3_SHAP_VALUES,
-})
+STUBBED_AUDIT_TESTS: Final[frozenset[str]] = frozenset(
+    {
+        AUDIT_TEST_3_SHAP_VALUES,
+    }
+)
 
 
 def report_audit_coverage() -> str:
     """Return the canonical audit coverage statement for the release."""
-    return (
-        "5/6 (test 3 SHAP values pending; tests 1, 2, 4, 5, 6 implemented)"
-    )
+    return "5/6 (test 3 SHAP values pending; tests 1, 2, 4, 5, 6 implemented)"
 
 
 #: Audit-protocol version. Bumped v1 → v1.1 on 2026-04-19 when the 2-D XP

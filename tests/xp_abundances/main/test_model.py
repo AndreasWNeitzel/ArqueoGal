@@ -15,7 +15,6 @@ from arqueogal.xp_abundances.main.model import (
     default_pipeline1_layout,
 )
 
-
 # --- CovarianceBlockLayout ---------------------------------------------------
 
 

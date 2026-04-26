@@ -46,10 +46,10 @@ def main() -> None:
     repo = Path(__file__).resolve().parents[1]
     dm_config["data_dir"] = str(repo / "data" / "external" / "dustmaps")
 
-    from dustmaps.edenhofer2023 import Edenhofer2023Query
-    from dustmaps.sfd import SFDQuery
     from astropy import units as u
     from astropy.coordinates import SkyCoord
+    from dustmaps.edenhofer2023 import Edenhofer2023Query
+    from dustmaps.sfd import SFDQuery
 
     from arqueogal.data.provenance import LocalSource, Provenance, write_sidecar
 

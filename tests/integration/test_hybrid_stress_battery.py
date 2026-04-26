@@ -32,8 +32,6 @@ GPU + production checkpoint + Stream-1 / Stream-3 parquets — see the
 
 from __future__ import annotations
 
-import json
-import time
 from pathlib import Path
 
 import numpy as np
@@ -118,7 +116,9 @@ def _encode(model, X: np.ndarray, device: torch.device, bs: int = 4096) -> np.nd
     return (z / np.linalg.norm(z, axis=1, keepdims=True).clip(min=1e-12)).astype(np.float32)
 
 
-def _gpu_knn(z_query: np.ndarray, z_train: np.ndarray, *, k: int, device: torch.device, batch: int = 2048):
+def _gpu_knn(
+    z_query: np.ndarray, z_train: np.ndarray, *, k: int, device: torch.device, batch: int = 2048
+):
     n = len(z_query)
     dist = np.empty((n, k), dtype=np.float32)
     idx = np.empty((n, k), dtype=np.int64)
@@ -169,7 +169,7 @@ def test_1_kfold_cv(encoder, training_arrays, device):
     rng = np.random.default_rng(20260425)
     folds = np.array_split(rng.permutation(len(X)), 5)
     fold_metrics: dict[str, list[dict[str, float]]] = {lbl: [] for lbl in LABEL_NAMES}
-    for fi, test_idx in enumerate(folds):
+    for _fi, test_idx in enumerate(folds):
         train_idx = np.setdiff1d(np.arange(len(X)), test_idx, assume_unique=False)
         z_tr = _encode(encoder, X[train_idx], device)
         z_te = _encode(encoder, X[test_idx], device)
@@ -190,7 +190,9 @@ def test_2_leakage(encoder, training_arrays, device):
     if not S3_PARQUET.exists():
         pytest.skip(f"Stream-3 parquet missing: {S3_PARQUET}")
     X_train, Y_train, sid_train = training_arrays
-    sid_s3 = pd.read_parquet(S3_PARQUET, columns=["source_id"])["source_id"].to_numpy(dtype=np.int64)
+    sid_s3 = pd.read_parquet(S3_PARQUET, columns=["source_id"])["source_id"].to_numpy(
+        dtype=np.int64
+    )
     overlap = np.intersect1d(sid_train, sid_s3)
     assert len(overlap) > 100, f"too small overlap to evaluate ({len(overlap)} stars)"
 
@@ -245,8 +247,10 @@ def test_3_per_cell_calibration(encoder, training_arrays, device):
         for ti in range(len(teff_bins) - 1):
             for mi in range(len(mh_bins) - 1):
                 m = (
-                    (Y[test_idx][:, 0] >= teff_bins[ti]) & (Y[test_idx][:, 0] < teff_bins[ti + 1]) &
-                    (Y[test_idx][:, 2] >= mh_bins[mi]) & (Y[test_idx][:, 2] < mh_bins[mi + 1])
+                    (Y[test_idx][:, 0] >= teff_bins[ti])
+                    & (Y[test_idx][:, 0] < teff_bins[ti + 1])
+                    & (Y[test_idx][:, 2] >= mh_bins[mi])
+                    & (Y[test_idx][:, 2] < mh_bins[mi + 1])
                 )
                 if m.sum() < 200:
                     continue
@@ -293,7 +297,9 @@ def test_5_k_sensitivity(encoder, training_arrays, device):
     rmses = {}
     for K in (20, 50, 100):
         med, *_ = _knn_summary(Y[train_idx], idx_max[:, :K])
-        rmses[K] = [_metrics(Y[test_idx][:, li], med[:, li])["rmse"] for li in range(len(LABEL_NAMES))]
+        rmses[K] = [
+            _metrics(Y[test_idx][:, li], med[:, li])["rmse"] for li in range(len(LABEL_NAMES))
+        ]
     for li, lbl in enumerate(LABEL_NAMES):
         vals = np.array([rmses[K][li] for K in (20, 50, 100)])
         spread = (vals.max() - vals.min()) / vals.mean()

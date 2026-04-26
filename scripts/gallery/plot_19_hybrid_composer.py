@@ -28,17 +28,14 @@ S3_PATH = REPO / "release/D-Cat-b/hybrid_pipeline_run/predictions_with_features.
 S2_PATH = REPO / "release/D-Cat-b/hybrid_pipeline_run_stream2/predictions_with_features.parquet"
 
 ELEMENTS = ("teff", "logg", "mh", "alpha_m", "mg_h")
-EL_LBL = {"teff": "Teff", "logg": "log g", "mh": "[M/H]",
-          "alpha_m": "[α/M]", "mg_h": "[Mg/H]"}
-SRC_COLORS = {"regressor": "#1f77b4", "knn": "#ff7f0e",
-              "regressor_caveat": "#d62728"}
+EL_LBL = {"teff": "Teff", "logg": "log g", "mh": "[M/H]", "alpha_m": "[α/M]", "mg_h": "[Mg/H]"}
+SRC_COLORS = {"regressor": "#1f77b4", "knn": "#ff7f0e", "regressor_caveat": "#d62728"}
 
 
 def _load(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None
-    cols = ([f"{e}_hybrid_source" for e in ELEMENTS]
-            + [f"{e}_hybrid_tier" for e in ELEMENTS])
+    cols = [f"{e}_hybrid_source" for e in ELEMENTS] + [f"{e}_hybrid_tier" for e in ELEMENTS]
     return pd.read_parquet(path, columns=cols)
 
 
@@ -46,21 +43,40 @@ def _source_panel(ax, df, name):
     n = len(df)
     bottoms = np.zeros(len(ELEMENTS))
     for src in ("regressor", "knn", "regressor_caveat"):
-        fracs = np.array([(df[f"{e}_hybrid_source"] == src).sum() / n * 100
-                            for e in ELEMENTS])
-        ax.bar(range(len(ELEMENTS)), fracs, bottom=bottoms,
-                color=SRC_COLORS[src], label=src, edgecolor="white", lw=0.4)
+        fracs = np.array([(df[f"{e}_hybrid_source"] == src).sum() / n * 100 for e in ELEMENTS])
+        ax.bar(
+            range(len(ELEMENTS)),
+            fracs,
+            bottom=bottoms,
+            color=SRC_COLORS[src],
+            label=src,
+            edgecolor="white",
+            lw=0.4,
+        )
         for i, f in enumerate(fracs):
             if f > 5:
-                ax.text(i, bottoms[i] + f / 2, f"{f:.1f}%",
-                         ha="center", va="center", fontsize=7, color="white")
+                ax.text(
+                    i,
+                    bottoms[i] + f / 2,
+                    f"{f:.1f}%",
+                    ha="center",
+                    va="center",
+                    fontsize=7,
+                    color="white",
+                )
         bottoms += fracs
     ax.set_xticks(range(len(ELEMENTS)))
     ax.set_xticklabels([EL_LBL[e] for e in ELEMENTS])
     ax.set_ylabel("% of stars")
     ax.set_title(f"{name} hybrid source per element (n={n:,})")
-    ax.legend(fontsize=8, loc="upper right", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=8,
+        loc="upper right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
 
 def _tier_panel(ax, df, name):
@@ -68,18 +84,26 @@ def _tier_panel(ax, df, name):
     x = np.arange(len(ELEMENTS))
     t1 = [int((df[f"{e}_hybrid_tier"] == 1).sum()) for e in ELEMENTS]
     t2 = [int((df[f"{e}_hybrid_tier"] == 2).sum()) for e in ELEMENTS]
-    ax.bar(x - width/2, t1, width, color="#2ca02c", label="tier 1")
-    ax.bar(x + width/2, t2, width, color="#ff7f0e", label="tier 2")
-    ax.set_xticks(x); ax.set_xticklabels([EL_LBL[e] for e in ELEMENTS])
+    ax.bar(x - width / 2, t1, width, color="#2ca02c", label="tier 1")
+    ax.bar(x + width / 2, t2, width, color="#ff7f0e", label="tier 2")
+    ax.set_xticks(x)
+    ax.set_xticklabels([EL_LBL[e] for e in ELEMENTS])
     ax.set_ylabel("count")
     ax.set_title(f"{name} per-element hybrid_tier")
-    ax.legend(fontsize=8, loc="upper right", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=8,
+        loc="upper right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
 
 def main() -> None:
     apply_style()
-    s3 = _load(S3_PATH); s2 = _load(S2_PATH)
+    s3 = _load(S3_PATH)
+    s2 = _load(S2_PATH)
     if s3 is None and s2 is None:
         return
 

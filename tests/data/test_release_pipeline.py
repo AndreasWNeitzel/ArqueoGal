@@ -167,7 +167,10 @@ def test_join_left_preserves_unmatched_predictions(tmp_path: Path) -> None:
     _make_features(len(feat_ids), source_ids=feat_ids).to_parquet(feat_path)
 
     summary = join_predictions_with_features(
-        pred_path, feat_path, out_path, how="left",
+        pred_path,
+        feat_path,
+        out_path,
+        how="left",
     )
 
     assert summary["n_joined"] == len(pred_ids)
@@ -233,7 +236,10 @@ def test_join_skips_provenance_when_disabled(tmp_path: Path) -> None:
     _make_features(n).to_parquet(feat_path)
 
     join_predictions_with_features(
-        pred_path, feat_path, out_path, write_provenance=False,
+        pred_path,
+        feat_path,
+        out_path,
+        write_provenance=False,
     )
     assert not out_path.with_name(out_path.stem + ".provenance.json").exists()
 
@@ -252,8 +258,11 @@ def test_hybrid_thresholds_match_release():
     (release.py) consume the same per-element σ thresholds. release_pipeline
     keeps a local copy to avoid pulling in torch via the package import; this
     test catches the case where one diverges from the other."""
-    from arqueogal.xp_abundances.main.release import _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD as canon
-    assert _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD == canon
+    from arqueogal.xp_abundances.main.release import (
+        _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD as canon,  # noqa: N811
+    )
+
+    assert canon == _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD
 
 
 def _make_annotated_with_sigma(n: int = 6) -> pd.DataFrame:
@@ -363,9 +372,7 @@ def test_hybrid_falls_back_to_regressor_caveat_when_knn_missing(tmp_path: Path):
     # Row 1 (teff_sigma=200) → regressor_caveat (no kNN available).
     assert out["teff_hybrid_source"].iloc[1] == "regressor_caveat"
     assert out["teff_hybrid_tier"].iloc[1] == 2
-    np.testing.assert_allclose(
-        out["teff_hybrid_pred"].iloc[1], df["teff_pred"].iloc[1], rtol=1e-5
-    )
+    np.testing.assert_allclose(out["teff_hybrid_pred"].iloc[1], df["teff_pred"].iloc[1], rtol=1e-5)
     assert summary["knn_attached"] is False
 
 

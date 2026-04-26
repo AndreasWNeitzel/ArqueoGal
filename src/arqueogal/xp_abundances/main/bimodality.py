@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -130,7 +130,7 @@ class BimodalityGrid:
         )
         sidecar = {
             "artifact": path.name,
-            "created_utc": datetime.now(timezone.utc).isoformat(),
+            "created_utc": datetime.now(UTC).isoformat(),
             "grid": {
                 "n_teff": int(len(self.teff_edges) - 1),
                 "n_logg": int(len(self.logg_edges) - 1),

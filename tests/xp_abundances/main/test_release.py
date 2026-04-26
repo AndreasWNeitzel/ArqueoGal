@@ -291,7 +291,9 @@ def test_annotate_parquet_adds_all_release_columns(tmp_path: Path):
         "prediction_sigma_inflated__alpha_m",
         "prediction_sigma_inflated_any",
     ):
-        assert new_col in payload["release_columns_added"], f"{new_col} missing from sidecar manifest"
+        assert new_col in payload["release_columns_added"], (
+            f"{new_col} missing from sidecar manifest"
+        )
     # v4 thresholds must be advertised.
     assert "prediction_sigma_inflated_thresholds" in payload
     thr = payload["prediction_sigma_inflated_thresholds"]
@@ -429,9 +431,7 @@ def test_dist_prior_dominated_is_diagnostic_only_in_v5():
     df = pd.DataFrame([row])
     per_element = assign_per_element_release_tier(df)
     for elem, series in per_element.items():
-        assert series.iloc[0] == 1, (
-            f"{elem} unexpectedly demoted on retired dist_prior_dominated"
-        )
+        assert series.iloc[0] == 1, f"{elem} unexpectedly demoted on retired dist_prior_dominated"
 
 
 def test_mode_ambiguous_per_element_caveat():
@@ -509,11 +509,11 @@ def test_assign_prediction_sigma_inflated_below_threshold_is_false():
 @pytest.mark.parametrize(
     "elem,sigma_col,inflated_value",
     [
-        ("teff", "teff_sigma", 200.0),    # > 150 K
-        ("logg", "logg_sigma", 0.40),     # > 0.30 dex
-        ("mh", "mh_sigma", 0.25),         # > 0.20 dex
+        ("teff", "teff_sigma", 200.0),  # > 150 K
+        ("logg", "logg_sigma", 0.40),  # > 0.30 dex
+        ("mh", "mh_sigma", 0.25),  # > 0.20 dex
         ("alpha_m", "alpha_m_sigma", 0.08),  # > 0.05 dex
-        ("mg_h", "mg_h_sigma", 0.25),     # > 0.20 dex
+        ("mg_h", "mg_h_sigma", 0.25),  # > 0.20 dex
     ],
 )
 def test_assign_prediction_sigma_inflated_above_threshold_is_true(elem, sigma_col, inflated_value):
@@ -550,11 +550,11 @@ def test_assign_prediction_sigma_inflated_exactly_at_threshold_is_false():
     not yet 'inflated'; the demotion only kicks in when σ exceeds the
     threshold."""
     row = _row_with_sigma(
-        teff_sigma=150.0,    # exactly at threshold
-        logg_sigma=0.30,     # exactly at threshold
-        mh_sigma=0.20,       # exactly at threshold
+        teff_sigma=150.0,  # exactly at threshold
+        logg_sigma=0.30,  # exactly at threshold
+        mh_sigma=0.20,  # exactly at threshold
         alpha_m_sigma=0.05,  # exactly at threshold
-        mg_h_sigma=0.20,     # exactly at threshold
+        mg_h_sigma=0.20,  # exactly at threshold
     )
     df = pd.DataFrame([row])
     flags = assign_prediction_sigma_inflated(df)

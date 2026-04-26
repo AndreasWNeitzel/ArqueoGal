@@ -44,8 +44,8 @@ _DEF_OUT = _REPO / "reports/pipeline1/run_a/latent_support_diagnostics.png"
 
 def _attach_galactic_coords(df: pd.DataFrame, features_path: Path) -> pd.DataFrame:
     """Join ra/dec/b_deg from features on source_id and derive l_deg."""
-    from astropy.coordinates import SkyCoord
     import astropy.units as u
+    from astropy.coordinates import SkyCoord
 
     feats = pd.read_parquet(
         features_path,

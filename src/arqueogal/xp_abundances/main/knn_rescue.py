@@ -271,17 +271,13 @@ def summarize_neighbors(
     """
     if Y_train.shape[1] != len(LABEL_NAMES):
         raise ValueError(
-            f"Y_train must have {len(LABEL_NAMES)} columns "
-            f"(LABEL_NAMES), got {Y_train.shape[1]}"
+            f"Y_train must have {len(LABEL_NAMES)} columns (LABEL_NAMES), got {Y_train.shape[1]}"
         )
     if indices.shape != distances.shape:
-        raise ValueError(
-            f"indices/distances shape mismatch: {indices.shape} vs {distances.shape}"
-        )
+        raise ValueError(f"indices/distances shape mismatch: {indices.shape} vs {distances.shape}")
     if len(source_id) != len(indices):
         raise ValueError(
-            f"source_id length {len(source_id)} does not match "
-            f"indices length {len(indices)}"
+            f"source_id length {len(source_id)} does not match indices length {len(indices)}"
         )
 
     k_eff = k if k is not None else indices.shape[1]
@@ -305,9 +301,7 @@ def summarize_neighbors(
         source_id=np.asarray(source_id, dtype=np.int64),
         summaries=summaries,
         top_distance=distances[:, 0].astype(np.float32, copy=False),
-        median_distance=np.median(distances[:, :k_eff], axis=1).astype(
-            np.float32, copy=False
-        ),
+        median_distance=np.median(distances[:, :k_eff], axis=1).astype(np.float32, copy=False),
         k=int(k_eff),
     )
 

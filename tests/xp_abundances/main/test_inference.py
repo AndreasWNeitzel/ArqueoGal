@@ -238,8 +238,10 @@ def test_sigma_streaming_aggregation_numerically_equivalent(tmp_path: Path) -> N
     )
     # Verify dimensionality and positivity.
     assert pred.Sigma_total.shape == (100, tiers.n_labels, tiers.n_labels)
-    assert np.all(np.diag(pred.Sigma_total.reshape(-1, tiers.n_labels, tiers.n_labels)
-                          .transpose(0, 2, 1)) >= -1e-6)  # diag should be >= 0
+    assert np.all(
+        np.diag(pred.Sigma_total.reshape(-1, tiers.n_labels, tiers.n_labels).transpose(0, 2, 1))
+        >= -1e-6
+    )  # diag should be >= 0
 
 
 def test_predict_ensemble_nan_sanitization_on_predictions(tmp_path: Path) -> None:
@@ -259,9 +261,7 @@ def test_predict_ensemble_nan_sanitization_on_predictions(tmp_path: Path) -> Non
     loader = _tiny_loader(layout, tiers, n=6)
 
     # Mock collect_predictions to return a NaN in mu_m.
-    with patch(
-        "arqueogal.xp_abundances.main.inference.collect_predictions"
-    ) as mock_collect:
+    with patch("arqueogal.xp_abundances.main.inference.collect_predictions") as mock_collect:
         mock_preds = {
             "mu": np.array([[np.nan, 1.0, 2.0] for _ in range(6)], dtype=np.float32),
             "L": np.zeros((6, 3, 3), dtype=np.float32),

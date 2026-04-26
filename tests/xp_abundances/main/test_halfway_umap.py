@@ -24,7 +24,6 @@ from arqueogal.xp_abundances.main.halfway_umap import (
 )
 from arqueogal.xp_abundances.main.model import ModelConfig, XpAbundanceModel
 
-
 # --- umap stub ---------------------------------------------------------------
 
 

@@ -583,7 +583,7 @@ def verify_frozen_stats_match_parquet(
             path=str(pq_path),
         )
     logger.info(
-        "verify_frozen_stats_match_parquet OK on %d rows: BP Δμ=%.4f σ_ratio=%.3f, RP Δμ=%.4f σ_ratio=%.3f",
+        "verify_frozen_stats_match_parquet OK on %d rows: BP Δμ=%.4f σ_ratio=%.3f, RP Δμ=%.4f σ_ratio=%.3f",  # noqa: E501
         n_use,
         bp_mean_drift,
         bp_sigma_ratio,

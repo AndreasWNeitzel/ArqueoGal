@@ -46,8 +46,14 @@ def main() -> None:
         axes[0].set_ylabel(r"$\Delta\varpi$ (μas), Lindegren+21 zpt")
         axes[0].set_title(f"Parallax zpt correction (n={int(m.sum()):,})")
     else:
-        axes[0].text(0.5, 0.5, "parallax_corr or parallax column missing",
-                     ha="center", va="center", transform=axes[0].transAxes)
+        axes[0].text(
+            0.5,
+            0.5,
+            "parallax_corr or parallax column missing",
+            ha="center",
+            va="center",
+            transform=axes[0].transAxes,
+        )
 
     # Subplot 2: post-correction colour-mag check. The raw `phot_g_mean_mag`
     # is not preserved in the feature parquet (only `g_mag` = corrected). The
@@ -58,14 +64,16 @@ def main() -> None:
         c = s1["bp_rp"].to_numpy()
         g = s1["g_mag"].to_numpy()
         m = np.isfinite(c) & np.isfinite(g)
-        h = axes[1].hexbin(c[m], g[m], gridsize=70, mincnt=10, cmap="viridis",
-                            bins="log", extent=[0, 3.5, 8, 18])
+        h = axes[1].hexbin(
+            c[m], g[m], gridsize=70, mincnt=10, cmap="viridis", bins="log", extent=[0, 3.5, 8, 18]
+        )
         plt.colorbar(h, ax=axes[1], label="log10 N")
         axes[1].invert_yaxis()
         axes[1].set_xlabel("BP − RP (mag, raw)")
         axes[1].set_ylabel("G (mag, Riello+21 corrected)")
-        axes[1].set_title(f"Post-Riello CMD (n={int(m.sum()):,})\n"
-                            f"raw G dropped; ΔG audit in provenance.json")
+        axes[1].set_title(
+            f"Post-Riello CMD (n={int(m.sum()):,})\nraw G dropped; ΔG audit in provenance.json"
+        )
 
     fig.suptitle("Mandatory Gaia DR3 corrections (Lindegren+21 + Riello+21)", fontsize=11)
     save_fig(fig, OUT / "gaia_corrections.png")

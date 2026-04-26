@@ -45,7 +45,6 @@ from arqueogal.xp_abundances.main.training import (
     train_model,
 )
 
-
 # --- fixtures ---------------------------------------------------------------
 
 

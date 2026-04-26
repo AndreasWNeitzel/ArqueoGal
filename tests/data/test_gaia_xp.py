@@ -30,6 +30,7 @@ from arqueogal.data.gaia_xp import (
     YE2024_N_OUTPUT,
     YE2024_SAMPLING_NM,
     XpC0Stats,
+    _build_hermite_basis,  # noqa: PLC2701 — internal, tested
     apply_ye2024_correction,
     fetch_xp_coefficients,
     normalise_xp,
@@ -37,7 +38,6 @@ from arqueogal.data.gaia_xp import (
     xp_sanity_check,
     zscore_c0,
 )
-from arqueogal.data.gaia_xp import _build_hermite_basis  # noqa: PLC2701 — internal, tested
 from arqueogal.data.tap import BATCH_PLACEHOLDER
 
 # ---- helpers -----------------------------------------------------------------

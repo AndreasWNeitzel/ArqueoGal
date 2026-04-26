@@ -44,7 +44,6 @@ import pandas as pd
 from arqueogal.xp_abundances.main.data import FeatureLayout, LabelTiers
 from arqueogal.xp_abundances.main.sanity import (
     BatteryVerdict,
-    CheckResult,
     run_battery,
 )
 
@@ -124,7 +123,7 @@ def _umap_embedding_43d(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray, int]:
     logger.info("UMAP input: %d rows × %d cols (of %d total)", X.shape[0], X.shape[1], len(df))
 
     try:
-        from cuml.manifold import UMAP as cuUMAP
+        from cuml.manifold import UMAP as cuUMAP  # noqa: N811
 
         logger.info("using cuml.UMAP on GPU")
         reducer = cuUMAP(
@@ -189,7 +188,7 @@ def _render_markdown(
         "SOFT-FAIL": "SOFT-FAIL — review flagged checks before training",
         "HARD-FAIL": "HARD-FAIL — training gate blocked, investigate upstream",
     }[verdict.overall]
-    lines.append(f"# Pipeline-1 Pre-training Sanity Battery")
+    lines.append("# Pipeline-1 Pre-training Sanity Battery")
     lines.append("")
     lines.append(f"**Verdict: {banner}**")
     lines.append("")

@@ -5,11 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 from astropy.io import fits
 from astropy.table import Table
-
-import pandas as pd
 
 from arqueogal.data.andrae2023 import (
     ANDRAE2023_DEFAULT_HDU,

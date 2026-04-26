@@ -56,9 +56,7 @@ _logger = logging.getLogger(__name__)
 
 _PRED_COLS: Final = ("teff_pred", "logg_pred", "mh_pred", "alpha_m_pred", "mg_h_pred")
 
-_OOD_FLAGS: Final = (
-    "ood_joint_flag",
-)
+_OOD_FLAGS: Final = ("ood_joint_flag",)
 """Joint per-row OOD flags. Any flag firing → Tier 3 for all elements.
 
 Simplified 2026-04-26 from the v3 set ``(ood_joint_flag, latent_support_flag,
@@ -137,14 +135,14 @@ _PER_ELEMENT_SIGMA_COL: Final[dict[str, str]] = {
 """Map element name to the per-element predicted-sigma column."""
 
 _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD: Final[dict[str, float]] = {
-    "teff": 150.0,    # K
-    "logg": 0.30,     # dex
-    "mh": 0.20,       # dex
+    "teff": 150.0,  # K
+    "logg": 0.30,  # dex
+    "mh": 0.20,  # dex
     "alpha_m": 0.05,  # dex (tightened 2026-04-26 from 0.10 → 0.05; ablation test
-                      #      release/test_ablations_2026-04-26 showed 23% T1 RMSE
-                      #      improvement on [α/M] at 0.5×σ_train, accepting
-                      #      ~14 pp T1-fraction loss on this element)
-    "mg_h": 0.20,     # dex
+    #      release/test_ablations_2026-04-26 showed 23% T1 RMSE
+    #      improvement on [α/M] at 0.5×σ_train, accepting
+    #      ~14 pp T1-fraction loss on this element)
+    "mg_h": 0.20,  # dex
 }
 """Per-element sigma above which the prediction is flagged as inflated (prior-collapse).
 
@@ -431,11 +429,7 @@ def assign_per_element_release_tier(df: pd.DataFrame) -> dict[str, pd.Series]:
         sigma_col = _PER_ELEMENT_SIGMA_COL.get(elem)
         sigma_threshold = _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD.get(elem)
         sigma_inflated = pd.Series(False, index=idx)
-        if (
-            sigma_col is not None
-            and sigma_col in df.columns
-            and sigma_threshold is not None
-        ):
+        if sigma_col is not None and sigma_col in df.columns and sigma_threshold is not None:
             sigma_inflated = (df[sigma_col].fillna(0.0) > sigma_threshold).astype(bool)
 
         # Per-element caveat flags (v5 schema, 2026-04-26): some caveats only fire
@@ -443,9 +437,7 @@ def assign_per_element_release_tier(df: pd.DataFrame) -> dict[str, pd.Series]:
         elem_specific_caveat = pd.Series(False, index=idx)
         for col in _PER_ELEMENT_CAVEAT_FLAGS.get(elem, ()):
             if col in df.columns:
-                elem_specific_caveat = (
-                    elem_specific_caveat | df[col].fillna(False).astype(bool)
-                )
+                elem_specific_caveat = elem_specific_caveat | df[col].fillna(False).astype(bool)
 
         # Tier 3 if NaN OR joint OOD.
         tier3 = elem_nan | ood
@@ -487,11 +479,7 @@ def assign_prediction_sigma_inflated(df: pd.DataFrame) -> dict[str, pd.Series]:
     for elem in _ABUNDANCE_ELEMENTS:
         sigma_col = _PER_ELEMENT_SIGMA_COL.get(elem)
         threshold = _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD.get(elem)
-        if (
-            sigma_col is None
-            or sigma_col not in df.columns
-            or threshold is None
-        ):
+        if sigma_col is None or sigma_col not in df.columns or threshold is None:
             out[elem] = pd.Series(False, index=idx, dtype="bool")
             continue
         out[elem] = (df[sigma_col].fillna(0.0) > threshold).astype(bool)
@@ -558,7 +546,8 @@ def annotate_parquet(path: Path) -> dict[str, int | dict[int, int]]:
     """
     _logger.info(
         "annotate_parquet: reading %s (catalog schema v%d)",
-        path, _CATALOGUE_SCHEMA_VERSION,
+        path,
+        _CATALOGUE_SCHEMA_VERSION,
     )
     df = pd.read_parquet(path)
     _logger.info("annotate_parquet: loaded %d rows from %s", len(df), path.name)
@@ -602,13 +591,15 @@ def annotate_parquet(path: Path) -> dict[str, int | dict[int, int]]:
 
     counts = tier_counts(df)
     _logger.info(
-        "annotate_parquet: %s wrote %d rows; tiers T1=%d (%.1f%%) "
-        "T2=%d (%.1f%%) T3=%d (%.1f%%)",
+        "annotate_parquet: %s wrote %d rows; tiers T1=%d (%.1f%%) T2=%d (%.1f%%) T3=%d (%.1f%%)",
         path.name,
         int(len(df)),
-        counts.get(1, 0), 100.0 * counts.get(1, 0) / max(len(df), 1),
-        counts.get(2, 0), 100.0 * counts.get(2, 0) / max(len(df), 1),
-        counts.get(3, 0), 100.0 * counts.get(3, 0) / max(len(df), 1),
+        counts.get(1, 0),
+        100.0 * counts.get(1, 0) / max(len(df), 1),
+        counts.get(2, 0),
+        100.0 * counts.get(2, 0) / max(len(df), 1),
+        counts.get(3, 0),
+        100.0 * counts.get(3, 0) / max(len(df), 1),
     )
     summary: dict[str, int | dict[int, int]] = {
         "n_rows": int(len(df)),

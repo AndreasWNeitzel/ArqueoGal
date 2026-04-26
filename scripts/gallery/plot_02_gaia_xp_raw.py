@@ -29,7 +29,7 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "gallery"))
-from _common import apply_style, save_fig, PALETTE
+from _common import PALETTE, apply_style, save_fig
 
 OUT = REPO / "reports/gallery/02_gaia_xp_raw"
 
@@ -44,7 +44,9 @@ STREAMS = [
 ]
 
 
-def _load_norm_and_c0(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+def _load_norm_and_c0(
+    path: Path,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
     """Returns (bp_norm[N,54], rp_norm[N,54], c0_scalar[N], g_mag[N], bp_rp[N])."""
     if not path.exists():
         return None
@@ -52,10 +54,16 @@ def _load_norm_and_c0(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, n
     have_norm = all(f"bp_coef_norm_{i}" in schema.columns for i in range(1, 55))
     if not have_norm:
         return None
-    c0_col = "bp_c0_z" if "bp_c0_z" in schema.columns else (
-        "bp_c0_log" if "bp_c0_log" in schema.columns else None)
-    cols = ["g_mag", "bp_rp"] + [f"bp_coef_norm_{i}" for i in range(1, 55)] + \
-           [f"rp_coef_norm_{i}" for i in range(1, 55)]
+    c0_col = (
+        "bp_c0_z"
+        if "bp_c0_z" in schema.columns
+        else ("bp_c0_log" if "bp_c0_log" in schema.columns else None)
+    )
+    cols = (
+        ["g_mag", "bp_rp"]
+        + [f"bp_coef_norm_{i}" for i in range(1, 55)]
+        + [f"rp_coef_norm_{i}" for i in range(1, 55)]
+    )
     if c0_col:
         cols.append(c0_col)
     df = pd.read_parquet(path, columns=cols)
@@ -69,8 +77,7 @@ def main() -> None:
     apply_style()
 
     fig = plt.figure(figsize=(15, 9.5))
-    gs = fig.add_gridspec(2, 3, hspace=0.38, wspace=0.30,
-                           width_ratios=[1, 1, 1])
+    gs = fig.add_gridspec(2, 3, hspace=0.38, wspace=0.30, width_ratios=[1, 1, 1])
 
     # Load the three streams
     streams_data = []
@@ -87,14 +94,19 @@ def main() -> None:
         bp, _, _, _, _ = d
         q = np.nanpercentile(bp, [25, 50, 75], axis=0)
         ax.fill_between(idx, q[0], q[2], color=color, alpha=0.20)
-        ax.plot(idx, q[1], color=color, lw=1.0,
-                 label=f"{name.split(' (')[0]} (n={len(bp):,})")
+        ax.plot(idx, q[1], color=color, lw=1.0, label=f"{name.split(' (')[0]} (n={len(bp):,})")
     ax.axhline(0, color="k", lw=0.4, ls="--")
     ax.set_xlabel("BP coef index (1..54)")
     ax.set_ylabel("normalised coef value (median + IQR shade)")
     ax.set_title("Per-coefficient IQR — BP, all streams overlaid")
-    ax.legend(fontsize=7, loc="lower right", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=7,
+        loc="lower right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
     # (0,1) RP IQR
     ax = fig.add_subplot(gs[0, 1])
@@ -104,14 +116,19 @@ def main() -> None:
         _, rp, _, _, _ = d
         q = np.nanpercentile(rp, [25, 50, 75], axis=0)
         ax.fill_between(idx, q[0], q[2], color=color, alpha=0.20)
-        ax.plot(idx, q[1], color=color, lw=1.0,
-                 label=f"{name.split(' (')[0]}")
+        ax.plot(idx, q[1], color=color, lw=1.0, label=f"{name.split(' (')[0]}")
     ax.axhline(0, color="k", lw=0.4, ls="--")
     ax.set_xlabel("RP coef index (1..54)")
     ax.set_ylabel("normalised coef value")
     ax.set_title("Per-coefficient IQR — RP")
-    ax.legend(fontsize=7, loc="lower right", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=7,
+        loc="lower right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
     # (0,2) c0 vs G — per-stream histogram (1D) since hexbin × 3 takes too much room
     ax = fig.add_subplot(gs[0, 2])
@@ -122,20 +139,40 @@ def main() -> None:
         m = np.isfinite(c0) & np.isfinite(g)
         if m.sum() < 100:
             continue
-        ax.hist(c0[m], bins=80, density=True, histtype="step", color=color, lw=1.2,
-                 label=f"{name.split(' (')[0]} (n={int(m.sum()):,})")
+        ax.hist(
+            c0[m],
+            bins=80,
+            density=True,
+            histtype="step",
+            color=color,
+            lw=1.2,
+            label=f"{name.split(' (')[0]} (n={int(m.sum()):,})",
+        )
     ax.set_xlabel("c0 (z-scored or log10)")
     ax.set_ylabel("density")
     ax.set_title("c0 (absolute flux scale) per stream")
-    ax.legend(fontsize=7, loc="upper right", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=7,
+        loc="upper right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
     # (1,0..2) c0 vs G hexbin per stream
-    for i, (name, color, d) in enumerate(streams_data):
+    for i, (name, _color, d) in enumerate(streams_data):
         ax = fig.add_subplot(gs[1, i])
         if d is None:
-            ax.text(0.5, 0.5, "(stream features not built yet)",
-                    ha="center", va="center", transform=ax.transAxes, fontsize=9)
+            ax.text(
+                0.5,
+                0.5,
+                "(stream features not built yet)",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+                fontsize=9,
+            )
             ax.set_axis_off()
             continue
         _, _, c0, g, _ = d

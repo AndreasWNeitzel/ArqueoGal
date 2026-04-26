@@ -38,7 +38,6 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
 from arqueogal.xp_abundances.main.kinematic_ood import (
-    KinematicOODBundle,
     fit_kinematic_ood,
     flag_kinematic_ood,
     score_kinematic_ood,
@@ -52,7 +51,7 @@ OUT_PARQUET = REPO / "data/processed/pipeline1_kin_ood_flag.parquet"
 BUNDLE_JSON = REPO / "data/processed/pipeline1_kin_ood_bundle.json"
 
 # Disc-cut for envelope-fit subset selection.
-DISC_VZ_MAX = 80.0   # km/s; thin + thick disc cap
+DISC_VZ_MAX = 80.0  # km/s; thin + thick disc cap
 DISC_VT_MIN = 100.0  # km/s; rejects retrograde / halo
 
 # Mahalanobis distance threshold quantile.
@@ -78,15 +77,14 @@ def main() -> None:
     _LOG.info("finite velocity rows: %d (%.2f%%)", n_finite, 100 * n_finite / n_total)
 
     # Disc-cut: |v_z| < 80, v_T > 100. Rejects halo + counter-rotating.
-    disc_mask = (
-        finite
-        & (np.abs(V[:, 2]) < DISC_VZ_MAX)
-        & (V[:, 1] > DISC_VT_MIN)
-    )
+    disc_mask = finite & (np.abs(V[:, 2]) < DISC_VZ_MAX) & (V[:, 1] > DISC_VT_MIN)
     n_disc = int(disc_mask.sum())
     _LOG.info(
         "disc-cut subset for envelope fit (|v_z|<%.0f, v_T>%.0f): %d (%.2f%%)",
-        DISC_VZ_MAX, DISC_VT_MIN, n_disc, 100 * n_disc / n_total,
+        DISC_VZ_MAX,
+        DISC_VT_MIN,
+        n_disc,
+        100 * n_disc / n_total,
     )
     if n_disc < 10_000:
         _LOG.error("disc subset too small for stable envelope fit")
@@ -110,7 +108,9 @@ def main() -> None:
     n_flagged = int(flags.sum())
     _LOG.info(
         "flagged %d / %d (%.2f%%) as kinematically OOD",
-        n_flagged, n_total, 100 * n_flagged / n_total,
+        n_flagged,
+        n_total,
+        100 * n_flagged / n_total,
     )
 
     # Distance-only diagnostic on finite rows

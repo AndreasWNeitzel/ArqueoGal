@@ -22,30 +22,32 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "gallery"))
-from _common import apply_style, save_fig, PALETTE
+from _common import PALETTE, apply_style, save_fig
 
 OUT = REPO / "reports/gallery/05_distance_extinction"
 
 STREAMS = [
-    ("Stream 1", REPO / "data/processed/pipeline1_features_stream1.parquet",
-     PALETTE["apogee"]),
-    ("Stream 2", REPO / "data/processed/pipeline1_features_stream2.parquet",
-     "#9467bd"),
-    ("Stream 3", REPO / "data/processed/pipeline1_features_stream3.parquet",
-     PALETTE["andrae_volume"]),
+    ("Stream 1", REPO / "data/processed/pipeline1_features_stream1.parquet", PALETTE["apogee"]),
+    ("Stream 2", REPO / "data/processed/pipeline1_features_stream2.parquet", "#9467bd"),
+    (
+        "Stream 3",
+        REPO / "data/processed/pipeline1_features_stream3.parquet",
+        PALETTE["andrae_volume"],
+    ),
 ]
 
-AV_MAPS = [("av_edenhofer", "edenhofer", "Edenhofer+24"),
-           ("av_lallement", "lallement", "Lallement+22"),
-           ("av_sfd",       "sfd",       "SFD"),
-           ("av_nbhd_median", "nbhd",     "GSP-Phot nbhd")]
+AV_MAPS = [
+    ("av_edenhofer", "edenhofer", "Edenhofer+24"),
+    ("av_lallement", "lallement", "Lallement+22"),
+    ("av_sfd", "sfd", "SFD"),
+    ("av_nbhd_median", "nbhd", "GSP-Phot nbhd"),
+]
 
 
 def _load(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None
-    cols = ["r_med_photogeo",
-            "av_edenhofer", "av_lallement", "av_sfd", "av_nbhd_median"]
+    cols = ["r_med_photogeo", "av_edenhofer", "av_lallement", "av_sfd", "av_nbhd_median"]
     return pd.read_parquet(path, columns=[c for c in cols])
 
 
@@ -74,12 +76,19 @@ def main() -> None:
         ax.axvline(1.25, color="k", lw=0.6, ls="--", alpha=0.7)
         ax.axvline(3.0, color="k", lw=0.6, ls=":", alpha=0.7)
         med = float(np.nanmedian(rf))
-        ax.text(0.96, 0.96, f"median = {med:.2f} kpc",
-                 transform=ax.transAxes, fontsize=8, ha="right", va="top",
-                 bbox=dict(facecolor="white", edgecolor="0.4", alpha=0.9, pad=2))
+        ax.text(
+            0.96,
+            0.96,
+            f"median = {med:.2f} kpc",
+            transform=ax.transAxes,
+            fontsize=8,
+            ha="right",
+            va="top",
+            bbox=dict(facecolor="white", edgecolor="0.4", alpha=0.9, pad=2),
+        )
 
     # Row 2: per-map A_V distributions, one panel per stream
-    for i, (name, color, df) in enumerate(loaded):
+    for i, (name, _color, df) in enumerate(loaded):
         ax = fig.add_subplot(gs[1, i])
         bins = np.linspace(0, 5, 61)
         for col, ckey, lbl in AV_MAPS:
@@ -89,14 +98,19 @@ def main() -> None:
             v = v[np.isfinite(v) & (v < 5)]
             if len(v) < 10:
                 continue
-            ax.hist(v, bins=bins, alpha=0.45, color=PALETTE[ckey],
-                     label=f"{lbl} ({len(v):,})")
+            ax.hist(v, bins=bins, alpha=0.45, color=PALETTE[ckey], label=f"{lbl} ({len(v):,})")
         ax.set_xlabel(r"$A_V$ (mag)")
         ax.set_ylabel("counts")
         ax.set_yscale("log")
         ax.set_title(f"{name}: per-map $A_V$", fontsize=9)
-        ax.legend(fontsize=7, loc="upper right", frameon=True, framealpha=0.95,
-                  facecolor="white", edgecolor="0.4")
+        ax.legend(
+            fontsize=7,
+            loc="upper right",
+            frameon=True,
+            framealpha=0.95,
+            facecolor="white",
+            edgecolor="0.4",
+        )
 
     fig.suptitle(
         "Stage 05 — distance + A_V cascade across S1 / S2 / S3 "

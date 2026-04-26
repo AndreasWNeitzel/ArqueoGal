@@ -292,8 +292,8 @@ def _format_ir_md(
         f"(N_complete = {n_ir:,} / N_total = {n_total:,}).",
         "",
         "The IR-dependency diagnostic referenced a ~99.9 % training-domain "
-        "completeness heuristic; the empirical value is {:.2f} %, in the same "
-        "ballpark but slightly lower, driven by faint-in-plane stars.".format(global_rate),
+        f"completeness heuristic; the empirical value is {global_rate:.2f} %, in the same "
+        "ballpark but slightly lower, driven by faint-in-plane stars.",
         "",
         "## 2. Binning",
         "",

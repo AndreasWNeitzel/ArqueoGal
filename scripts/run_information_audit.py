@@ -48,7 +48,6 @@ import argparse
 import datetime as dt
 import json
 import logging
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -732,8 +731,8 @@ def _write_label_card(  # noqa: PLR0913 — all knobs are independent collaborat
     with path_md.open("w") as f:
         f.write(f"# {label} — §9.2 information-content report card\n\n")
         f.write(
-            f"_Ensemble: 5-label main (seed 0–4) · Val split seed 0 · "
-            f"N_val used per test: see §tests below._\n\n",
+            "_Ensemble: 5-label main (seed 0–4) · Val split seed 0 · "
+            "N_val used per test: see §tests below._\n\n",
         )
         f.write(f"## Verdict: **{verdict}** → **{tier}**\n\n")
         f.write(f"{halt_line}\n\n")

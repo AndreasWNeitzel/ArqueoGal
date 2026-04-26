@@ -15,7 +15,6 @@ from arqueogal.xp_abundances.main.ood import (
     score_mahalanobis_ood,
 )
 
-
 # --- Mahalanobis OOD: fit ---------------------------------------------------
 
 

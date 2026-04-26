@@ -83,10 +83,16 @@ def main() -> None:
         ax.hist(vals, bins=bins, color=color, alpha=0.75, edgecolor=color, lw=0.6)
         med = float(np.nanmedian(vals))
         ax.axvline(med, color="k", lw=0.7, ls="--")
-        ax.text(0.96, 0.94,
-                 f"n = {len(vals):,}\nmedian = {med:.3f}",
-                 transform=ax.transAxes, fontsize=8, ha="right", va="top",
-                 bbox=dict(facecolor="white", edgecolor="0.4", alpha=0.92, pad=2))
+        ax.text(
+            0.96,
+            0.94,
+            f"n = {len(vals):,}\nmedian = {med:.3f}",
+            transform=ax.transAxes,
+            fontsize=8,
+            ha="right",
+            va="top",
+            bbox=dict(facecolor="white", edgecolor="0.4", alpha=0.92, pad=2),
+        )
         ax.set_xlabel(f"{kind} cosine distance")
         ax.set_ylabel("count")
         ax.set_title(f"{name} — {kind}")
@@ -103,8 +109,13 @@ def main() -> None:
         axes[0, 3].set_axis_off()
     axes[0, 4].set_axis_off()
 
-    ranges = {"teff": (3500, 6500), "logg": (0.5, 4.0), "mh": (-2.5, 0.6),
-              "alpha_m": (-0.2, 0.5), "mg_h": (-1.5, 0.5)}
+    ranges = {
+        "teff": (3500, 6500),
+        "logg": (0.5, 4.0),
+        "mh": (-2.5, 0.6),
+        "alpha_m": (-0.2, 0.5),
+        "mg_h": (-1.5, 0.5),
+    }
 
     def _sigma_row(row, frame, name):
         for i, e in enumerate(ELEMENTS):
@@ -115,11 +126,19 @@ def main() -> None:
             if m.sum() > 100:
                 lo = float(np.nanmin([knn_sigma[m].min(), reg_sigma[m].min()]))
                 hi = float(np.nanpercentile(np.concatenate([knn_sigma[m], reg_sigma[m]]), 99))
-                h = ax.hexbin(reg_sigma[m], knn_sigma[m], gridsize=45, mincnt=10,
-                               cmap="viridis", bins="log", extent=[lo, hi, lo, hi])
+                h = ax.hexbin(
+                    reg_sigma[m],
+                    knn_sigma[m],
+                    gridsize=45,
+                    mincnt=10,
+                    cmap="viridis",
+                    bins="log",
+                    extent=[lo, hi, lo, hi],
+                )
                 plt.colorbar(h, ax=ax, label="log10 N")
                 ax.plot([lo, hi], [lo, hi], color="red", lw=0.6, ls="--")
-                ax.set_xlabel(f"σ_{e} regressor"); ax.set_ylabel(f"σ_{e} kNN IQR/1.349")
+                ax.set_xlabel(f"σ_{e} regressor")
+                ax.set_ylabel(f"σ_{e} kNN IQR/1.349")
                 ax.set_title(f"{name} — σ: {e}", fontsize=9)
 
     def _pred_row(row, frame, name):
@@ -130,11 +149,19 @@ def main() -> None:
             m = np.isfinite(p) & np.isfinite(knn_m)
             if m.sum() > 100:
                 lo, hi = ranges[e]
-                h = ax.hexbin(p[m], knn_m[m], gridsize=50, mincnt=10, cmap="viridis",
-                               bins="log", extent=[lo, hi, lo, hi])
+                h = ax.hexbin(
+                    p[m],
+                    knn_m[m],
+                    gridsize=50,
+                    mincnt=10,
+                    cmap="viridis",
+                    bins="log",
+                    extent=[lo, hi, lo, hi],
+                )
                 plt.colorbar(h, ax=ax, label="log10 N")
                 ax.plot([lo, hi], [lo, hi], color="red", lw=0.6, ls="--")
-                ax.set_xlabel(f"{e} regressor pred"); ax.set_ylabel(f"{e} kNN median")
+                ax.set_xlabel(f"{e} regressor pred")
+                ax.set_ylabel(f"{e} kNN median")
                 ax.set_title(f"{name} — pred vs kNN: {e}", fontsize=9)
 
     _sigma_row(1, df, "Stream 3")

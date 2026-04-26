@@ -34,7 +34,6 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import shutil
 import sys
 import time
 import types
@@ -188,7 +187,7 @@ def join_predictions_with_features(
             f"{n_pred - n_joined} predictions had no matching feature row. "
             f"This is a silent data-loss bug. Verify the features parquet "
             f"covers every source_id in the predictions parquet, or pass "
-            f"how=\"left\" to retain unmatched predictions explicitly."
+            f'how="left" to retain unmatched predictions explicitly.'
         )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -217,10 +216,7 @@ def join_predictions_with_features(
         if pred_sidecar.exists():
             try:
                 pred_payload = json.loads(pred_sidecar.read_text())
-                frozen_fp = (
-                    pred_payload.get("frozen_stats", {})
-                    .get("basis_fingerprint_sha256")
-                )
+                frozen_fp = pred_payload.get("frozen_stats", {}).get("basis_fingerprint_sha256")
             except (json.JSONDecodeError, KeyError, TypeError):
                 frozen_fp = None
 
@@ -279,7 +275,11 @@ def attach_kin_ood_flag(joined_path: Path, kin_ood_path: Path) -> dict[str, obje
         return {"injected": False, "reason": f"kin_ood lookup parquet absent: {kin_ood_path}"}
     df = pd.read_parquet(joined_path)
     lookup = pd.read_parquet(kin_ood_path)
-    n_pre = int(df.get("kin_ood_flag", pd.Series(dtype=bool)).sum()) if "kin_ood_flag" in df.columns else 0
+    n_pre = (
+        int(df.get("kin_ood_flag", pd.Series(dtype=bool)).sum())
+        if "kin_ood_flag" in df.columns
+        else 0
+    )
     if "kin_ood_flag" in df.columns:
         df = df.drop(columns=["kin_ood_flag"])
     df = df.merge(lookup[["source_id", "kin_ood_flag"]], on="source_id", how="left")
@@ -335,10 +335,14 @@ def run_release_pipeline(
         # Default: try the canonical artefact path written by build_kin_ood_flag.py.
         candidate = src_root.parent / "data/processed/pipeline1_kin_ood_flag.parquet"
         kin_ood_path = candidate if candidate.exists() else None
-    kin_ood_summary = attach_kin_ood_flag(joined_path, kin_ood_path) if kin_ood_path else {
-        "injected": False,
-        "reason": "no kin_ood_path provided",
-    }
+    kin_ood_summary = (
+        attach_kin_ood_flag(joined_path, kin_ood_path)
+        if kin_ood_path
+        else {
+            "injected": False,
+            "reason": "no kin_ood_path provided",
+        }
+    )
 
     release_mod = _load_release_module(src_root)
     t0 = time.time()
@@ -463,9 +467,17 @@ def _hybrid_compose_per_element(
     knn_med_col = f"knn_{elem}_med"
     knn_iqr_col = f"knn_{elem}_iqr"
 
-    pred = df[pred_col].astype("float32") if pred_col in df.columns else pd.Series(np.nan, index=idx, dtype="float32")
-    sigma = df[sigma_col].astype("float32") if sigma_col in df.columns else pd.Series(np.nan, index=idx, dtype="float32")
-    inflated = (sigma.fillna(0.0) > sigma_threshold)
+    pred = (
+        df[pred_col].astype("float32")
+        if pred_col in df.columns
+        else pd.Series(np.nan, index=idx, dtype="float32")
+    )
+    sigma = (
+        df[sigma_col].astype("float32")
+        if sigma_col in df.columns
+        else pd.Series(np.nan, index=idx, dtype="float32")
+    )
+    inflated = sigma.fillna(0.0) > sigma_threshold
 
     if knn_med_col in df.columns and knn_iqr_col in df.columns:
         knn_med = df[knn_med_col].astype("float32")

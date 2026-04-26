@@ -47,12 +47,18 @@ def _sigma_panel(ax, sigma: np.ndarray, thr: float, name: str, color: str):
     lo, hi = np.nanpercentile(sigma, [0.5, 99.5])
     bins = np.linspace(lo, max(hi, thr * 1.5), 41)
     ax.hist(sigma, bins=bins, color=color, alpha=0.7)
-    ax.axvline(thr, color="#d62728", lw=0.8, ls="--",
-                label=f"thr {thr:g}")
+    ax.axvline(thr, color="#d62728", lw=0.8, ls="--", label=f"thr {thr:g}")
     rate = (sigma > thr).mean() * 100
-    ax.text(0.95, 0.95, f"σ-inf: {rate:.1f}%\nn={len(sigma):,}",
-            ha="right", va="top", transform=ax.transAxes, fontsize=7,
-            bbox=dict(facecolor="white", edgecolor="0.7", alpha=0.92, pad=2))
+    ax.text(
+        0.95,
+        0.95,
+        f"σ-inf: {rate:.1f}%\nn={len(sigma):,}",
+        ha="right",
+        va="top",
+        transform=ax.transAxes,
+        fontsize=7,
+        bbox=dict(facecolor="white", edgecolor="0.7", alpha=0.92, pad=2),
+    )
     ax.set_xlabel(f"σ_{name}")
     ax.legend(fontsize=6, loc="upper left")
 
@@ -84,13 +90,13 @@ def main() -> None:
         if df is None:
             continue
         for i, e in enumerate(ELEMENTS):
-            _sigma_panel(axes[row, i], df[f"{e}_sigma"].dropna().to_numpy(),
-                         THRESHOLDS[e], e, color)
+            _sigma_panel(
+                axes[row, i], df[f"{e}_sigma"].dropna().to_numpy(), THRESHOLDS[e], e, color
+            )
             axes[row, i].set_title(f"{name} — {e}: σ", fontsize=9)
         row += 1
         for i, e in enumerate(ELEMENTS):
-            _pred_panel(axes[row, i], df["g_mag"].to_numpy(),
-                         df[f"{e}_pred"].to_numpy(), e)
+            _pred_panel(axes[row, i], df["g_mag"].to_numpy(), df[f"{e}_pred"].to_numpy(), e)
             axes[row, i].set_title(f"{name} — {e}: pred vs G", fontsize=9)
         row += 1
 

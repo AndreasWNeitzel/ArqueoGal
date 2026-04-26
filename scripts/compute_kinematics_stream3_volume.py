@@ -48,13 +48,12 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from arqueogal.data.kinematics import (
-    KinematicsConfig,
     OUTPUT_COLS,
     REQUIRED_INPUT_COLS,
+    KinematicsConfig,
     compute_actions,
 )
 

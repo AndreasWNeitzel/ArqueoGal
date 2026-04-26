@@ -55,7 +55,6 @@ import pandas as pd
 from arqueogal.data.dedup import dedup_by_source_id
 from arqueogal.xp_abundances.main.data import LabelTiers
 
-
 CheckLevel = Literal["HARD", "SOFT"]
 
 

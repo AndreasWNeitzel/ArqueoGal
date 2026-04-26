@@ -46,8 +46,8 @@ def _attach_galactic_coords(df: pd.DataFrame, features_path: Path) -> pd.DataFra
     features carry ra/dec/b_deg but not l. Called only when the sky panel
     needs l/b.
     """
-    from astropy.coordinates import SkyCoord
     import astropy.units as u
+    from astropy.coordinates import SkyCoord
 
     feats = pd.read_parquet(
         features_path,

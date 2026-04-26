@@ -29,6 +29,7 @@ import pandas as pd
 import torch
 
 from arqueogal.xp_abundances.main.adapter import XpFeatureAdapter
+from arqueogal.xp_abundances.main.config import LossWeights, TrainingConfig
 from arqueogal.xp_abundances.main.data import FeatureLayout, LabelTiers
 from arqueogal.xp_abundances.main.model import (
     CovarianceBlockLayout,
@@ -45,7 +46,6 @@ from arqueogal.xp_abundances.main.ood import (
 )
 from arqueogal.xp_abundances.main.training import build_dataloaders, load_checkpoint
 from arqueogal.xp_abundances.main.uncertainty import RegimeBEnvelope
-from arqueogal.xp_abundances.main.config import LossWeights, TrainingConfig
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG = logging.getLogger("run_ood_eval")

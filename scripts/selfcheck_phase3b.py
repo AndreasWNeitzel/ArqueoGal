@@ -26,7 +26,6 @@ import logging
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -49,7 +48,7 @@ def main() -> int:
 
     # --- Check 1: NaN Mahalanobis → ood_joint_flag=True ----------------------
     mahal_nan = df["ood_mahalanobis_score"].isna()
-    joint_true_on_nan_mahal = (df.loc[mahal_nan, "ood_joint_flag"] == True).mean()
+    joint_true_on_nan_mahal = (df.loc[mahal_nan, "ood_joint_flag"]).mean()
     logger.info(
         "check 1: NaN Mahalanobis → ood_joint=True fraction = %.4f (expected 1.0, n_nan=%d)",
         joint_true_on_nan_mahal,
@@ -95,7 +94,7 @@ def main() -> int:
     pred_nan = df["teff_pred"].isna()
     n_pred_nan = int(pred_nan.sum())
     if n_pred_nan:
-        gated = int((df.loc[pred_nan, "ood_joint_flag"] == True).sum())
+        gated = int((df.loc[pred_nan, "ood_joint_flag"]).sum())
         logger.info(
             "check 3: pred_NaN = %d; of those, ood_joint=True = %d (%.4f)",
             n_pred_nan,

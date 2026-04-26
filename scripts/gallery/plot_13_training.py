@@ -61,14 +61,26 @@ def main() -> None:
         gap_be = float(val[be] - train[be])
         delta_train = float(train[-1] - train[0])
         delta_val = float(val[-1] - val[0])
-        gen_status = "→ overfitting" if (gap_be > 0 and delta_train < delta_val) else \
-            ("→ generalising" if abs(gap_be) < 0.02 * abs(train[be] + 1e-9) else "→ tracking")
-        txt = (f"val-train @best = {gap_be:+.3f}\n"
-                f"Δ train = {delta_train:+.3f}, Δ val = {delta_val:+.3f}\n"
-                f"{gen_status}")
-        ax.text(0.02, 0.02, txt, transform=ax.transAxes, fontsize=6.5,
-                 ha="left", va="bottom",
-                 bbox=dict(facecolor="white", edgecolor="0.7", alpha=0.92, pad=2))
+        gen_status = (
+            "→ overfitting"
+            if (gap_be > 0 and delta_train < delta_val)
+            else ("→ generalising" if abs(gap_be) < 0.02 * abs(train[be] + 1e-9) else "→ tracking")
+        )
+        txt = (
+            f"val-train @best = {gap_be:+.3f}\n"
+            f"Δ train = {delta_train:+.3f}, Δ val = {delta_val:+.3f}\n"
+            f"{gen_status}"
+        )
+        ax.text(
+            0.02,
+            0.02,
+            txt,
+            transform=ax.transAxes,
+            fontsize=6.5,
+            ha="left",
+            va="bottom",
+            bbox=dict(facecolor="white", edgecolor="0.7", alpha=0.92, pad=2),
+        )
 
     # Grad norms
     ax = axes[1, 1]
@@ -80,7 +92,8 @@ def main() -> None:
     ax.axvline(member["best_epoch"], color="0.5", lw=0.6, ls="--")
     ax.set_yscale("log")
     ax.set_title("Train grad norms")
-    ax.set_xlabel("epoch"); ax.set_ylabel("|g|")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("|g|")
     ax.legend(fontsize=8)
 
     # τ
@@ -91,7 +104,8 @@ def main() -> None:
     ax.plot(epoch, tau_val, "o-", color="#d62728", label="val τ", ms=4)
     ax.axvline(member["best_epoch"], color="0.5", lw=0.6, ls="--")
     ax.set_title("SupCon temperature τ")
-    ax.set_xlabel("epoch"); ax.set_ylabel("τ")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("τ")
     ax.legend(fontsize=8)
 
     fig.suptitle(

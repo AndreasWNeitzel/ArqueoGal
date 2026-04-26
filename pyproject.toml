@@ -31,12 +31,32 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "PLR"]
+# PLR (Pylint refactor) is intentionally excluded: too-many-arguments,
+# too-many-statements, too-many-branches are advisory style rules that
+# mis-fire on plotting helpers, numerical recipes, and CLI drivers in
+# scientific Python. Real-bug categories (E, F, W, B) stay on.
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM"]
 ignore = [
-    "N803",    # argument name should be lowercase — astronomical variables (M_sun, etc.)
-    "N806",    # variable in function should be lowercase — same reason
-    "PLR2004", # magic value comparison — constants in physics/plotting are fine
+    "N803",   # argument name should be lowercase: astronomical variables (M_sun, etc.)
+    "N806",   # variable in function should be lowercase: same reason
+    "E741",   # ambiguous variable name: L, I, l are valid in math / linear algebra
+    "E402",   # module-import-not-at-top-of-file: CLI scripts append sys.path first
+    "E702",   # multiple-statements-on-one-line-semicolon: common in test fixtures
+    "E701",   # multiple-statements-on-one-line-colon: same
+    "B905",   # zip() without strict=: pervasive scientific-Python pattern
+    "B904",   # raise-without-from-inside-except: verbose noise for low-level helpers
+    "B017",   # assert-raises-exception: wide pytest.raises is sometimes the intent
+    "SIM108", # if-else-block-instead-of-if-exp: readability call is project-style
+    "UP037",  # quoted annotation: defer to pyright runtime semantics
+    "UP047",  # PEP 695 generic syntax not yet broadly used
+    "N812",   # `import torch.nn.functional as F` is universal PyTorch idiom
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Test names like `test_..._L` (matrix L) are descriptive and must not be lowercased.
+"tests/**/*.py" = ["N802"]
+# CLI scripts have long log/format strings; line-length policing is noise here.
+"scripts/**/*.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["arqueogal"]

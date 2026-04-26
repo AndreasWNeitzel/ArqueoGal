@@ -145,9 +145,13 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
-    parser.add_argument("--early-stop-patience", type=int, default=3,
-                         help="Epochs of no val improvement before stopping. "
-                         "Default 3; bump to 5+ for longer runs to absorb noise.")
+    parser.add_argument(
+        "--early-stop-patience",
+        type=int,
+        default=3,
+        help="Epochs of no val improvement before stopping. "
+        "Default 3; bump to 5+ for longer runs to absorb noise.",
+    )
     parser.add_argument(
         "--label-set",
         choices=("21", "5"),

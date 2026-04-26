@@ -17,18 +17,25 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "gallery"))
-from _common import (apply_style, save_fig, radec_to_galactic_mollweide,
-                     style_galactic_mollweide, sample_index, PALETTE)
+from _common import (
+    PALETTE,
+    apply_style,
+    radec_to_galactic_mollweide,
+    sample_index,
+    save_fig,
+    style_galactic_mollweide,
+)
 
 OUT = REPO / "reports/gallery/09_selection_function"
 
 STREAMS = [
-    ("Stream 1", REPO / "data/processed/pipeline1_features_stream1.parquet",
-     PALETTE["apogee"]),
-    ("Stream 2", REPO / "data/processed/pipeline1_features_stream2.parquet",
-     "#9467bd"),
-    ("Stream 3", REPO / "data/processed/pipeline1_features_stream3.parquet",
-     PALETTE["andrae_volume"]),
+    ("Stream 1", REPO / "data/processed/pipeline1_features_stream1.parquet", PALETTE["apogee"]),
+    ("Stream 2", REPO / "data/processed/pipeline1_features_stream2.parquet", "#9467bd"),
+    (
+        "Stream 3",
+        REPO / "data/processed/pipeline1_features_stream3.parquet",
+        PALETTE["andrae_volume"],
+    ),
 ]
 
 
@@ -66,13 +73,26 @@ def main() -> None:
         if df is None or omega_col is None:
             continue
         v = df[omega_col].dropna().to_numpy()
-        ax.hist(v, bins=bins, density=True, histtype="step", color=color, lw=1.4,
-                 label=f"{name} (n={len(v):,}, mean={v.mean():.3f})")
+        ax.hist(
+            v,
+            bins=bins,
+            density=True,
+            histtype="step",
+            color=color,
+            lw=1.4,
+            label=f"{name} (n={len(v):,}, mean={v.mean():.3f})",
+        )
     ax.set_xlabel("selection_prob ω(s)")
     ax.set_ylabel("density")
     ax.set_title("ω(s) distribution overlay")
-    ax.legend(fontsize=7, loc="upper left", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=7,
+        loc="upper left",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
     # Row 1 col 1: ω vs G hexbin (each stream)
     ax = fig.add_subplot(gs[0, 1])
@@ -93,13 +113,20 @@ def main() -> None:
             sel = bin_idx == i
             if sel.sum() > 50:
                 meds[i] = np.median(o[m][sel])
-        ax.plot(centres, meds, "o-", color=color, lw=1.2, ms=4,
-                 label=f"{name} (n={int(m.sum()):,})")
+        ax.plot(
+            centres, meds, "o-", color=color, lw=1.2, ms=4, label=f"{name} (n={int(m.sum()):,})"
+        )
     ax.set_xlabel("G (mag)")
     ax.set_ylabel("median ω(s)")
     ax.set_title("ω(s) vs G — median per bin")
-    ax.legend(fontsize=7, loc="lower left", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=7,
+        loc="lower left",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
     # Row 1 col 2: per-stream summary stats bar
     ax = fig.add_subplot(gs[0, 2])
@@ -111,17 +138,28 @@ def main() -> None:
         if df is None or oc is None:
             continue
         v = df[oc].dropna().to_numpy()
-        bars = [v.min(), float(np.percentile(v, 10)),
-                 float(np.median(v)), float(np.percentile(v, 90)),
-                 float(v.mean())]
+        bars = [
+            v.min(),
+            float(np.percentile(v, 10)),
+            float(np.median(v)),
+            float(np.percentile(v, 90)),
+            float(v.mean()),
+        ]
         offset = (i - (n_streams - 1) / 2) * width
         ax.bar(x + offset, bars, width=width * 0.95, color=color, label=name)
-    ax.set_xticks(x); ax.set_xticklabels(stats)
+    ax.set_xticks(x)
+    ax.set_xticklabels(stats)
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("ω(s)")
     ax.set_title("Per-stream ω(s) summary")
-    ax.legend(fontsize=7, loc="lower right", frameon=True, framealpha=0.95,
-              facecolor="white", edgecolor="0.4")
+    ax.legend(
+        fontsize=7,
+        loc="lower right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
     # Row 2: per-stream sky map of ω
     for i, (name, color, df, oc) in enumerate(loaded):
@@ -130,20 +168,21 @@ def main() -> None:
             ax.set_title(f"{name}\n(not built)", fontsize=9)
             continue
         idx = sample_index(len(df), 60_000, rng)
-        x, y = radec_to_galactic_mollweide(df.ra_deg.iloc[idx].to_numpy(),
-                                            df.dec_deg.iloc[idx].to_numpy())
+        x, y = radec_to_galactic_mollweide(
+            df.ra_deg.iloc[idx].to_numpy(), df.dec_deg.iloc[idx].to_numpy()
+        )
         if oc:
             c = df[oc].iloc[idx].to_numpy()
-            sc = ax.scatter(x, y, s=0.5, c=c, cmap="viridis", vmin=0, vmax=1,
-                             alpha=0.5, rasterized=True)
+            sc = ax.scatter(
+                x, y, s=0.5, c=c, cmap="viridis", vmin=0, vmax=1, alpha=0.5, rasterized=True
+            )
             plt.colorbar(sc, ax=ax, fraction=0.04, pad=0.05, label="ω(s)")
         else:
             ax.scatter(x, y, s=0.4, alpha=0.35, color=color, rasterized=True)
         style_galactic_mollweide(ax)
         ax.set_title(f"{name} ω(s) sky map", fontsize=9)
 
-    fig.suptitle("Stage 09 — selection function ω(s) across S1 / S2 / S3",
-                  fontsize=10)
+    fig.suptitle("Stage 09 — selection function ω(s) across S1 / S2 / S3", fontsize=10)
     save_fig(fig, OUT / "selection_function.png")
 
 

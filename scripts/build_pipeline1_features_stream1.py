@@ -28,8 +28,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy.coordinates import SkyCoord
 
 from arqueogal.data.dust_maps import (
     neighborhood_av_features,

@@ -148,11 +148,7 @@ class XpFeatureAdapter(nn.Module):
         if bool(finite.all()):
             return
         cols = self.layout.all_required_columns
-        per_col_bad = (
-            (~finite).any(dim=tuple(range(x.dim() - 1)))
-            if x.dim() > 1
-            else ~finite
-        )
+        per_col_bad = (~finite).any(dim=tuple(range(x.dim() - 1))) if x.dim() > 1 else ~finite
         bad_indices = torch.nonzero(per_col_bad, as_tuple=False).flatten().tolist()
         bad_cols = [cols[i] if i < len(cols) else f"col_{i}" for i in bad_indices]
         raise ValueError(

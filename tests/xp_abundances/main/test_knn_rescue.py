@@ -18,8 +18,8 @@ import pytest
 import torch
 
 from arqueogal.xp_abundances.main.knn_rescue import (
-    KnnRescueArtifact,
     LABEL_NAMES,
+    KnnRescueArtifact,
     compute_latents,
     gpu_knn_search,
     summarize_neighbors,
@@ -43,6 +43,7 @@ class _DummyEncoderModel(torch.nn.Module):
         def _fn(x):
             z = self.encoder_module(x)
             return z, torch.nn.functional.normalize(z, dim=1)
+
         return _fn
 
 

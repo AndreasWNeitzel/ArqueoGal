@@ -92,7 +92,11 @@ class TestMeszaros2025LinearRegime:
         a, b, _, _ = MESZAROS2025_COEFFS["alpha_m_atm"]
         teffs = np.array([3500.0, 4000.0, 4500.0, 5000.0, 5500.0, 6000.0])
         df = pd.DataFrame(
-            {"teff": teffs, "logg": np.full(len(teffs), 2.0), "alpha_m_atm": np.full(len(teffs), 0.3)}
+            {
+                "teff": teffs,
+                "logg": np.full(len(teffs), 2.0),
+                "alpha_m_atm": np.full(len(teffs), 0.3),
+            }
         )
         out = apply_meszaros2025_corrections(df, elements=("alpha_m_atm",))
         expected = 0.3 - (a * teffs + b)
@@ -127,18 +131,26 @@ class TestMeszaros2025BoundaryOffsets:
     def test_cold_boundary_offset_below_3500k(self) -> None:
         """Teff < 3500 K uses the cold offset from Table 3."""
         _, _, _, cold = MESZAROS2025_COEFFS["mg_h_atm"]
-        df = pd.DataFrame({"teff": [3400.0, 3200.0, 3000.0], "logg": [2.0, 2.0, 2.0], "mg_h_atm": [0.5, 0.5, 0.5]})
+        df = pd.DataFrame(
+            {"teff": [3400.0, 3200.0, 3000.0], "logg": [2.0, 2.0, 2.0], "mg_h_atm": [0.5, 0.5, 0.5]}
+        )
         out = apply_meszaros2025_corrections(df, elements=("mg_h_atm",))
         expected = 0.5 - cold
-        np.testing.assert_allclose(out["mg_h_atm"].to_numpy(), [expected, expected, expected], rtol=1e-10)
+        np.testing.assert_allclose(
+            out["mg_h_atm"].to_numpy(), [expected, expected, expected], rtol=1e-10
+        )
 
     def test_hot_boundary_offset_above_6000k(self) -> None:
         """Teff > 6000 K uses the hot offset from Table 3."""
         _, _, hot, _ = MESZAROS2025_COEFFS["mg_h_atm"]
-        df = pd.DataFrame({"teff": [6100.0, 6500.0, 7000.0], "logg": [2.0, 2.0, 2.0], "mg_h_atm": [0.5, 0.5, 0.5]})
+        df = pd.DataFrame(
+            {"teff": [6100.0, 6500.0, 7000.0], "logg": [2.0, 2.0, 2.0], "mg_h_atm": [0.5, 0.5, 0.5]}
+        )
         out = apply_meszaros2025_corrections(df, elements=("mg_h_atm",))
         expected = 0.5 - hot
-        np.testing.assert_allclose(out["mg_h_atm"].to_numpy(), [expected, expected, expected], rtol=1e-10)
+        np.testing.assert_allclose(
+            out["mg_h_atm"].to_numpy(), [expected, expected, expected], rtol=1e-10
+        )
 
     def test_exact_boundaries_are_linear(self) -> None:
         """At exactly Teff = 3500 and 6000 K the linear formula is used, not offset."""

@@ -38,7 +38,6 @@ from arqueogal.xp_abundances.main.uncertainty import (
     shrunken_per_cell_per_label_scale,
 )
 
-
 # --- Synthetic ensemble builder ---------------------------------------------
 
 

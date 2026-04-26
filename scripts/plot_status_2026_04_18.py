@@ -25,8 +25,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy.coordinates import SkyCoord
 
 from arqueogal.data.gaia_xp import YE2024_SAMPLING_NM
 
@@ -233,9 +233,8 @@ def plot_xp_spectra(df: pd.DataFrame) -> None:
 
     fig, ax = plt.subplots(figsize=(10, 6))
     cmap = plt.get_cmap("coolwarm_r")
-    feh_vals = sub["fe_h_atm"].to_numpy()
     norm = mpl.colors.Normalize(vmin=-2.0, vmax=0.4)
-    for i, row in sub.iterrows():
+    for _i, row in sub.iterrows():
         flux = np.asarray(row["corrected_flux"])
         # Normalize each spectrum to its median for shape comparison
         flux_n = flux / np.nanmedian(flux)

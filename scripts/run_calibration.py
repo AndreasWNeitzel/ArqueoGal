@@ -23,7 +23,6 @@ import argparse
 import json
 import logging
 import math
-from dataclasses import asdict
 from pathlib import Path
 
 import matplotlib
@@ -34,6 +33,7 @@ import numpy as np
 import torch
 
 from arqueogal.xp_abundances.main.adapter import XpFeatureAdapter
+from arqueogal.xp_abundances.main.config import LossWeights, TrainingConfig
 from arqueogal.xp_abundances.main.data import FeatureLayout, LabelScaler, LabelTiers
 from arqueogal.xp_abundances.main.model import (
     CovarianceBlockLayout,
@@ -53,7 +53,6 @@ from arqueogal.xp_abundances.main.uncertainty import (
     shrunken_per_cell_per_label_scale,
     temperature_scaling_per_cell,
 )
-from arqueogal.xp_abundances.main.config import LossWeights, TrainingConfig
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG = logging.getLogger("run_calibration")
@@ -320,9 +319,9 @@ def _adjacent_cell_smoothness(
             c = c * nb + i
         return c
 
-    cells = sorted({c for (c, _) in scales.keys()})
+    cells = sorted({c for (c, _) in scales})
     cell_set = set(cells)
-    labels = sorted({j for (_, j) in scales.keys()})
+    labels = sorted({j for (_, j) in scales})
 
     log_ratios: list[float] = []
     max_log = 0.0

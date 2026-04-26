@@ -1028,10 +1028,10 @@ def _write_markdown(path: Path, payload: dict[str, Any]) -> None:
         "Inputs and artefacts:",
     )
     lines.append(
-        f"- Existing audit: `reports/pipeline1/audit/audit_payload.json`",
+        "- Existing audit: `reports/pipeline1/audit/audit_payload.json`",
     )
     lines.append(
-        f"- This diagnostic (JSON): `reports/pipeline1/audit/three_question_diagnostic.json`",
+        "- This diagnostic (JSON): `reports/pipeline1/audit/three_question_diagnostic.json`",
     )
     lines.append(
         f"- Aux-only baseline: `{q3['baseline_checkpoint']}` + `.provenance.json`",

@@ -36,7 +36,6 @@ from sklearn.decomposition import PCA
 
 from arqueogal.data.gaia_xp import (
     HERMITE_N_BASIS,
-    HERMITE_REPROJECTION_VERSION,
     YE2024_N_OUTPUT,
     YE2024_SAMPLING_NM,
     reproject_ye_to_hermite,

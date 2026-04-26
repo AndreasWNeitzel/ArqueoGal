@@ -41,9 +41,19 @@ def main() -> None:
     apply_style()
     if not KIN.exists():
         return
-    df = pd.read_parquet(KIN, columns=["E_kms2", "L_z_kpc_kms", "J_R_kpc_kms",
-                                         "J_z_kpc_kms", "ecc",
-                                         "v_R_kms", "v_T_kms", "v_z_kms"])
+    df = pd.read_parquet(
+        KIN,
+        columns=[
+            "E_kms2",
+            "L_z_kpc_kms",
+            "J_R_kpc_kms",
+            "J_z_kpc_kms",
+            "ecc",
+            "v_R_kms",
+            "v_T_kms",
+            "v_z_kms",
+        ],
+    )
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 11))
 
@@ -57,7 +67,7 @@ def main() -> None:
     v_z = df["v_z_kms"].to_numpy()
 
     # (0,0) Toomre diagram in Galactocentric cylindrical velocities.
-    v_perp = np.sqrt(v_R ** 2 + v_z ** 2)
+    v_perp = np.sqrt(v_R**2 + v_z**2)
     m = np.isfinite(v_T) & np.isfinite(v_perp)
     if m.sum() > 0:
         # Tight extent on the disc population: 0 < v_T < 400 km/s,
@@ -65,41 +75,65 @@ def main() -> None:
         # disc stars; halo tail extends beyond and is intentionally clipped.
         x_lo, x_hi = 0.0, 400.0
         y_lo, y_hi = 0.0, 200.0
-        h = axes[0, 0].hexbin(v_T[m], v_perp[m], gridsize=80, mincnt=10,
-                                cmap="viridis", bins="log",
-                                extent=[x_lo, x_hi, y_lo, y_hi])
+        h = axes[0, 0].hexbin(
+            v_T[m],
+            v_perp[m],
+            gridsize=80,
+            mincnt=10,
+            cmap="viridis",
+            bins="log",
+            extent=[x_lo, x_hi, y_lo, y_hi],
+        )
         plt.colorbar(h, ax=axes[0, 0], label="log10 N")
         # Halo isovelocity arcs at |V − V_LSR| = 100, 200 km/s — only the
         # portion within the new extent is drawn.
         th = np.linspace(0, 2 * np.pi, 400)
-        for r_iso, color, lab in [(100, "#9467bd", "100 km/s from LSR"),
-                                    (200, "#d62728", "200 km/s (halo cut)")]:
-            cx = V_LSR + r_iso * np.cos(th); cy = r_iso * np.sin(th)
+        for r_iso, color, lab in [
+            (100, "#9467bd", "100 km/s from LSR"),
+            (200, "#d62728", "200 km/s (halo cut)"),
+        ]:
+            cx = V_LSR + r_iso * np.cos(th)
+            cy = r_iso * np.sin(th)
             in_box = (cx >= x_lo) & (cx <= x_hi) & (cy >= y_lo) & (cy <= y_hi)
             if in_box.any():
-                axes[0, 0].plot(cx[in_box], cy[in_box], color=color, lw=0.9,
-                                  ls="--", alpha=0.85, label=lab)
-        axes[0, 0].axvline(V_LSR, color="orange", lw=0.8, ls=":",
-                            label=f"$V_{{\\rm LSR}}$ = {V_LSR:.0f} km/s")
-        axes[0, 0].set_xlim(x_lo, x_hi); axes[0, 0].set_ylim(y_lo, y_hi)
+                axes[0, 0].plot(
+                    cx[in_box], cy[in_box], color=color, lw=0.9, ls="--", alpha=0.85, label=lab
+                )
+        axes[0, 0].axvline(
+            V_LSR, color="orange", lw=0.8, ls=":", label=f"$V_{{\\rm LSR}}$ = {V_LSR:.0f} km/s"
+        )
+        axes[0, 0].set_xlim(x_lo, x_hi)
+        axes[0, 0].set_ylim(y_lo, y_hi)
         axes[0, 0].set_xlabel(r"$v_T$ (km/s)")
         axes[0, 0].set_ylabel(r"$\sqrt{v_R^2+v_z^2}$ (km/s)")
         # Fraction within view for honest reporting
         in_view = m & (v_T >= x_lo) & (v_T <= x_hi) & (v_perp <= y_hi)
         axes[0, 0].set_title(
-            f"Toomre diagram (n={int(in_view.sum()):,} in view "
-            f"of {int(m.sum()):,} total)")
-        axes[0, 0].legend(fontsize=8, loc="upper right", frameon=True, framealpha=0.95,
-                            facecolor="white", edgecolor="0.4")
+            f"Toomre diagram (n={int(in_view.sum()):,} in view of {int(m.sum()):,} total)"
+        )
+        axes[0, 0].legend(
+            fontsize=8,
+            loc="upper right",
+            frameon=True,
+            framealpha=0.95,
+            facecolor="white",
+            edgecolor="0.4",
+        )
 
     # (0,1) E vs L_z. Restrict to bound population.
     m = np.isfinite(Lz) & np.isfinite(E) & (E < 0)
     if m.sum() > 0:
         Lz_p1, Lz_p99 = np.percentile(Lz[m], [0.5, 99.5])
         E_p1, E_p99 = np.percentile(E[m], [0.5, 99.5])
-        h = axes[0, 1].hexbin(Lz[m], E[m] / 1e5, gridsize=80, mincnt=10,
-                                cmap="viridis", bins="log",
-                                extent=[Lz_p1, Lz_p99, E_p1 / 1e5, E_p99 / 1e5])
+        h = axes[0, 1].hexbin(
+            Lz[m],
+            E[m] / 1e5,
+            gridsize=80,
+            mincnt=10,
+            cmap="viridis",
+            bins="log",
+            extent=[Lz_p1, Lz_p99, E_p1 / 1e5, E_p99 / 1e5],
+        )
         plt.colorbar(h, ax=axes[0, 1], label="log10 N")
         axes[0, 1].set_xlabel(r"$L_z$ (kpc km/s)")
         axes[0, 1].set_ylabel(r"$E\;(10^5\,\mathrm{km^2/s^2})$")
@@ -112,35 +146,48 @@ def main() -> None:
     # so we form the quadrature sqrt(2 J_R + 2 J_z) — this combined axis is
     # the action equivalent of v_perp on the Toomre.
     radial_action = np.sqrt(2.0 * (JR + Jz))
-    m = (np.isfinite(Lz) & np.isfinite(radial_action) & (JR < 1e4) & (Jz < 1e4))
+    m = np.isfinite(Lz) & np.isfinite(radial_action) & (JR < 1e4) & (Jz < 1e4)
     if m.sum() > 0:
-        h = axes[1, 0].hexbin(Lz[m], radial_action[m], gridsize=80, mincnt=10,
-                                cmap="viridis", bins="log",
-                                extent=[np.percentile(Lz[m], 0.5),
-                                         np.percentile(Lz[m], 99.5),
-                                         0,
-                                         np.percentile(radial_action[m], 99.5)])
+        h = axes[1, 0].hexbin(
+            Lz[m],
+            radial_action[m],
+            gridsize=80,
+            mincnt=10,
+            cmap="viridis",
+            bins="log",
+            extent=[
+                np.percentile(Lz[m], 0.5),
+                np.percentile(Lz[m], 99.5),
+                0,
+                np.percentile(radial_action[m], 99.5),
+            ],
+        )
         plt.colorbar(h, ax=axes[1, 0], label="log10 N")
         axes[1, 0].set_xlabel(r"$L_z$ (kpc km/s)")
         axes[1, 0].set_ylabel(r"$\sqrt{2(J_R+J_z)}$ (kpc km/s)$^{1/2}$")
-        axes[1, 0].set_title(f"Action plane: angular vs combined non-angular "
-                              f"(n={int(m.sum()):,})")
+        axes[1, 0].set_title(f"Action plane: angular vs combined non-angular (n={int(m.sum()):,})")
         axes[1, 0].axvline(0, color="0.6", lw=0.5, ls="--")
 
     # (1,1) Eccentricity histogram with regime labels.
     ecc_finite = ecc[np.isfinite(ecc)]
-    axes[1, 1].hist(ecc_finite, bins=np.linspace(0, 1, 41), color="#1f77b4",
-                      alpha=0.75)
+    axes[1, 1].hist(ecc_finite, bins=np.linspace(0, 1, 41), color="#1f77b4", alpha=0.75)
     axes[1, 1].axvline(0.3, color="#9467bd", lw=0.9, ls="--", label="thin/thick (e=0.3)")
     axes[1, 1].axvline(0.6, color="#d62728", lw=0.9, ls="--", label="halo-like (e=0.6)")
     axes[1, 1].set_xlabel("eccentricity")
     axes[1, 1].set_ylabel("count")
     axes[1, 1].set_title(f"Stream-3 eccentricity (n={len(ecc_finite):,})")
-    axes[1, 1].legend(fontsize=8, loc="upper right", frameon=True, framealpha=0.95,
-                        facecolor="white", edgecolor="0.4")
+    axes[1, 1].legend(
+        fontsize=8,
+        loc="upper right",
+        frameon=True,
+        framealpha=0.95,
+        facecolor="white",
+        edgecolor="0.4",
+    )
 
-    fig.suptitle("Kinematic enrichment (galpy MWPotential2014): Toomre + actions + ecc",
-                  fontsize=11)
+    fig.suptitle(
+        "Kinematic enrichment (galpy MWPotential2014): Toomre + actions + ecc", fontsize=11
+    )
     save_fig(fig, OUT / "kinematics.png")
 
 

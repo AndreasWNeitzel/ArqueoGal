@@ -101,8 +101,7 @@ def main() -> None:
     n_src = len(union)
     n_batches = (n_src + XP_BATCH_SIZE - 1) // XP_BATCH_SIZE
     logger.info(
-        "Stream 1 has_xp: %d, Stream 2 has_xp: %d, Stream 3 has_xp: %d, "
-        "union: %d (dedup by %d)",
+        "Stream 1 has_xp: %d, Stream 2 has_xp: %d, Stream 3 has_xp: %d, union: %d (dedup by %d)",
         len(s1_xp),
         len(s2_xp),
         len(s3_xp),

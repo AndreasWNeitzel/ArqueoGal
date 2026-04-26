@@ -27,14 +27,12 @@ import os
 import time
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from arqueogal.data.gaia_xp import (
     YE2024_FLAG_CALIBRATE_FAIL,
     YE2024_FLAG_NO_SYNTH_PHOT,
     YE2024_FLAG_OK,
-    YE2024_N_OUTPUT,
     YE2024_SAMPLING_NM,
     apply_ye2024_correction,
 )

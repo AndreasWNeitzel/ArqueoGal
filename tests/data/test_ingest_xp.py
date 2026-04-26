@@ -24,7 +24,6 @@ from arqueogal.data.gaia_xp import (
     YE2024_FLAG_NO_SYNTH_PHOT,
     YE2024_FLAG_OK,
     YE2024_N_OUTPUT,
-    YE2024_SAMPLING_NM,
 )
 
 

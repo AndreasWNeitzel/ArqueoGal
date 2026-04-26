@@ -25,9 +25,19 @@ from _common import apply_style, save_fig
 OUT = REPO / "reports/gallery/07_apogee_labels"
 S1 = REPO / "data/processed/pipeline1_features_stream1.parquet"
 
-LABEL_COLS = ("teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee",
-              "mg_h_apogee", "fe_h_apogee", "ca_h_apogee", "si_h_apogee",
-              "al_h_apogee", "n_h_apogee", "c_h_apogee")
+LABEL_COLS = (
+    "teff_apogee",
+    "logg_apogee",
+    "mh_apogee",
+    "alpha_m_apogee",
+    "mg_h_apogee",
+    "fe_h_apogee",
+    "ca_h_apogee",
+    "si_h_apogee",
+    "al_h_apogee",
+    "n_h_apogee",
+    "c_h_apogee",
+)
 
 
 def main() -> None:
@@ -47,32 +57,51 @@ def main() -> None:
     axes[0].set_title("APOGEE label coverage (post-Mészáros+25)")
     for b, p in zip(bars, pcts):
         if p > 0.1:
-            axes[0].text(b.get_x() + b.get_width() / 2, p + 0.1, f"{p:.1f}",
-                          ha="center", fontsize=7)
+            axes[0].text(
+                b.get_x() + b.get_width() / 2, p + 0.1, f"{p:.1f}", ha="center", fontsize=7
+            )
 
     # APOGEE pseudo-Kiel
-    teff = df["teff_apogee"].to_numpy(); logg = df["logg_apogee"].to_numpy()
+    teff = df["teff_apogee"].to_numpy()
+    logg = df["logg_apogee"].to_numpy()
     m = np.isfinite(teff) & np.isfinite(logg)
-    h = axes[1].hexbin(teff[m], logg[m], gridsize=70, mincnt=10, cmap="viridis",
-                        bins="log", extent=[3500, 6500, 0.5, 4.0])
+    h = axes[1].hexbin(
+        teff[m],
+        logg[m],
+        gridsize=70,
+        mincnt=10,
+        cmap="viridis",
+        bins="log",
+        extent=[3500, 6500, 0.5, 4.0],
+    )
     plt.colorbar(h, ax=axes[1], label="log10 N")
-    axes[1].invert_xaxis(); axes[1].invert_yaxis()
+    axes[1].invert_xaxis()
+    axes[1].invert_yaxis()
     axes[1].set_xlabel(r"$T_{\rm eff}$ (K), APOGEE")
     axes[1].set_ylabel(r"$\log g$ (dex), APOGEE")
     axes[1].set_title(f"Stream-1 APOGEE Kiel ({int(m.sum()):,})")
 
     # α/M vs M/H bimodality
-    mh = df["mh_apogee"].to_numpy(); am = df["alpha_m_apogee"].to_numpy()
+    mh = df["mh_apogee"].to_numpy()
+    am = df["alpha_m_apogee"].to_numpy()
     m = np.isfinite(mh) & np.isfinite(am)
-    h = axes[2].hexbin(mh[m], am[m], gridsize=70, mincnt=10, cmap="viridis",
-                        bins="log", extent=[-2.5, 0.6, -0.2, 0.5])
+    h = axes[2].hexbin(
+        mh[m],
+        am[m],
+        gridsize=70,
+        mincnt=10,
+        cmap="viridis",
+        bins="log",
+        extent=[-2.5, 0.6, -0.2, 0.5],
+    )
     plt.colorbar(h, ax=axes[2], label="log10 N")
     axes[2].set_xlabel("[M/H] (dex), APOGEE")
     axes[2].set_ylabel(r"[$\alpha$/M] (dex), APOGEE")
     axes[2].set_title("Training-pool α-bimodality")
 
-    fig.suptitle("APOGEE DR19 training labels (Mészáros+2025 [X/M] corrections applied)",
-                  fontsize=11)
+    fig.suptitle(
+        "APOGEE DR19 training labels (Mészáros+2025 [X/M] corrections applied)", fontsize=11
+    )
     save_fig(fig, OUT / "apogee_labels.png")
 
 

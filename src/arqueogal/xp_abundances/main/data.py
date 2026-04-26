@@ -464,7 +464,7 @@ class LabelScaler:
         """Un-scale a mean vector/matrix with columns in ``label_names`` order."""
         return mu * self.scale + self.mean
 
-    def inverse_L(self, L: np.ndarray) -> np.ndarray:
+    def inverse_L(self, L: np.ndarray) -> np.ndarray:  # noqa: N802
         """Un-scale a Cholesky factor with row/col axis in ``label_names`` order.
 
         ``L`` shape is either ``(n, n)`` or ``(B, n, n)``. Returns

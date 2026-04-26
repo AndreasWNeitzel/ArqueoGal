@@ -82,7 +82,7 @@ def main() -> None:
 
     fig.suptitle(
         r"M\'esz\'aros+2025 Table 3 $\Delta$[X/M] applied (pre $\to$ post), "
-        f"354,890 DR19 giants",
+        "354,890 DR19 giants",
         fontsize=10,
     )
     fig.tight_layout(rect=(0, 0, 1, 0.97))

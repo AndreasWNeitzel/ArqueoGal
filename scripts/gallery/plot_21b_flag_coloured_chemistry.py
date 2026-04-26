@@ -36,7 +36,8 @@ from _common import apply_style, save_fig
 OUT = REPO / "reports/gallery/21b_flag_coloured_chemistry"
 PARQUET_S3 = REPO / "release/D-Cat-b/hybrid_pipeline_run/predictions_with_features.parquet"
 PARQUET_S2 = REPO / "release/D-Cat-b/hybrid_pipeline_run_stream2/predictions_with_features.parquet"
-CHEM_X = (-2.5, 0.6); CHEM_Y = (-0.2, 0.5)
+CHEM_X = (-2.5, 0.6)
+CHEM_Y = (-0.2, 0.5)
 
 # Priority-ordered flag list. v5 active gates first (with " (active)"
 # suffix), then v4 diagnostic-only flags. When a star has multiple flags,
@@ -65,18 +66,41 @@ def _scatter_panel(ax, t1, t2, *, title, color_t2):
     i2 = rng.choice(len(t2), n_t2, replace=False) if len(t2) > n_t2 else np.arange(len(t2))
 
     # Tier 2 first, underneath
-    ax.scatter(t2["mh_hybrid_pred"].iloc[i2], t2["alpha_m_hybrid_pred"].iloc[i2],
-                s=1.2, color=color_t2, alpha=0.18, rasterized=True, zorder=1,
-                label=f"Tier 2 ({len(t2):,})")
+    ax.scatter(
+        t2["mh_hybrid_pred"].iloc[i2],
+        t2["alpha_m_hybrid_pred"].iloc[i2],
+        s=1.2,
+        color=color_t2,
+        alpha=0.18,
+        rasterized=True,
+        zorder=1,
+        label=f"Tier 2 ({len(t2):,})",
+    )
     # Tier 1 on top
-    ax.scatter(t1["mh_hybrid_pred"].iloc[i1], t1["alpha_m_hybrid_pred"].iloc[i1],
-                s=1.0, color="0.35", alpha=0.18, rasterized=True, zorder=2,
-                label=f"Tier 1 ({len(t1):,})")
-    ax.set_xlim(CHEM_X); ax.set_ylim(CHEM_Y)
-    ax.set_xlabel("[M/H] (dex)"); ax.set_ylabel(r"[$\alpha$/M] (dex)")
+    ax.scatter(
+        t1["mh_hybrid_pred"].iloc[i1],
+        t1["alpha_m_hybrid_pred"].iloc[i1],
+        s=1.0,
+        color="0.35",
+        alpha=0.18,
+        rasterized=True,
+        zorder=2,
+        label=f"Tier 1 ({len(t1):,})",
+    )
+    ax.set_xlim(CHEM_X)
+    ax.set_ylim(CHEM_Y)
+    ax.set_xlabel("[M/H] (dex)")
+    ax.set_ylabel(r"[$\alpha$/M] (dex)")
     ax.set_title(title)
-    leg = ax.legend(fontsize=8, loc="upper right", frameon=True, framealpha=0.92,
-                     facecolor="white", edgecolor="0.4", markerscale=4)
+    leg = ax.legend(
+        fontsize=8,
+        loc="upper right",
+        frameon=True,
+        framealpha=0.92,
+        facecolor="white",
+        edgecolor="0.4",
+        markerscale=4,
+    )
     for h in leg.legend_handles:
         h.set_alpha(1.0)
 
@@ -88,15 +112,23 @@ def _flag_panel(ax, t1, t2, *, available_flags, n_total):
     # Tier 1 grey baseline (subsample for visibility)
     n_t1 = min(80_000, len(t1))
     i1 = rng.choice(len(t1), n_t1, replace=False) if len(t1) > n_t1 else np.arange(len(t1))
-    ax.scatter(t1["mh_hybrid_pred"].iloc[i1], t1["alpha_m_hybrid_pred"].iloc[i1],
-                s=0.8, color="0.55", alpha=0.10, rasterized=True, zorder=1,
-                label=f"Tier 1 baseline ({len(t1):,})")
+    ax.scatter(
+        t1["mh_hybrid_pred"].iloc[i1],
+        t1["alpha_m_hybrid_pred"].iloc[i1],
+        s=0.8,
+        color="0.55",
+        alpha=0.10,
+        rasterized=True,
+        zorder=1,
+        label=f"Tier 1 baseline ({len(t1):,})",
+    )
 
     # Assign each Tier 2 star to its highest-priority fired flag.
     assigned = np.full(len(t2), -1, dtype=int)
     for k, (col, _label, _color) in enumerate(FLAG_PRIORITY):
-        if col not in available_flags: continue
-        unflagged = (assigned == -1)
+        if col not in available_flags:
+            continue
+        unflagged = assigned == -1
         m = unflagged & t2[col].astype(bool).to_numpy()
         assigned[m] = k
 
@@ -104,43 +136,67 @@ def _flag_panel(ax, t1, t2, *, available_flags, n_total):
     # populations sit on top.
     flag_counts = []
     for k, (col, label, color) in enumerate(FLAG_PRIORITY):
-        if col not in available_flags: continue
+        if col not in available_flags:
+            continue
         n_k = int((assigned == k).sum())
         if n_k > 0:
             flag_counts.append((n_k, k, col, label, color))
     flag_counts.sort(key=lambda x: -x[0])  # plot largest first
 
-    for n_k, k, col, label, color in flag_counts:
-        m = (assigned == k)
+    for n_k, k, _col, label, color in flag_counts:
+        m = assigned == k
         # subsample within flag if too dense
         idx = np.flatnonzero(m)
         n_sub = min(40_000, len(idx))
         if len(idx) > n_sub:
             idx = rng.choice(idx, n_sub, replace=False)
-        ax.scatter(t2["mh_hybrid_pred"].iloc[idx],
-                    t2["alpha_m_hybrid_pred"].iloc[idx],
-                    s=2.0, color=color, alpha=0.25, rasterized=True, zorder=3,
-                    label=f"{label} ({n_k:,})")
+        ax.scatter(
+            t2["mh_hybrid_pred"].iloc[idx],
+            t2["alpha_m_hybrid_pred"].iloc[idx],
+            s=2.0,
+            color=color,
+            alpha=0.25,
+            rasterized=True,
+            zorder=3,
+            label=f"{label} ({n_k:,})",
+        )
 
     n_unflagged = int((assigned == -1).sum())
     if n_unflagged > 0:
-        m = (assigned == -1)
+        m = assigned == -1
         idx = np.flatnonzero(m)
         n_sub = min(20_000, len(idx))
         if len(idx) > n_sub:
             idx = rng.choice(idx, n_sub, replace=False)
-        ax.scatter(t2["mh_hybrid_pred"].iloc[idx],
-                    t2["alpha_m_hybrid_pred"].iloc[idx],
-                    s=1.5, color="0.2", alpha=0.20, rasterized=True, zorder=2,
-                    label=f"Tier 2, no flag listed ({n_unflagged:,})")
+        ax.scatter(
+            t2["mh_hybrid_pred"].iloc[idx],
+            t2["alpha_m_hybrid_pred"].iloc[idx],
+            s=1.5,
+            color="0.2",
+            alpha=0.20,
+            rasterized=True,
+            zorder=2,
+            label=f"Tier 2, no flag listed ({n_unflagged:,})",
+        )
 
-    ax.set_xlim(CHEM_X); ax.set_ylim(CHEM_Y)
-    ax.set_xlabel("[M/H] (dex)"); ax.set_ylabel(r"[$\alpha$/M] (dex)")
-    ax.set_title("Tier 2 stars by flag (priority-ordered, v5 active gates first)\n"
-                  "σ-inflated > mode_ambiguous(α/M) > kin_ood > diagnostic-only set")
-    leg = ax.legend(fontsize=7, loc="upper right", frameon=True, framealpha=0.92,
-                     facecolor="white", edgecolor="0.4", markerscale=4,
-                     ncol=1)
+    ax.set_xlim(CHEM_X)
+    ax.set_ylim(CHEM_Y)
+    ax.set_xlabel("[M/H] (dex)")
+    ax.set_ylabel(r"[$\alpha$/M] (dex)")
+    ax.set_title(
+        "Tier 2 stars by flag (priority-ordered, v5 active gates first)\n"
+        "σ-inflated > mode_ambiguous(α/M) > kin_ood > diagnostic-only set"
+    )
+    leg = ax.legend(
+        fontsize=7,
+        loc="upper right",
+        frameon=True,
+        framealpha=0.92,
+        facecolor="white",
+        edgecolor="0.4",
+        markerscale=4,
+        ncol=1,
+    )
     for h in leg.legend_handles:
         h.set_alpha(1.0)
 
@@ -156,9 +212,13 @@ def _render(parquet: Path, stream_label: str, out_png: Path) -> None:
     t2 = df[df["release_tier"] == 2]
 
     fig, axes = plt.subplots(1, 2, figsize=(15, 6.5))
-    _scatter_panel(axes[0], t1, t2,
-                    title=f"{stream_label}: Tier 1 vs Tier 2 (scatter overlay)",
-                    color_t2="#ff7f0e")
+    _scatter_panel(
+        axes[0],
+        t1,
+        t2,
+        title=f"{stream_label}: Tier 1 vs Tier 2 (scatter overlay)",
+        color_t2="#ff7f0e",
+    )
     _flag_panel(axes[1], t1, t2, available_flags=set(flag_cols), n_total=len(df))
     fig.suptitle(
         f"{stream_label} chemistry plane on the hybrid surface, scatter overlay.\n"

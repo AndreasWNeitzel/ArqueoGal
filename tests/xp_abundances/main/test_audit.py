@@ -17,8 +17,8 @@ from arqueogal.xp_abundances.main.audit import (
     AUDIT_TEST_4_SHUFFLED_NULL,
     AUDIT_TEST_5_CONDITIONAL_MI,
     AUDIT_TEST_6_DECORRELATED_SUBSAMPLE,
-    AuditReport,
     STUBBED_AUDIT_TESTS,
+    AuditReport,
     audit_report,
     conditional_mi_ksg,
     decorrelated_subsample,
@@ -346,6 +346,4 @@ def test_incomplete_protocol_error_is_shared_exception() -> None:
     """Verify IncompleteProtocolError is shared between modules."""
     assert issubclass(IncompleteProtocolError, Exception)
     with pytest.raises(IncompleteProtocolError):
-        raise IncompleteProtocolError(
-            "audit test 3 SHAP cannot pass without validation work"
-        )
+        raise IncompleteProtocolError("audit test 3 SHAP cannot pass without validation work")

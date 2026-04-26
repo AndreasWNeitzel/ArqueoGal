@@ -230,11 +230,9 @@ def export_to_fits(
     # Apply per-column units, UCDs, descriptions where defined.
     for col_name in table.colnames:
         if col_name in _COLUMN_UNITS:
-            try:
+            # Non-numeric columns may reject units; that's fine.
+            with contextlib.suppress(Exception):
                 table[col_name].unit = _COLUMN_UNITS[col_name]
-            except Exception:
-                # Non-numeric columns may reject units; that's fine.
-                pass
         if col_name in _COLUMN_UCDS:
             table[col_name].meta["UCD"] = _COLUMN_UCDS[col_name]
         if col_name in _COLUMN_DESCRIPTIONS:

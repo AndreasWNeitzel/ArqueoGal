@@ -73,8 +73,7 @@ def main() -> None:
         return
 
     n_batches = (len(delta) + XP_BATCH_SIZE - 1) // XP_BATCH_SIZE
-    logger.info("XP delta fetch: %d batches of %d via AIP UPLOAD",
-                n_batches, XP_BATCH_SIZE)
+    logger.info("XP delta fetch: %d batches of %d via AIP UPLOAD", n_batches, XP_BATCH_SIZE)
 
     svc = aip_service()
     new_df = batched_upload_fetch_df(
@@ -98,8 +97,9 @@ def main() -> None:
         .sort_values("source_id")
         .reset_index(drop=True)
     )
-    logger.info("merged: existing=%d + new=%d → final=%d",
-                len(existing_df), len(new_df), len(full_df))
+    logger.info(
+        "merged: existing=%d + new=%d → final=%d", len(existing_df), len(new_df), len(full_df)
+    )
 
     _write_parquet_atomic(full_df, xp_existing)
     size_mb = xp_existing.stat().st_size / 1024**2

@@ -187,12 +187,14 @@ def build_tier1_only_subset(
     if drop_aux_assisted_columns:
         drop_patterns = []
         for elem in _AUX_ASSISTED_ELEMENTS:
-            drop_patterns.extend([
-                f"{elem}_pred",
-                f"{elem}_sigma",
-                f"release_tier__{elem}",
-                f"xp_abundance_type__{elem}",
-            ])
+            drop_patterns.extend(
+                [
+                    f"{elem}_pred",
+                    f"{elem}_sigma",
+                    f"release_tier__{elem}",
+                    f"xp_abundance_type__{elem}",
+                ]
+            )
         for col in drop_patterns:
             if col in df.columns:
                 df = df.drop(columns=col)
@@ -249,7 +251,9 @@ def build_per_cell_summary(
             row[k] = v
         row["n_rows"] = int(len(sub))
         # Per-element aggregates.
-        for elem, pred_col, sigma_col in zip(_ABUNDANCE_ELEMENTS, _PRED_COLS, _SIGMA_COLS, strict=False):
+        for elem, pred_col, sigma_col in zip(
+            _ABUNDANCE_ELEMENTS, _PRED_COLS, _SIGMA_COLS, strict=False
+        ):
             if pred_col in sub.columns:
                 row[f"mean_{elem}_pred"] = float(np.nanmean(sub[pred_col]))
             if sigma_col in sub.columns:
@@ -302,7 +306,9 @@ def build_per_magnitude_reliability(
 
     rows: list[dict[str, object]] = []
     for (mag_bin,), sub in df.groupby(["g_mag_bin"], dropna=False):
-        for elem, pred_col, sigma_col in zip(_ABUNDANCE_ELEMENTS, _PRED_COLS, _SIGMA_COLS, strict=False):
+        for elem, pred_col, sigma_col in zip(
+            _ABUNDANCE_ELEMENTS, _PRED_COLS, _SIGMA_COLS, strict=False
+        ):
             row: dict[str, object] = {
                 "g_mag_bin": mag_bin,
                 "element": elem,

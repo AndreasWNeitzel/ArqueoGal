@@ -49,15 +49,17 @@ def main() -> None:
     args = parser.parse_args()
 
     _LOG.info(
-        "hybrid release pipeline → %s\n"
-        "  predictions = %s\n"
-        "  features    = %s\n"
-        "  knn_rescue  = %s",
-        args.output_dir, args.predictions, args.features, args.knn_rescue,
+        "hybrid release pipeline → %s\n  predictions = %s\n  features    = %s\n  knn_rescue  = %s",
+        args.output_dir,
+        args.predictions,
+        args.features,
+        args.knn_rescue,
     )
     knn_path = args.knn_rescue if args.knn_rescue.exists() else None
     if knn_path is None:
-        _LOG.warning("kNN-rescue parquet not found; running degraded hybrid (regressor + caveat only)")
+        _LOG.warning(
+            "kNN-rescue parquet not found; running degraded hybrid (regressor + caveat only)"
+        )
 
     manifest = run_hybrid_release_pipeline(
         args.predictions,

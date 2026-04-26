@@ -71,8 +71,16 @@ KIEL_TEFF = (3500.0, 6500.0)
 KIEL_LOGG = (0.0, 3.8)
 
 _IR_COLS = [
-    "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
-    "e_j_mag", "e_h_mag", "e_k_mag", "e_w1_mag", "e_w2_mag",
+    "j_mag",
+    "h_mag",
+    "k_mag",
+    "w1_mag",
+    "w2_mag",
+    "e_j_mag",
+    "e_h_mag",
+    "e_k_mag",
+    "e_w1_mag",
+    "e_w2_mag",
     "ir_missing_flag",
 ]
 
@@ -106,11 +114,12 @@ def _query_sfd(ra: np.ndarray, dec: np.ndarray) -> np.ndarray:
 
 
 def _query_lallement(
-    ra: np.ndarray, dec: np.ndarray, distance_pc: np.ndarray,
+    ra: np.ndarray,
+    dec: np.ndarray,
+    distance_pc: np.ndarray,
 ) -> np.ndarray:
     if not LALLEMENT_CUBE_PATH.exists():
-        logger.warning("Lallement cube missing at %s — av_lallement all-NaN",
-                       LALLEMENT_CUBE_PATH)
+        logger.warning("Lallement cube missing at %s — av_lallement all-NaN", LALLEMENT_CUBE_PATH)
         return np.full(len(ra), np.nan, dtype=np.float32)
     from arqueogal.data.dust_maps import lallement2022_query, load_lallement2022_cube
 
@@ -126,17 +135,23 @@ def _query_lallement(
 
 
 def _compute_selection_prob(
-    b_deg: np.ndarray, g_mag: np.ndarray,
-    teff: np.ndarray, logg: np.ndarray,
-    parallax_over_error: np.ndarray, av_missing: np.ndarray,
+    b_deg: np.ndarray,
+    g_mag: np.ndarray,
+    teff: np.ndarray,
+    logg: np.ndarray,
+    parallax_over_error: np.ndarray,
+    av_missing: np.ndarray,
     parallax_snr_min: float = 5.0,
 ) -> dict[str, np.ndarray]:
     p_ye = score_selection_prob(
-        b_deg.astype(np.float64), g_mag.astype(np.float64),
+        b_deg.astype(np.float64),
+        g_mag.astype(np.float64),
     )
     p_ir = score_ir_completeness(
-        b_deg.astype(np.float64), g_mag.astype(np.float64),
-        teff.astype(np.float64), logg.astype(np.float64),
+        b_deg.astype(np.float64),
+        g_mag.astype(np.float64),
+        teff.astype(np.float64),
+        logg.astype(np.float64),
     )
     p_parallax = (
         np.isfinite(parallax_over_error) & (parallax_over_error >= parallax_snr_min)
@@ -145,7 +160,8 @@ def _compute_selection_prob(
     product = p_ye * p_ir * p_parallax * p_extinction
     hard_zero = (p_parallax == 0.0) | (p_extinction == 0.0)
     p_compound = np.where(
-        hard_zero, 0.0,
+        hard_zero,
+        0.0,
         np.clip(product, COMPOUND_FLOOR, SELECTION_PROB_CEIL),
     )
     return {
@@ -175,20 +191,24 @@ def main() -> None:
     logger.info("  %d rows", len(s2))
 
     # Compute Galactic latitude.
-    coords = SkyCoord(ra=s2["ra"].to_numpy() * u.deg,
-                       dec=s2["dec"].to_numpy() * u.deg, frame="icrs").galactic
+    coords = SkyCoord(
+        ra=s2["ra"].to_numpy() * u.deg, dec=s2["dec"].to_numpy() * u.deg, frame="icrs"
+    ).galactic
     s2["b_deg"] = coords.b.deg.astype(np.float32)
 
     # Rename Gaia columns to match Stream 3 schema.
-    s2 = s2.rename(columns={
-        "ra": "ra_deg", "dec": "dec_deg",
-        "phot_g_mean_mag_corr": "g_mag",
-        "phot_bp_mean_mag": "bp_mag",
-        "phot_rp_mean_mag": "rp_mag",
-        "teff_gspphot": "teff_gspphot_orig",
-        "logg_gspphot": "logg_gspphot_orig",
-        "mh_gspphot": "mh_gspphot_orig",
-    })
+    s2 = s2.rename(
+        columns={
+            "ra": "ra_deg",
+            "dec": "dec_deg",
+            "phot_g_mean_mag_corr": "g_mag",
+            "phot_bp_mean_mag": "bp_mag",
+            "phot_rp_mean_mag": "rp_mag",
+            "teff_gspphot": "teff_gspphot_orig",
+            "logg_gspphot": "logg_gspphot_orig",
+            "mh_gspphot": "mh_gspphot_orig",
+        }
+    )
     s2["parallax_raw"] = s2["parallax"]
     s2["parallax"] = s2["parallax_corr"]
     s2["sample"] = "asteroseismic"
@@ -205,8 +225,12 @@ def main() -> None:
     # GSP-Phot distance triple → BJ21-style triple (triple slot used by
     # downstream release pipeline).
     s2["r_med_photogeo"] = s2["distance_gspphot"].astype(np.float32)
-    s2["r_lo_photogeo"] = s2.get("distance_gspphot_lower", pd.Series(np.nan, index=s2.index)).astype(np.float32)
-    s2["r_hi_photogeo"] = s2.get("distance_gspphot_upper", pd.Series(np.nan, index=s2.index)).astype(np.float32)
+    s2["r_lo_photogeo"] = s2.get(
+        "distance_gspphot_lower", pd.Series(np.nan, index=s2.index)
+    ).astype(np.float32)
+    s2["r_hi_photogeo"] = s2.get(
+        "distance_gspphot_upper", pd.Series(np.nan, index=s2.index)
+    ).astype(np.float32)
     s2["distance_pc"] = s2["distance_gspphot"].astype(np.float32)
 
     df = s2
@@ -216,19 +240,22 @@ def main() -> None:
     teff_a = df["teff_andrae"].to_numpy()
     logg_a = df["logg_andrae"].to_numpy()
     in_kiel = (
-        np.isfinite(teff_a) & np.isfinite(logg_a)
-        & (teff_a >= KIEL_TEFF[0]) & (teff_a <= KIEL_TEFF[1])
-        & (logg_a >= KIEL_LOGG[0]) & (logg_a <= KIEL_LOGG[1])
+        np.isfinite(teff_a)
+        & np.isfinite(logg_a)
+        & (teff_a >= KIEL_TEFF[0])
+        & (teff_a <= KIEL_TEFF[1])
+        & (logg_a >= KIEL_LOGG[0])
+        & (logg_a <= KIEL_LOGG[1])
     )
     df = df[in_kiel].reset_index(drop=True)
-    logger.info("RGB+RC cut: %d / %d retained (dropped %d)",
-                len(df), n_pre_cut, n_pre_cut - len(df))
+    logger.info(
+        "RGB+RC cut: %d / %d retained (dropped %d)", len(df), n_pre_cut, n_pre_cut - len(df)
+    )
 
     logger.info("loading IR: %s", ir_path)
     ir = pd.read_parquet(ir_path)[["source_id", *_IR_COLS]]
     df = df.merge(ir, on="source_id", how="left")
-    logger.info("  IR-complete rows: %d / %d",
-                int((~df["ir_missing_flag"]).sum()), len(df))
+    logger.info("  IR-complete rows: %d / %d", int((~df["ir_missing_flag"]).sum()), len(df))
 
     # XP sampled flux: union of stream2-only delta + S1 + S3 corrected
     # (some S2 source_ids overlap with the existing XP corrected files).
@@ -240,8 +267,7 @@ def main() -> None:
             df_xp = df_xp[df_xp["ye2024_flag"] == 0]
             xp_parts.append(df_xp)
             logger.info("  %s: %d Ye-OK rows", p.name, len(df_xp))
-    xp = pd.concat(xp_parts, ignore_index=True).drop_duplicates(
-        subset="source_id", keep="first")
+    xp = pd.concat(xp_parts, ignore_index=True).drop_duplicates(subset="source_id", keep="first")
     logger.info("  XP Ye-OK union: %d", len(xp))
 
     df = df.merge(xp, on="source_id", how="inner")
@@ -267,7 +293,8 @@ def main() -> None:
 
     logger.info("computing nbhd-median A_V")
     nbhd = neighborhood_av_features(
-        ra_deg=ra, dec_deg=dec,
+        ra_deg=ra,
+        dec_deg=dec,
         distance_pc=distance,
         ag_gspphot=df["ag_gspphot"].to_numpy(dtype=np.float64),
         radius_pc=NEIGHBORHOOD_RADIUS_PC,
@@ -283,7 +310,8 @@ def main() -> None:
     with np.errstate(invalid="ignore", divide="ignore"):
         plx_snr = np.where(
             np.isfinite(plx) & np.isfinite(plx_err) & (plx_err > 0.0),
-            plx / plx_err, np.nan,
+            plx / plx_err,
+            np.nan,
         )
     av_missing = (
         ~np.isfinite(df["av_sfd"].to_numpy())
@@ -300,27 +328,65 @@ def main() -> None:
     )
     for k, v in sel.items():
         df[k] = v
-    logger.info("  selection_prob: min=%.4f mean=%.4f max=%.4f",
-                float(df["selection_prob"].min()),
-                float(df["selection_prob"].mean()),
-                float(df["selection_prob"].max()))
+    logger.info(
+        "  selection_prob: min=%.4f mean=%.4f max=%.4f",
+        float(df["selection_prob"].min()),
+        float(df["selection_prob"].mean()),
+        float(df["selection_prob"].max()),
+    )
 
     keep = [
-        "source_id", "sample", "ra_deg", "dec_deg", "b_deg",
-        "teff_andrae", "logg_andrae", "mh_andrae",
-        "g_mag", "bp_mag", "rp_mag", "bp_rp", "bp_g", "g_rp",
-        "parallax", "parallax_error", "parallax_corr", "parallax_raw", "ruwe",
-        "r_med_photogeo", "r_lo_photogeo", "r_hi_photogeo", "distance_pc",
-        "j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag",
-        "e_j_mag", "e_h_mag", "e_k_mag", "e_w1_mag", "e_w2_mag",
+        "source_id",
+        "sample",
+        "ra_deg",
+        "dec_deg",
+        "b_deg",
+        "teff_andrae",
+        "logg_andrae",
+        "mh_andrae",
+        "g_mag",
+        "bp_mag",
+        "rp_mag",
+        "bp_rp",
+        "bp_g",
+        "g_rp",
+        "parallax",
+        "parallax_error",
+        "parallax_corr",
+        "parallax_raw",
+        "ruwe",
+        "r_med_photogeo",
+        "r_lo_photogeo",
+        "r_hi_photogeo",
+        "distance_pc",
+        "j_mag",
+        "h_mag",
+        "k_mag",
+        "w1_mag",
+        "w2_mag",
+        "e_j_mag",
+        "e_h_mag",
+        "e_k_mag",
+        "e_w1_mag",
+        "e_w2_mag",
         "ir_missing_flag",
-        "av_edenhofer", "av_sfd", "av_lallement", "av_nbhd_median", "av_nbhd_std",
+        "av_edenhofer",
+        "av_sfd",
+        "av_lallement",
+        "av_nbhd_median",
+        "av_nbhd_std",
         "n_neighbors_75pc",
-        "ag_gspphot", "ag_gspphot_lower", "ag_gspphot_upper",
+        "ag_gspphot",
+        "ag_gspphot_lower",
+        "ag_gspphot_upper",
         "teff_gspphot",
-        "selection_prob", "p_ye_retained", "p_ir_complete",
-        "p_parallax", "p_extinction",
-        "corrected_flux", "ye2024_flag",
+        "selection_prob",
+        "p_ye_retained",
+        "p_ir_complete",
+        "p_parallax",
+        "p_extinction",
+        "corrected_flux",
+        "ye2024_flag",
     ]
     missing = [c for c in keep if c not in df.columns]
     if missing:

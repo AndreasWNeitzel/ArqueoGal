@@ -37,19 +37,36 @@ def main() -> None:
         ar = pd.read_parquet(raw, columns=["source_id"]).dropna()
         sid_counts = ar["source_id"].value_counts()
         bins = np.arange(1, sid_counts.max() + 2)
-        axes[0].hist(sid_counts.values, bins=bins - 0.5, color="#d62728", alpha=0.7,
-                      label=f"raw APOGEE\n({len(ar):,} rows, {ar['source_id'].nunique():,} unique)")
+        axes[0].hist(
+            sid_counts.values,
+            bins=bins - 0.5,
+            color="#d62728",
+            alpha=0.7,
+            label=f"raw APOGEE\n({len(ar):,} rows, {ar['source_id'].nunique():,} unique)",
+        )
     else:
-        axes[0].text(0.5, 0.7, "raw APOGEE parquet not present\nshowing only post-dedup",
-                      ha="center", va="center", transform=axes[0].transAxes, fontsize=8)
+        axes[0].text(
+            0.5,
+            0.7,
+            "raw APOGEE parquet not present\nshowing only post-dedup",
+            ha="center",
+            va="center",
+            transform=axes[0].transAxes,
+            fontsize=8,
+        )
 
     if s1.exists():
         post = pd.read_parquet(s1, columns=["source_id"])
         post_counts = post["source_id"].value_counts()
         bins = np.arange(1, max(post_counts.max(), 4) + 2)
-        axes[0].hist(post_counts.values, bins=bins - 0.5, color="#1f77b4", alpha=0.7,
-                      label=f"post-dedup Stream 1\n({len(post):,} rows, "
-                              f"{post['source_id'].nunique():,} unique)")
+        axes[0].hist(
+            post_counts.values,
+            bins=bins - 0.5,
+            color="#1f77b4",
+            alpha=0.7,
+            label=f"post-dedup Stream 1\n({len(post):,} rows, "
+            f"{post['source_id'].nunique():,} unique)",
+        )
     axes[0].set_xlabel("# spectra per source_id")
     axes[0].set_ylabel("count")
     axes[0].set_yscale("log")
@@ -61,13 +78,15 @@ def main() -> None:
         post = pd.read_parquet(s1, columns=["teff_apogee", "logg_apogee", "mh_apogee"])
         n = len(post)
         n_finite = post.dropna().shape[0]
-        bars = axes[1].bar(["raw rows", "post-dedup unique sources",
-                              "complete labels (3-tier)"],
-                              [n, post["teff_apogee"].notna().sum(), n_finite],
-                              color=["#9467bd", "#1f77b4", "#2ca02c"])
+        bars = axes[1].bar(
+            ["raw rows", "post-dedup unique sources", "complete labels (3-tier)"],
+            [n, post["teff_apogee"].notna().sum(), n_finite],
+            color=["#9467bd", "#1f77b4", "#2ca02c"],
+        )
         for b, v in zip(bars, [n, post["teff_apogee"].notna().sum(), n_finite]):
-            axes[1].text(b.get_x() + b.get_width() / 2, v, f"{v:,}",
-                           ha="center", va="bottom", fontsize=8)
+            axes[1].text(
+                b.get_x() + b.get_width() / 2, v, f"{v:,}", ha="center", va="bottom", fontsize=8
+            )
         axes[1].set_ylabel("rows / sources")
         axes[1].set_title("Stream-1 row inventory")
         axes[1].tick_params(axis="x", labelsize=8)

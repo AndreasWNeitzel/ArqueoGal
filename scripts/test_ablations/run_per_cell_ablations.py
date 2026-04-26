@@ -149,7 +149,7 @@ def assign_tier(
             thr = k * train_sigma[elem]
         else:
             thr = cfg.sigma_thresholds[elem]
-        sigma_inflated = (np.nan_to_num(sigma, nan=0.0) > thr)
+        sigma_inflated = np.nan_to_num(sigma, nan=0.0) > thr
 
         elem_caveat = caveat | sigma_inflated
         if elem in AUX_ASSISTED:
@@ -236,11 +236,10 @@ def main() -> None:
     # training. We need the columns the stratifier expects.
     print("rebuilding 70/15/15 stratified split (seed=0)")
     # Stratifier needs: fe_h_apogee, teff_apogee, b_deg (DEFAULT_STRAT_COLS).
-    feat_for_split = pd.read_parquet(FEATURES, columns=[
-        "source_id", "teff_apogee", "fe_h_apogee", "b_deg"
-    ])
-    split_ids = stratified_split_ids(feat_for_split, seed=0,
-                                       fracs=(0.70, 0.15, 0.15))
+    feat_for_split = pd.read_parquet(
+        FEATURES, columns=["source_id", "teff_apogee", "fe_h_apogee", "b_deg"]
+    )
+    split_ids = stratified_split_ids(feat_for_split, seed=0, fracs=(0.70, 0.15, 0.15))
     test_source_ids = set(split_ids["test"])
     test_mask = df["source_id"].isin(test_source_ids).to_numpy()
     test_idx = np.flatnonzero(test_mask)
@@ -255,7 +254,7 @@ def main() -> None:
         y = df[truth_col].to_numpy()[train_idx]
         ok = np.isfinite(y)
         train_sigma[elem] = float(np.std(y[ok])) if ok.any() else 1.0
-    print(f"per-element training-σ (used for global-σ threshold ablation):")
+    print("per-element training-σ (used for global-σ threshold ablation):")
     for elem, s in train_sigma.items():
         print(f"  {elem}: {s:.4g}")
 
@@ -336,13 +335,12 @@ def main() -> None:
         AblationConfig(
             name="all_ood_off",
             description="Drop ALL OOD flags (no Tier-3 demotions from OOD; "
-                         "only NaN predictions go to Tier 3).",
+            "only NaN predictions go to Tier 3).",
             ood_flags=(),
         ),
         AblationConfig(
             name="minimal_gates",
-            description="Drop ALL caveats AND OOD flags. Only NaN → Tier 3, "
-                         "σ-inflation → Tier 2.",
+            description="Drop ALL caveats AND OOD flags. Only NaN → Tier 3, σ-inflation → Tier 2.",
             ood_flags=(),
             caveat_flags=(),
         ),
@@ -350,40 +348,49 @@ def main() -> None:
         AblationConfig(
             name="prod_alpha_tightened",
             description="Production stack with α/M σ-threshold tightened from "
-                         "0.10 → 0.05 dex (≈0.5×σ_train). Isolates the σ-tighten "
-                         "effect from the gate-set simplification.",
+            "0.10 → 0.05 dex (≈0.5×σ_train). Isolates the σ-tighten "
+            "effect from the gate-set simplification.",
             sigma_thresholds={
-                "teff": 150.0, "logg": 0.30, "mh": 0.20,
-                "alpha_m": 0.05, "mg_h": 0.20,
+                "teff": 150.0,
+                "logg": 0.30,
+                "mh": 0.20,
+                "alpha_m": 0.05,
+                "mg_h": 0.20,
             },
         ),
         AblationConfig(
             name="recommended_no_alpha_tighten",
             description="Recommended gate-set simplification but with α/M "
-                         "σ-threshold left at 0.10. Isolates the gate-set effect "
-                         "from the σ-tighten.",
+            "σ-threshold left at 0.10. Isolates the gate-set effect "
+            "from the σ-tighten.",
             ood_flags=("ood_joint_flag",),
             caveat_flags=(),
             caveat_flags_per_element={"alpha_m": ("mode_ambiguous_flag",)},
             use_kin_ood=False,
             sigma_thresholds={
-                "teff": 150.0, "logg": 0.30, "mh": 0.20,
-                "alpha_m": 0.10, "mg_h": 0.20,
+                "teff": 150.0,
+                "logg": 0.30,
+                "mh": 0.20,
+                "alpha_m": 0.10,
+                "mg_h": 0.20,
             },
         ),
         AblationConfig(
             name="recommended",
             description="Final 2026-04-26 recommendation. Mahalanobis OOD only; "
-                         "mode-ambiguous demotion on α/M only; kin_ood disabled "
-                         "(Stream-3 layer concern); all other gates dropped; "
-                         "α/M σ-threshold tightened to 0.05.",
+            "mode-ambiguous demotion on α/M only; kin_ood disabled "
+            "(Stream-3 layer concern); all other gates dropped; "
+            "α/M σ-threshold tightened to 0.05.",
             ood_flags=("ood_joint_flag",),
             caveat_flags=(),
             caveat_flags_per_element={"alpha_m": ("mode_ambiguous_flag",)},
             use_kin_ood=False,
             sigma_thresholds={
-                "teff": 150.0, "logg": 0.30, "mh": 0.20,
-                "alpha_m": 0.05, "mg_h": 0.20,
+                "teff": 150.0,
+                "logg": 0.30,
+                "mh": 0.20,
+                "alpha_m": 0.05,
+                "mg_h": 0.20,
             },
         ),
     ]
@@ -394,20 +401,27 @@ def main() -> None:
         m = metrics_for_config(df, truth, test_idx, cfg, train_sigma)
         results.append(m)
         # Quick stdout summary of Tier 1 RMSE per element.
-        t1_rmse = {e: m["per_element"][e].get("tier1", {}).get("rmse", float("nan"))
-                   for e in ELEMENTS}
-        t1_frac = {e: m["per_element"][e].get("tier1", {}).get("frac_of_test", 0.0)
-                   for e in ELEMENTS}
-        msg = ", ".join(f"{e}:f={t1_frac[e]:.3f}/RMSE={t1_rmse[e]:.3f}"
-                         for e in ELEMENTS)
+        t1_rmse = {
+            e: m["per_element"][e].get("tier1", {}).get("rmse", float("nan")) for e in ELEMENTS
+        }
+        t1_frac = {
+            e: m["per_element"][e].get("tier1", {}).get("frac_of_test", 0.0) for e in ELEMENTS
+        }
+        msg = ", ".join(f"{e}:f={t1_frac[e]:.3f}/RMSE={t1_rmse[e]:.3f}" for e in ELEMENTS)
         print(f"  {cfg.name:24s} {msg}")
 
     out_path = OUT_DIR / "ablations.json"
-    out_path.write_text(json.dumps({
-        "n_test": int(len(test_idx)),
-        "train_sigma": train_sigma,
-        "ablations": results,
-    }, indent=2, default=float))
+    out_path.write_text(
+        json.dumps(
+            {
+                "n_test": int(len(test_idx)),
+                "train_sigma": train_sigma,
+                "ablations": results,
+            },
+            indent=2,
+            default=float,
+        )
+    )
     print(f"\nwrote {out_path}")
 
 

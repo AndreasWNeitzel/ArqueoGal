@@ -43,9 +43,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("run_knn_rescue")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_ENSEMBLE = (
-    REPO_ROOT / "models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label"
-)
+_DEFAULT_ENSEMBLE = REPO_ROOT / "models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label"
 _DEFAULT_TRAIN = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
 _DEFAULT_INFER = REPO_ROOT / "data/processed/pipeline1_features_stream3.parquet"
 _DEFAULT_FROZEN = REPO_ROOT / "data/processed/pipeline1_features_stream1.provenance.json"
@@ -71,8 +69,7 @@ def _load_inference_features(
     """
     feature_cols = list(layout.all_required_columns)
     raw_cols = ["source_id"] + [
-        c.replace("bp_c0_z", "bp_c0_log").replace("rp_c0_z", "rp_c0_log")
-        for c in feature_cols
+        c.replace("bp_c0_z", "bp_c0_log").replace("rp_c0_z", "rp_c0_log") for c in feature_cols
     ]
     df = pd.read_parquet(parquet, columns=list(dict.fromkeys(raw_cols)))
     sid = df["source_id"].to_numpy(dtype=np.int64)
@@ -84,7 +81,9 @@ def _load_inference_features(
     rp_norm = df[rp_norm_cols].to_numpy(dtype=np.float64)
     bp_c0_log = df["bp_c0_log"].to_numpy(dtype=np.float64)
     rp_c0_log = df["rp_c0_log"].to_numpy(dtype=np.float64)
-    bp_z, rp_z, bp_c0_z, rp_c0_z = apply_frozen_zscore(bp_norm, rp_norm, bp_c0_log, rp_c0_log, stats)
+    bp_z, rp_z, bp_c0_z, rp_c0_z = apply_frozen_zscore(
+        bp_norm, rp_norm, bp_c0_log, rp_c0_log, stats
+    )
 
     df_z = df.copy()
     for i in range(1, 55):
@@ -100,14 +99,18 @@ def _load_inference_features(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ensemble-dir", type=Path, default=_DEFAULT_ENSEMBLE)
-    parser.add_argument("--member", type=int, default=0, help="Ensemble member index used for kNN encoder.")
+    parser.add_argument(
+        "--member", type=int, default=0, help="Ensemble member index used for kNN encoder."
+    )
     parser.add_argument("--train-parquet", type=Path, default=_DEFAULT_TRAIN)
     parser.add_argument("--infer-parquet", type=Path, default=_DEFAULT_INFER)
     parser.add_argument("--frozen-stats", type=Path, default=_DEFAULT_FROZEN)
     parser.add_argument("--output", type=Path, default=_DEFAULT_OUTPUT)
     parser.add_argument("--k", type=int, default=50)
     parser.add_argument("--batch", type=int, default=2048)
-    parser.add_argument("--device", default=None, help="Override torch device (e.g. 'cuda:0', 'cpu').")
+    parser.add_argument(
+        "--device", default=None, help="Override torch device (e.g. 'cuda:0', 'cpu')."
+    )
     args = parser.parse_args()
 
     # load_ensemble does flat glob *.pt; production checkpoints live at
@@ -121,8 +124,10 @@ def main() -> None:
     if not 0 <= args.member < len(members):
         raise ValueError(f"--member {args.member} out of range [0, {len(members)})")
     model = members[args.member].model
-    device = torch.device(args.device) if args.device else (
-        torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = (
+        torch.device(args.device)
+        if args.device
+        else (torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     )
     model.to(device)
     _LOG.info("loaded ensemble member %d from %s on %s", args.member, args.ensemble_dir, device)

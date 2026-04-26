@@ -737,8 +737,8 @@ def _write_report(  # noqa: PLR0913, PLR0915 — operator report
         "",
         "## 1. Strategy",
         "",
-        f"- Primary strategy: **TAP UPLOAD** (VOTable join against `TAP_UPLOAD.sidlist`).",
-        f"  Validated against GAVO live service with a 10 k smoke test before the run.",
+        "- Primary strategy: **TAP UPLOAD** (VOTable join against `TAP_UPLOAD.sidlist`).",
+        "  Validated against GAVO live service with a 10 k smoke test before the run.",
         f"- Actual strategy used: **`{strategy_used}`**"
         + (
             " (no fallback needed)"

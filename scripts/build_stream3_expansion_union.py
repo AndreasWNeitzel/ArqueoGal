@@ -560,7 +560,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915 — linear driver
     print(f"    ... from uniform arm:           {n_uniform_new:>10,}")
     print(f"    ... from volume-limited arm:    {n_vol_new:>10,}")
     print(f"  Wall-clock:                       {dt:>10.1f} s")
-    print(f"  Outputs:")
+    print("  Outputs:")
     print(f"    {OUT_UNION.relative_to(REPO)} ({union_size_mb:.2f} MB)")
     print(f"    {OUT_DELTA_IDS.relative_to(REPO)} ({delta_size_mb:.2f} MB)")
     print("=== done ===\n")

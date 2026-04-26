@@ -8,14 +8,14 @@ import numpy as np
 import pytest
 
 from arqueogal.xp_abundances.main.tier_promotion import (
-    IncompleteProtocolError,
+    STUBBED_TESTS,
     TEST_1_PHYSICAL_FEASIBILITY,
     TEST_2_HOLDOUT_RMSE,
     TEST_3_SHAP_FEATURE_IMPORTANCE,
     TEST_4_PERMUTATION_SHUFFLE_NULL,
     TEST_5_CONDITIONAL_MI,
     TEST_6_CROSS_CATALOGUE_CONSISTENCY,
-    STUBBED_TESTS,
+    IncompleteProtocolError,
     TestResult,
     TierPromotionReport,
     audit_gate,
@@ -388,6 +388,4 @@ def test_incomplete_protocol_error_is_exception() -> None:
     """Verify IncompleteProtocolError is an exception class."""
     assert issubclass(IncompleteProtocolError, Exception)
     with pytest.raises(IncompleteProtocolError):
-        raise IncompleteProtocolError(
-            "test 3 SHAP cannot pass without validation work"
-        )
+        raise IncompleteProtocolError("test 3 SHAP cannot pass without validation work")

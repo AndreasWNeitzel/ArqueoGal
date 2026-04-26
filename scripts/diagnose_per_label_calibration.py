@@ -24,6 +24,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+
+# Reuse the heavy lifting from run_calibration.
+import sys as _sys
 from pathlib import Path
 
 import numpy as np
@@ -32,9 +35,6 @@ import torch
 from arqueogal.xp_abundances.main.data import FeatureLayout, LabelScaler, LabelTiers
 from arqueogal.xp_abundances.main.model import default_pipeline1_layout
 from arqueogal.xp_abundances.main.training import build_dataloaders, load_checkpoint
-
-# Reuse the heavy lifting from run_calibration.
-import sys as _sys
 
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_calibration import (  # noqa: E402
@@ -215,11 +215,11 @@ def main() -> None:
 
     print("\n# Summary")
     print(f"- max |bias|/y_std across labels: {max_abs_bias:.4g}")
-    print(f"  (Hypothesis B flag if > ~0.10)")
+    print("  (Hypothesis B flag if > ~0.10)")
     print(f"- max |z_std − 1| across labels: {max_zstd_dev:.4g}")
-    print(f"  (Hypothesis A flag — direct measure of per-label marginal miscalibration)")
+    print("  (Hypothesis A flag — direct measure of per-label marginal miscalibration)")
     print(f"- max |z_mean| across labels: {max_zmean:.4g}")
-    print(f"  (Hypothesis B flag if > ~0.2)")
+    print("  (Hypothesis B flag if > ~0.2)")
     print(f"- labels failing rel_err ≤ 0.10: {len(bad_labels)}/{len(valid)}")
     print(f"  failing: {bad_labels}")
     print(f"  passing: {good_labels}")
