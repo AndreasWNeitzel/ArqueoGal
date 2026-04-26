@@ -1,6 +1,6 @@
 {
   "train_parquet": "/home/aneitzel/projects/ArqueoGal/data/processed/pipeline1_features_stream1.parquet",
-  "output_dir": "models/main/xp_abundances/strong_contrastive_2026-04-25/20260425_6b96c06_b0a9cb6_ensemble_5label",
+  "output_dir": "/home/aneitzel/projects/ArqueoGal/models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label",
   "latent_dim": 32,
   "trunk_hidden": [
     256,
@@ -12,7 +12,7 @@
   "weight_decay": 0.0001,
   "pct_start": 0.15,
   "grad_clip_norm": 1.0,
-  "epochs": 12,
+  "epochs": 30,
   "batch_size": 512,
   "num_workers": 2,
   "amp_dtype": "bfloat16",
@@ -39,7 +39,7 @@
   "ensemble_seeds": [
     0
   ],
-  "early_stop_patience": 3,
+  "early_stop_patience": 5,
   "early_stop_min_delta": 0.0001,
   "deterministic": false,
   "use_c0_scalars": true,
@@ -64,5 +64,5 @@
   ],
   "inverse_freq_clip": 5.0,
   "git_sha": "6b96c06c8d6925939a3a102427a83d50afd97142",
-  "cfg_hash": "b0a9cb6"
+  "cfg_hash": "cd1cbb9"
 }

@@ -1,0 +1,64 @@
+{
+  "ensemble_dir": "models/main/xp_abundances/subset20k_test/20260425_6b96c06_3e284e9_ensemble_5label",
+  "pretrained_ckpt": "models/main/xp_abundances/20260421_38a993e_1371f1a/xp_abundances_main_contrastive_seed0_best.pt",
+  "cfg_hash": "3e284e9",
+  "git_sha": "6b96c06c8d6925939a3a102427a83d50afd97142",
+  "device": "cuda",
+  "members": [
+    {
+      "seed": 0,
+      "ckpt": "models/main/xp_abundances/subset20k_test/20260425_6b96c06_3e284e9_ensemble_5label/member_seed0/xp_abundances_main_ensemble_5label_seed0_best.pt",
+      "best_val_loss": 0.33476542805631954,
+      "best_epoch": 2,
+      "history": [
+        {
+          "epoch": 0,
+          "train_loss": 1.2940964231304093,
+          "train_supcon": 3.1609978582344804,
+          "train_nll": 0.977996628074085,
+          "train_barlow": 0.0,
+          "train_tau": 0.09746195156784619,
+          "train_grad_norm_max": 246.11480712890625,
+          "train_grad_norm_mean": 48.9893964879653,
+          "val_loss": 0.7189702366789182,
+          "val_supcon": 3.9987805684407554,
+          "val_nll": 0.3190921762337287,
+          "val_barlow": 0.0,
+          "val_tau": 0.09422723948955536
+        },
+        {
+          "epoch": 1,
+          "train_loss": 0.50173905433393,
+          "train_supcon": 3.02859670975629,
+          "train_nll": 0.19887937532336103,
+          "train_barlow": 0.0,
+          "train_tau": 0.09229897547001932,
+          "train_grad_norm_max": 61.9908447265625,
+          "train_grad_norm_mean": 33.26403118582333,
+          "val_loss": 0.4098794162273407,
+          "val_supcon": 3.942645172278086,
+          "val_nll": 0.015614896935100356,
+          "val_barlow": 0.0,
+          "val_tau": 0.09072231501340866
+        },
+        {
+          "epoch": 2,
+          "train_loss": 0.34380434541141286,
+          "train_supcon": 3.0192839865591012,
+          "train_nll": 0.04187594067451416,
+          "train_barlow": 0.0,
+          "train_tau": 0.09023104388924207,
+          "train_grad_norm_max": 46.06127166748047,
+          "train_grad_norm_mean": 25.46260461620256,
+          "val_loss": 0.33476542805631954,
+          "val_supcon": 3.9336809118588767,
+          "val_nll": -0.05860266803453366,
+          "val_barlow": 0.0,
+          "val_tau": 0.09004297107458115
+        }
+      ]
+    }
+  ],
+  "val_loss_mean": 0.33476542805631954,
+  "val_loss_spread": 0.0
+}

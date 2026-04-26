@@ -1,6 +1,6 @@
 {
-  "train_parquet": "/home/aneitzel/projects/ArqueoGal/data/processed/pipeline1_features_stream1.parquet",
-  "output_dir": "models/main/xp_abundances/strong_contrastive_2026-04-25/20260425_6b96c06_b0a9cb6_ensemble_5label",
+  "train_parquet": "data/processed/pipeline1_features_stream1.parquet",
+  "output_dir": "models/main/xp_abundances/strong_contrastive_2026-04-25/20260425_6b96c06_dbcbc09_ensemble_5label",
   "latent_dim": 32,
   "trunk_hidden": [
     256,
@@ -13,19 +13,19 @@
   "pct_start": 0.15,
   "grad_clip_norm": 1.0,
   "epochs": 12,
-  "batch_size": 512,
+  "batch_size": 256,
   "num_workers": 2,
   "amp_dtype": "bfloat16",
   "loss_weights": {
-    "supcon": 0.3,
+    "supcon": 1.0,
     "beta_nll": 1.0,
     "beta": 0.0,
     "supcon_sigma": 0.1,
     "supcon_label_n_first": null,
-    "barlow": 0.8,
+    "barlow": 0.5,
     "barlow_lam": 0.005
   },
-  "temperature_init": 0.15,
+  "temperature_init": 0.1,
   "temperature_bounds": [
     0.001,
     0.5
@@ -64,5 +64,5 @@
   ],
   "inverse_freq_clip": 5.0,
   "git_sha": "6b96c06c8d6925939a3a102427a83d50afd97142",
-  "cfg_hash": "b0a9cb6"
+  "cfg_hash": "dbcbc09"
 }
