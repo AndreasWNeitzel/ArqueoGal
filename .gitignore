@@ -8,6 +8,28 @@ AGENTS.md
 # Logs
 logs/
 
+# Images: never committed (figures and gallery PNGs stay local).
+*.png
+*.PNG
+*.jpg
+*.JPG
+*.jpeg
+*.JPEG
+*.gif
+*.GIF
+*.svg
+*.SVG
+*.webp
+*.bmp
+*.tif
+*.tiff
+*.ico
+*.pdf
+*.PDF
+
+# Filter-repo backup snapshot
+.git-backup-before-filter/
+
 # Reports tree: stays local, not part of the GitHub publication surface.
 # Includes gallery PNGs, training-run logs, calibration JSONs, audit chain
 # reports, sanity-battery figures, and figure outputs.
