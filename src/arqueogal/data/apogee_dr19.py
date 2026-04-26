@@ -1,4 +1,4 @@
-"""APOGEE DR19 (Mészáros+2025) summary file ingestion — Stream 1, step 1.
+"""APOGEE DR19 (Mészáros+2025) summary file ingestion. Stream 1, step 1.
 
 Reads the Astra/ASPCAP summary FITS (HDU 2), keeps only the columns we need
 for training Pipeline 1, applies the §3.3 quality cuts, derives ``c_n`` if
@@ -9,10 +9,12 @@ absent, and hands off to provenance.
 :func:`ingest_dr19_summary`, which composes this module with
 ``arqueogal.data.downloads``.
 
-The §3.4 Mészáros+2025 Teff-trend corrections are a deliberate **stub** —
-calling ``apply_meszaros2025_corrections`` raises ``NotImplementedError`` with
-the exact next action (fetch the supplementary polynomials). Do NOT silently
-skip this before training — the correction is mandatory (see
+The §3.4 Mészáros+2025 Teff-trend corrections are implemented in
+:func:`apply_meszaros2025_corrections`, which rewrites the 14 per-element
+abundances listed in Mészáros Table 3 (α, O, Na, Mg, Al, Si, S, K, Ca, Ti,
+Cr, Mn, Ni, Ce). [M/H], [Fe/H], C, N, V, Cu are intentionally left
+uncorrected per Mészáros §4.1-4.2; do not extend the correction to those
+labels. The correction is mandatory before use as training targets (see
 ``docs/data_acquisition.md`` §3.4).
 
 DR19 ASPCAP summary naming conventions
