@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install minimal dependencies (no GPU, no RAPIDS)
+        run: |
+          uv pip install --system \
+            "numpy>=1.26" "pandas>=2.0" "pyarrow>=15" "scipy>=1.11" \
+            "matplotlib>=3.8" "astropy>=6" "scikit-learn>=1.4" \
+            "torch>=2.0" "pytest>=9.0" "ruff>=0.5" "pyvo>=1.8.1" \
+            "pydantic>=2.0" "pydantic-settings>=2.0" "PyYAML>=6.0"
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/ scripts/
+
+      - name: Format check with ruff
+        run: ruff format --check src/ tests/ scripts/
+
+      - name: Run CPU-safe tests
+        run: |
+          pytest tests/xp_abundances/main/test_release.py \
+                 tests/data/test_release_pipeline.py \
+                 -v --tb=short
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          PYTHONUNBUFFERED: "1"

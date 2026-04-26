@@ -17,6 +17,7 @@ keywords = ["galactic-archaeology", "stellar-populations", "gaia", "apogee", "ma
 # Do NOT use `pip install -e .` to pull these; they are already installed.
 dependencies = [
     "aim>=3.29.1",
+    "pyvo>=1.8.1",
 ]
 
 [project.optional-dependencies]
@@ -46,4 +47,19 @@ pythonpath = ["src"]
 addopts = "-v --tb=short"
 markers = [
     "slow: integration tests invoking real galpy/astropy (seconds each)",
+    "gpu: tests that require a CUDA device and the production checkpoint",
+    "stress: hybrid stress-battery tests, opt-in via --run-stress",
+]
+
+[dependency-groups]
+dev = [
+    "astropy>=6",
+    "jupytext>=1.19.1",
+    "matplotlib>=3.8",
+    "pandas>=2.0",
+    "pyarrow>=15",
+    "pytest>=9.0.3",
+    "scikit-learn>=1.4",
+    "scipy>=1.11",
+    "torch>=2.0",
 ]

@@ -59,3 +59,6 @@ Thumbs.db
 
 # aim experiment tracking DB (Phase 5)
 .aim/
+
+# Expert-review workspaces (untracked, agent-generated reports)
+.expert_review_*/

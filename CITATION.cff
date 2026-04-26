@@ -1,0 +1,29 @@
+# Citation file for ArqueoGal Pipeline 1.
+# Note: DOI placeholder must be replaced after Zenodo minting.
+# Citation format specification: https://citation-file-format.github.io/
+
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Neitzel
+    given-names: Andreas W.
+    orcid: "https://orcid.org/0000-0001-6283-907X"
+  - family-names: Campante
+    given-names: Tiago L.
+  - family-names: Bossini
+    given-names: Diego
+  - family-names: Miglio
+    given-names: Andrea
+title: "ArqueoGal Pipeline 1: per-element abundances from Gaia BP/RP with calibrated information-content audit"
+version: "1.0.0"
+date-released: "2026-04-19"
+doi: "PLACEHOLDER-AWAITING-ZENODO"
+repository-code: "https://github.com/AndreasWNeitzel/ArqueoGal"
+license: MIT
+keywords:
+  - galactic-archaeology
+  - gaia
+  - apogee
+  - stellar-abundances
+  - machine-learning
+  - asteroseismology
