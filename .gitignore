@@ -62,3 +62,9 @@ Thumbs.db
 
 # Expert-review workspaces (untracked, agent-generated reports)
 .expert_review_*/
+
+# Local D-Cat-b release-format candidates (large parquets; regenerated from
+# tracked code, not part of the GitHub release surface).
+release/D-Cat-b/
+release/test_ablations_*/predictions_stream*.parquet
+release/test_ablations_*/predictions_stream*.parquet.provenance.json

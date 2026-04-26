@@ -1,8 +1,12 @@
-"""Stage 07: APOGEE DR19 labels (training targets) — Mészáros+2025 corrected.
+"""Stage 07: APOGEE DR19 labels + Mészáros+2025 [X/M] correction.
 
-Outputs:
-  - reports/gallery/07_apogee_labels/label_pairwise_hexbin.png
-  - reports/gallery/07_apogee_labels/label_nan_rates.png
+What the deploy did: ``data.apogee_dr19`` ingested DR19 ASPCAP and applied
+the Mészáros+2025 Table-3 polynomial corrections per element on RGB-only
+stars (logg < 3.8). CLAUDE.md hard rule #13 — corrections are mandatory
+before training.
+
+What we plot: per-label NaN rates, Teff vs logg pseudo-Kiel from APOGEE
+labels (training pool ground truth), [Mg/H] vs [Fe/H] α-bimodality.
 """
 
 from __future__ import annotations
@@ -12,187 +16,64 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pyarrow.parquet as pq
+import pandas as pd
 
-sys.path.append(str(Path(__file__).resolve().parent))
-from _common import (  # noqa: E402
-    DATA_PROCESSED,
-    GALLERY,
-    apply_style,
-    save_fig,
-)
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts" / "gallery"))
+from _common import apply_style, save_fig
 
-OUT = GALLERY / "07_apogee_labels"
+OUT = REPO / "reports/gallery/07_apogee_labels"
+S1 = REPO / "data/processed/pipeline1_features_stream1.parquet"
 
-ELEMENTS = [
-    # (column, display, group)
-    ("teff_apogee", "T_eff", "atmospheric"),
-    ("logg_apogee", "log g", "atmospheric"),
-    ("mh_apogee", "[M/H]", "atmospheric"),
-    ("alpha_m_apogee", "[alpha/M]", "alpha"),
-    ("fe_h_apogee", "[Fe/H]", "Fe-peak"),
-    ("mg_h_apogee", "[Mg/H]", "alpha"),
-    ("si_h_apogee", "[Si/H]", "alpha"),
-    ("ca_h_apogee", "[Ca/H]", "alpha"),
-    ("ti_h_apogee", "[Ti/H]", "alpha"),
-    ("mn_h_apogee", "[Mn/H]", "Fe-peak"),
-    ("ni_h_apogee", "[Ni/H]", "Fe-peak"),
-    ("cr_h_apogee", "[Cr/H]", "Fe-peak"),
-    ("c_h_apogee", "[C/H]", "light"),
-    ("n_h_apogee", "[N/H]", "light"),
-    ("o_h_apogee", "[O/H]", "light"),
-    ("na_h_apogee", "[Na/H]", "light"),
-    ("al_h_apogee", "[Al/H]", "light"),
-    ("k_h_apogee", "[K/H]", "light"),
-    ("s_h_apogee", "[S/H]", "alpha"),
-    ("v_h_apogee", "[V/H]", "Fe-peak"),
-    ("ce_h_apogee", "[Ce/H]", "s-process"),
-]
-
-GROUP_COLOR = {
-    "atmospheric": "#1f77b4",
-    "alpha": "#2ca02c",
-    "Fe-peak": "#d62728",
-    "light": "#9467bd",
-    "s-process": "#ff7f0e",
-}
-
-
-def _have(schema, name: str) -> bool:
-    return name in {f.name for f in schema}
-
-
-def label_pairwise_hexbin() -> None:
-    path = DATA_PROCESSED / "pipeline1_features_stream1.parquet"
-    cols_needed = ["mh_apogee", "alpha_m_apogee", "fe_h_apogee", "mg_h_apogee"]
-    schema = pq.read_schema(path)
-    have = [c for c in cols_needed if _have(schema, c)]
-    df = pq.read_table(path, columns=have).to_pandas()
-
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-
-    pairs = [
-        (
-            "mh_apogee",
-            "alpha_m_apogee",
-            r"$[{\rm M}/{\rm H}]$",
-            r"$[\alpha/{\rm M}]$",
-            (-2.2, 0.6),
-            (-0.25, 0.55),
-        ),
-        (
-            "mh_apogee",
-            "fe_h_apogee",
-            r"$[{\rm M}/{\rm H}]$",
-            r"$[{\rm Fe}/{\rm H}]$",
-            (-2.2, 0.6),
-            (-2.2, 0.6),
-        ),
-        (
-            "alpha_m_apogee",
-            "mg_h_apogee",
-            r"$[\alpha/{\rm M}]$",
-            r"$[{\rm Mg}/{\rm H}]$",
-            (-0.25, 0.55),
-            (-1.8, 0.6),
-        ),
-    ]
-
-    for ax, (x, y, xl, yl, xlim, ylim) in zip(axes.flat, pairs):
-        if x not in df.columns or y not in df.columns:
-            ax.set_visible(False)
-            continue
-        xv = df[x].to_numpy(dtype=float)
-        yv = df[y].to_numpy(dtype=float)
-        m = np.isfinite(xv) & np.isfinite(yv)
-        hb = ax.hexbin(
-            xv[m],
-            yv[m],
-            gridsize=80,
-            cmap="magma",
-            bins="log",
-            extent=(xlim[0], xlim[1], ylim[0], ylim[1]),
-            mincnt=1,
-        )
-        plt.colorbar(hb, ax=ax, shrink=0.85, pad=0.02, label="log N")
-        # identity for mh vs feh
-        if x == "mh_apogee" and y == "fe_h_apogee":
-            ax.plot(xlim, xlim, "k--", lw=0.8, alpha=0.6)
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
-        ax.set_xlabel(xl)
-        ax.set_ylabel(yl)
-        ax.set_title(f"{xl} vs {yl}   n={int(m.sum()):,}")
-
-    fig.suptitle(
-        "APOGEE DR19 label pairwise hexbin  —  Mészáros+2025-corrected, Stream 1",
-        fontsize=13,
-        fontweight="bold",
-        y=1.02,
-    )
-    save_fig(fig, OUT / "label_pairwise_hexbin.png")
-
-
-def label_nan_rates() -> None:
-    path = DATA_PROCESSED / "pipeline1_features_stream1.parquet"
-    cols = [c for (c, _, _) in ELEMENTS]
-    schema = pq.read_schema(path)
-    have = [c for c in cols if _have(schema, c)]
-    df = pq.read_table(path, columns=have).to_pandas()
-    n = len(df)
-
-    rows = []
-    for col, name, group in ELEMENTS:
-        if col not in df.columns:
-            continue
-        nan_frac = 100.0 * df[col].isna().mean()
-        rows.append((col, name, group, nan_frac))
-
-    rows.sort(key=lambda r: r[3])  # ascending
-    names = [r[1] for r in rows]
-    fracs = np.array([r[3] for r in rows])
-    colors = [GROUP_COLOR[r[2]] for r in rows]
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    y = np.arange(len(rows))
-    bars = ax.barh(y, fracs, color=colors, edgecolor="#333", alpha=0.9)
-    ax.set_yticks(y)
-    ax.set_yticklabels(names)
-    ax.set_xlabel("NaN rate  [%]")
-    ax.set_title(
-        rf"APOGEE DR19 per-label NaN rate  —  n={n:,} Stream 1 stars  "
-        r"(drives `mask=` path in beta_nll_block_cholesky)",
-        fontsize=11,
-        fontweight="semibold",
-    )
-    # annotations
-    for b, pct in zip(bars, fracs):
-        ax.text(
-            b.get_width() + 0.15,
-            b.get_y() + b.get_height() / 2,
-            f"{pct:.2f}%",
-            va="center",
-            fontsize=8,
-            color="#333",
-        )
-    ax.set_xlim(0, max(25, 1.1 * fracs.max() if len(fracs) else 10))
-    ax.grid(True, axis="x", alpha=0.3)
-    ax.invert_yaxis()
-
-    # legend for groups
-    from matplotlib.patches import Patch
-
-    legend = [Patch(facecolor=c, edgecolor="#333", label=g) for g, c in GROUP_COLOR.items()]
-    ax.legend(handles=legend, loc="lower right", title="group")
-
-    save_fig(fig, OUT / "label_nan_rates.png")
+LABEL_COLS = ("teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee",
+              "mg_h_apogee", "fe_h_apogee", "ca_h_apogee", "si_h_apogee",
+              "al_h_apogee", "n_h_apogee", "c_h_apogee")
 
 
 def main() -> None:
     apply_style()
-    OUT.mkdir(parents=True, exist_ok=True)
-    label_pairwise_hexbin()
-    label_nan_rates()
+    df = pd.read_parquet(S1, columns=list(LABEL_COLS))
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.4))
+
+    # NaN rates
+    rates = [(c.replace("_apogee", ""), df[c].isna().mean() * 100) for c in LABEL_COLS]
+    names = [r[0] for r in rates]
+    pcts = [r[1] for r in rates]
+    bars = axes[0].bar(range(len(names)), pcts, color="#1f77b4")
+    axes[0].set_xticks(range(len(names)))
+    axes[0].set_xticklabels(names, rotation=45, ha="right", fontsize=8)
+    axes[0].set_ylabel("% NaN in Stream 1")
+    axes[0].set_title("APOGEE label coverage (post-Mészáros+25)")
+    for b, p in zip(bars, pcts):
+        if p > 0.1:
+            axes[0].text(b.get_x() + b.get_width() / 2, p + 0.1, f"{p:.1f}",
+                          ha="center", fontsize=7)
+
+    # APOGEE pseudo-Kiel
+    teff = df["teff_apogee"].to_numpy(); logg = df["logg_apogee"].to_numpy()
+    m = np.isfinite(teff) & np.isfinite(logg)
+    h = axes[1].hexbin(teff[m], logg[m], gridsize=70, mincnt=10, cmap="viridis",
+                        bins="log", extent=[3500, 6500, 0.5, 4.0])
+    plt.colorbar(h, ax=axes[1], label="log10 N")
+    axes[1].invert_xaxis(); axes[1].invert_yaxis()
+    axes[1].set_xlabel(r"$T_{\rm eff}$ (K), APOGEE")
+    axes[1].set_ylabel(r"$\log g$ (dex), APOGEE")
+    axes[1].set_title(f"Stream-1 APOGEE Kiel ({int(m.sum()):,})")
+
+    # α/M vs M/H bimodality
+    mh = df["mh_apogee"].to_numpy(); am = df["alpha_m_apogee"].to_numpy()
+    m = np.isfinite(mh) & np.isfinite(am)
+    h = axes[2].hexbin(mh[m], am[m], gridsize=70, mincnt=10, cmap="viridis",
+                        bins="log", extent=[-2.5, 0.6, -0.2, 0.5])
+    plt.colorbar(h, ax=axes[2], label="log10 N")
+    axes[2].set_xlabel("[M/H] (dex), APOGEE")
+    axes[2].set_ylabel(r"[$\alpha$/M] (dex), APOGEE")
+    axes[2].set_title("Training-pool α-bimodality")
+
+    fig.suptitle("APOGEE DR19 training labels (Mészáros+2025 [X/M] corrections applied)",
+                  fontsize=11)
+    save_fig(fig, OUT / "apogee_labels.png")
 
 
 if __name__ == "__main__":

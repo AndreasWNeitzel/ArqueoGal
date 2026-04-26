@@ -157,6 +157,8 @@ class MasterSchema:
     optional: tuple[str, ...] = ()
     array_cols: tuple[str, ...] = ()
     array_length: int | None = None
+    version: int = 2
+    last_modified: str = "2026-04-24"
 
     @property
     def all_columns(self) -> tuple[str, ...]:
@@ -210,6 +212,8 @@ PIPELINE1_TRAINING_SCHEMA: Final[MasterSchema] = MasterSchema(
     optional=_TRAINING_OPTIONAL_FLAGS,
     array_cols=XP_ARRAY_COLS,
     array_length=XP_N_COEFFS,
+    version=3,
+    last_modified="2026-04-24",
 )
 """§10.1 training-set schema (~700 k rows)."""
 
@@ -227,6 +231,89 @@ _ANDRAE_OPTIONAL_DIAG_COLS: Final[tuple[str, ...]] = ("evolutionary_stage_andrae
 default :mod:`arqueogal.data.andrae2023` column set. Keep the schema slot
 as optional so callers who opt into the extra column still validate."""
 
+_PIPELINE1_RELEASE_COLS: Final[tuple[str, ...]] = (
+    "release_tier",
+    "release_tier__teff",
+    "release_tier__logg",
+    "release_tier__mh",
+    "release_tier__alpha_m",
+    "release_tier__mg_h",
+    "xp_abundance_type__teff",
+    "xp_abundance_type__logg",
+    "xp_abundance_type__mh",
+    "xp_abundance_type__alpha_m",
+    "xp_abundance_type__mg_h",
+    "kin_ood_flag",
+    "g_mag_bin",
+    "dist_prior_dominated",
+    "ood_aux_mahalanobis_flag",
+    # v4 (Phase A2-followup-2, 2026-04-25): per-element σ-inflation caveat.
+    "prediction_sigma_inflated__teff",
+    "prediction_sigma_inflated__logg",
+    "prediction_sigma_inflated__mh",
+    "prediction_sigma_inflated__alpha_m",
+    "prediction_sigma_inflated__mg_h",
+    "prediction_sigma_inflated_any",
+)
+"""Release-tier catalog columns added after inference.
+
+v2 (Phase A2, 2026-04-24): release_tier, xp_abundance_type__<element>, kin_ood_flag, g_mag_bin.
+v3 (Phase A2-followup, 2026-04-24): per-element release_tier__<element>, dist_prior_dominated,
+ood_aux_mahalanobis_flag. The composite release_tier becomes the row-max of per-element
+tiers (most conservative). The per-element tiers consume xp_abundance_type__<element> and
+kin_ood_flag to demote aux-assisted elements when the kinematic-OOD flag fires (META_META
+§14.3, outlier_flagging.md).
+v4 (Phase A2-followup-2, 2026-04-25): per-element ``prediction_sigma_inflated__<elem>``
+flag (5 columns) plus the ``prediction_sigma_inflated_any`` row-OR aggregate. When the
+regression-head σ for an element exceeds its prior-collapse threshold (Teff: 150 K;
+logg: 0.30 dex; [M/H], [Mg/H]: 0.20 dex; [α/M] originally 0.10 dex — see v5), that
+element demotes to Tier 2 — see release.assign_prediction_sigma_inflated and
+HIGH_SIGMA_RESCUE_REPORT.md.
+v5 (per-cell-gate ablation, 2026-04-26): simplified release-tier composition; α/M
+σ-threshold tightened 0.10 → 0.05 dex; ``mode_ambiguous_flag`` becomes a per-element
+caveat on [α/M] only; ``regime_b_flag``, ``ood_disagreement_flag``, ``aux_missing_any``,
+``dist_prior_dominated``, ``latent_support_flag``, ``ood_aux_mahalanobis_flag`` retired
+from tier gating but kept as diagnostic columns. See ADR-0015 and
+release/test_ablations_2026-04-26/REPORT.md."""
+
+_PIPELINE1_KNN_RESCUE_COLS: Final[tuple[str, ...]] = (
+    # Per-element neighbour-label statistics emitted by knn_rescue.summarize_neighbors.
+    "knn_teff_med", "knn_teff_p25", "knn_teff_p75", "knn_teff_iqr", "knn_teff_std",
+    "knn_logg_med", "knn_logg_p25", "knn_logg_p75", "knn_logg_iqr", "knn_logg_std",
+    "knn_mh_med", "knn_mh_p25", "knn_mh_p75", "knn_mh_iqr", "knn_mh_std",
+    "knn_alpha_m_med", "knn_alpha_m_p25", "knn_alpha_m_p75", "knn_alpha_m_iqr", "knn_alpha_m_std",
+    "knn_mg_h_med", "knn_mg_h_p25", "knn_mg_h_p75", "knn_mg_h_iqr", "knn_mg_h_std",
+    "knn_top_distance",
+    "knn_median_distance",
+)
+"""Latent-kNN rescue columns (v4-followup, 2026-04-25).
+
+For each Stream 3 star, ``knn_rescue.gpu_knn_search`` finds the K nearest training-set
+neighbours in encoder-projection space (cosine distance, K=50) and ``summarize_neighbors``
+reports their actual APOGEE label distribution. The kNN bypasses the regression head
+entirely and is bounded by training-set support (no extrapolation), so it is the
+preferred fallback for stars whose regression-head σ exceeds the prior-collapse
+threshold (HIGH_SIGMA_RESCUE_REPORT.md, 2026-04-25). Hybrid composition with the
+regression head is implemented separately in release_pipeline.run_hybrid_release_pipeline."""
+
+_PIPELINE1_HYBRID_COLS: Final[tuple[str, ...]] = (
+    # v5: hybrid (regressor + kNN) composed columns from
+    # release_pipeline.attach_hybrid_columns. Per-element pred / sigma /
+    # source-of-prediction / hybrid tier.
+    "teff_hybrid_pred", "teff_hybrid_sigma", "teff_hybrid_source", "teff_hybrid_tier",
+    "logg_hybrid_pred", "logg_hybrid_sigma", "logg_hybrid_source", "logg_hybrid_tier",
+    "mh_hybrid_pred", "mh_hybrid_sigma", "mh_hybrid_source", "mh_hybrid_tier",
+    "alpha_m_hybrid_pred", "alpha_m_hybrid_sigma", "alpha_m_hybrid_source", "alpha_m_hybrid_tier",
+    "mg_h_hybrid_pred", "mg_h_hybrid_sigma", "mg_h_hybrid_source", "mg_h_hybrid_tier",
+)
+"""Hybrid composer columns (v5, 2026-04-25).
+
+The hybrid surface composes the regressor and the latent-kNN: regressor is used
+when its σ is below the per-element prior-collapse threshold; kNN-median
+substitutes when σ is above-threshold AND kNN columns are populated;
+``regressor_caveat`` is the fallback label when kNN is unavailable. See
+``release_pipeline.attach_hybrid_columns``."""
+
 PIPELINE1_INFERENCE_SCHEMA: Final[MasterSchema] = MasterSchema(
     name="pipeline1_inference",
     required=(
@@ -241,9 +328,17 @@ PIPELINE1_INFERENCE_SCHEMA: Final[MasterSchema] = MasterSchema(
         *_ANDRAE_DIAG_COLS,
         *_TRAINING_FLAGS,
     ),
-    optional=(*_TRAINING_OPTIONAL_FLAGS, *_ANDRAE_OPTIONAL_DIAG_COLS),
+    optional=(
+        *_TRAINING_OPTIONAL_FLAGS,
+        *_ANDRAE_OPTIONAL_DIAG_COLS,
+        *_PIPELINE1_RELEASE_COLS,
+        *_PIPELINE1_KNN_RESCUE_COLS,
+        *_PIPELINE1_HYBRID_COLS,
+    ),
     array_cols=XP_ARRAY_COLS,
     array_length=XP_N_COEFFS,
+    version=5,
+    last_modified="2026-04-25",
 )
 """§10.2 inference-set schema (~1.5 M rows).
 

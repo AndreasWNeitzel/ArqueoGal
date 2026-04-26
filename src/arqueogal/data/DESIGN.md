@@ -1,4 +1,4 @@
-# `arqueogal.data` — Design
+# `arqueogal.data`. Design
 
 ## Purpose
 
@@ -15,29 +15,29 @@ polynomials, and disk-footprint accounting live there.
 
 ```
 arqueogal.data
-├── credentials.py        — reads ~/.arqueogal/credentials.yaml (AIP user/password, etc.)
-├── tap.py                — pyvo TAP wrappers (AIP, GAVO, VizieR). Async submission >5k rows.
-├── downloads.py          — requests-based HTTPS downloads with streaming, tqdm, SHA-256,
+├── credentials.py, reads ~/.arqueogal/credentials.yaml (AIP user/password, etc.)
+├── tap.py, pyvo TAP wrappers (AIP, GAVO, VizieR). Async submission >5k rows.
+├── downloads.py, requests-based HTTPS downloads with streaming, tqdm, SHA-256,
 │                           atomic temp→rename.
-├── provenance.py         — JSON sidecar writer (§14.4 of data_acquisition.md).
-├── gaia_corrections.py   — Lindegren+2021 parallax zpt + Riello+2021 G-mag correction.
+├── provenance.py. JSON sidecar writer (§14.4 of data_acquisition.md).
+├── gaia_corrections.py. Lindegren+2021 parallax zpt + Riello+2021 G-mag correction.
 │                           Mandatory at Stream 1/3 ingestion.
-├── apogee_dr19.py        — Stream 1 loader; DR19 column-naming handling; Mészáros+2025
+├── apogee_dr19.py. Stream 1 loader; DR19 column-naming handling; Mészáros+2025
 │                           [X/M]/Teff correction polynomials.
-├── tess_hon2021.py       — Stream 2 loader; Hon+2021 ν_max catalogue; TASOC pre-staging.
-├── stream3_selection.py  — Andrae+2023 vetted-RGB stratified sampling to 1.5M stars.
-├── gaia_xp.py            — XP coefficient extraction; Ye+2024 NN flux-correction;
-│                           normalisation (§6.4 — FIXED ORDER: Ye+2024 → divide by c0 →
+├── tess_hon2021.py. Stream 2 loader; Hon+2021 ν_max catalogue; TASOC pre-staging.
+├── stream3_selection.py. Andrae+2023 vetted-RGB stratified sampling to 1.5M stars.
+├── gaia_xp.py. XP coefficient extraction; Ye+2024 NN flux-correction;
+│                           normalisation (§6.4. FIXED ORDER: Ye+2024 → divide by c0 →
 │                           log10+z-score c0 → error propagation).
-├── dust_maps.py          — Edenhofer+2024 (d<1.25 kpc) / Lallement+2022 (1.25–3 kpc) /
+├── dust_maps.py. Edenhofer+2024 (d<1.25 kpc) / Lallement+2022 (1.25–3 kpc) /
 │                           SFD composition + GSP-Phot neighborhood-median Av via cKDTree.
-├── distances.py          — Bailer-Jones+2021 (GAVO TAP) + StarHorse2 v2 (AIP TAP).
-├── kinematics.py         — galpy orbits (McMillan17, Staeckel fudge, δ=0.45); central-value
+├── distances.py. Bailer-Jones+2021 (GAVO TAP) + StarHorse2 v2 (AIP TAP).
+├── kinematics.py, galpy orbits (McMillan17, Staeckel fudge, δ=0.45); central-value
 │                           for bulk, full MC driven by downstream consumers (Starfold,
 │                           separate repo) for boundary-star subsamples only.
-├── crossmatch.py         — DR2↔DR3 via gaiadr3.dr2_neighbourhood; TIC v8.2↔Gaia DR3.
+├── crossmatch.py. DR2↔DR3 via gaiadr3.dr2_neighbourhood; TIC v8.2↔Gaia DR3.
 │                           Many-to-many handling; brightest-tie-break.
-└── fire2_ananke.py       — Subtask 5.1 hare-and-hounds. Follows Starfold (separate repo);
+└── fire2_ananke.py. Subtask 5.1 hare-and-hounds. Follows Starfold (separate repo);
                             retained here only if still imported for method-validation
                             harness and strictly segregated from real-data science.
 ```
@@ -59,7 +59,7 @@ arqueogal.data
 - **5 GB disk budget** (data_acquisition.md §12). Audit before adding artefacts.
 - **Float32 downcast** for XP coefficients and kinematics outputs at Parquet write time;
   float64 inside galpy integration for numerical stability.
-- **No XP coefficient correlation matrices** — 48 GB for 2 M stars; excluded from budget.
+- **No XP coefficient correlation matrices**: 48 GB for 2 M stars; excluded from budget.
 - **FIRE-2 in `data/fire2/`, strictly separated from `data/processed/`** (real-data science).
 
 ## Tests

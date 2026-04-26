@@ -1,8 +1,8 @@
-# ArqueoGal plan — overview
+# ArqueoGal plan, overview
 
 Last updated: 2026-04-22. Pipeline 1 v1 shipped 2026-04-19 but exhibited an
 [α/M]≈+0.11 attractor-stripe on metal-poor stars (chemistry bimodality
-collapse). Active work is a joint-loss architecture port from TESS_ML —
+collapse). Active work is a joint-loss architecture port from TESS_ML 
 single-stage `supcon + beta_nll + barlow_twins` replacing the two-stage
 contrastive→supervised workflow. The port preserves the disc bimodality on
 the Stream-1 validation split (attractor-stripe fraction 6.27% vs v2 ~72%).
@@ -25,11 +25,11 @@ Starfold trains with `age=null` until Task 4 delivers.
 
 | File | Phase | Status |
 |---|---|---|
-| `01_pipeline1_v1.md` | Pipeline 1 v1 production model | **Shipped but superseded** — tagged `pipeline1-v1-2026-04-19`; chemistry bimodality collapse motivated rebuild |
-| `02_pipeline1_audit.md` | §9.2 information-content audit | **Partial** — 5/6 tests done + tier decisions ratified; test 6 (cross-catalogue) blocked on Stream 3 |
-| `03_stream3_inference.md` | Stream 3 expansion + Pipeline 1 inference | **In progress** — Phase 2 prerequisites complete; Phase 3 gated on joint-loss ensemble |
-| `04_pipeline2_main.md` | Population classification (D5.1 deliverable) | **Moved to Starfold** — separate repo; this file is now a pointer / integration-contract stub |
-| `05_release_packaging.md` | D-Cat-b, D5.1, D-Cat-d packaging | **Underspecified** — release-format decisions deferred |
+| `01_pipeline1_v1.md` | Pipeline 1 v1 production model | **Shipped but superseded**: tagged `pipeline1-v1-2026-04-19`; chemistry bimodality collapse motivated rebuild |
+| `02_pipeline1_audit.md` | §9.2 information-content audit | **Partial**: 5/6 tests done + tier decisions ratified; test 6 (cross-catalogue) blocked on Stream 3 |
+| `03_stream3_inference.md` | Stream 3 expansion + Pipeline 1 inference | **In progress**: Phase 2 prerequisites complete; Phase 3 gated on joint-loss ensemble |
+| `04_pipeline2_main.md` | Population classification (D5.1 deliverable) | **Moved to Starfold**: separate repo; this file is now a pointer / integration-contract stub |
+| `05_release_packaging.md` | D-Cat-b, D5.1, D-Cat-d packaging | **Underspecified**: release-format decisions deferred |
 | `06_methods_paper.md` | Methods paper (parallel to deliverables) | **Tracked, not actively drafted** |
 
 ## Current work (joint-loss rebuild in flight as of 2026-04-22)
@@ -48,7 +48,7 @@ Starfold trains with `age=null` until Task 4 delivers.
 - Retired scripts kept in-tree for git history but not on the critical
   path: `run_contrastive_pretrain.py`, `run_supervised_finetune.py`,
   `run_ensemble.py`. Old v1.x diagnostic scripts (10 files) reference
-  `pretrained_encoder_ckpt` and will break on joint checkpoints —
+  `pretrained_encoder_ckpt` and will break on joint checkpoints 
   re-patch only when re-invoked for the methods paper.
 - Gallery stages 10-14 cleared (READMEs preserved). Stage 10 is now
   intentionally empty (no pretrain stage in joint architecture).
