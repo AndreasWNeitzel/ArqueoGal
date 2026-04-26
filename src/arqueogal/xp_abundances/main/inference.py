@@ -21,6 +21,12 @@ release layer free to pick whichever it needs.
 Post-hoc calibration (from :mod:`.uncertainty`) is applied per member
 before aggregation if the checkpoint carries a calibration blob — that's
 how DESIGN §Release gates wants it: calibrate each member, then average.
+
+NaN safety: all features are sanitised at inference entry via
+``np.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0)`` per ADR-0012.
+The XpFeatureAdapter (in data loader / preprocessing) is a pass-through
+and does not guard against NaNs; sanitisation must occur at the inference
+driver boundary before the first model forward pass.
 """
 
 from __future__ import annotations
@@ -34,6 +40,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+from arqueogal.data.frozen_stats import assert_frozen_stats_match
 from arqueogal.xp_abundances.main.model import (
     CovarianceBlockLayout,
     ModelConfig,
@@ -205,10 +212,21 @@ def predict_ensemble(
     ``cell_ids`` (optional) is a per-star cell ID array used for per-cell
     temperature scaling. If omitted, the cell ID 0 is used for every star —
     equivalent to a single global calibration cell.
+
+    Raises
+    ------
+    AssertionError
+        If the feature tensor contains non-finite values after NaN sanitisation.
+        This indicates either that ``nan_to_num`` failed to capture a pathology
+        (e.g., a user-supplied value of NaN not caught by the loader) or that
+        the caller's data is malformed. See ADR-0012.
     """
     if not ensemble:
         raise ValueError("ensemble is empty")
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Pre-flight check: verify frozen v1 stats are available and basis matches.
+    assert_frozen_stats_match()
 
     mus: list[np.ndarray] = []
     Sigmas_alea: list[np.ndarray] = []
@@ -217,6 +235,16 @@ def predict_ensemble(
     for m in ensemble:
         preds = collect_predictions(m.model, loader, device=device)
         mu_m, L_m = preds["mu"], preds["L"]
+        # NaN safety (ADR-0012): sanitise predictions before aggregation.
+        # This catches any NaN/Inf that slipped through the data loader.
+        mu_m = np.nan_to_num(mu_m, nan=0.0, posinf=0.0, neginf=0.0)
+        L_m = np.nan_to_num(L_m, nan=0.0, posinf=0.0, neginf=0.0)
+        assert np.isfinite(mu_m).all(), (
+            "Inference detected non-finite mu_m after nan_to_num. See ADR-0012."
+        )
+        assert np.isfinite(L_m).all(), (
+            "Inference detected non-finite L_m after nan_to_num. See ADR-0012."
+        )
         if cell_ids is None:
             cell_ids_m = np.zeros(mu_m.shape[0], dtype=np.int64)
         else:
@@ -229,11 +257,18 @@ def predict_ensemble(
         if y_ref is None:
             y_ref = preds["y"]
 
-    per_mu = np.stack(mus, axis=0)  # (M, B, n)
-    per_Sig = np.stack(Sigmas_alea, axis=0)  # (M, B, n, n)
-    mu_mean = per_mu.mean(axis=0)
-    Sigma_alea = per_Sig.mean(axis=0)
-    delta = per_mu - mu_mean[None]
+    # Streaming aggregation (memory-efficient, avoids O(M * B * n^2) stacking).
+    # Accumulate Σ_alea and epistemic moments without holding the full per-member stack.
+    per_mu = np.stack(mus, axis=0)  # (M, B, n) — required for epistemic covariance
+    mu_mean = per_mu.mean(axis=0)  # (B, n)
+
+    # Accumulate aleatoric covariance via streaming; free per-member covariance after use.
+    Sigma_alea = np.zeros_like(Sigmas_alea[0]) if Sigmas_alea else np.zeros((1, 1, 1))
+    for Sigma_m in Sigmas_alea:
+        Sigma_alea += Sigma_m / len(Sigmas_alea)
+
+    # Epistemic covariance from centered per-member means.
+    delta = per_mu - mu_mean[None, :, :]  # (M, B, n)
     Sigma_epi = np.einsum("mbi,mbj->bij", delta, delta) / per_mu.shape[0]
     Sigma_total = Sigma_alea + Sigma_epi
 

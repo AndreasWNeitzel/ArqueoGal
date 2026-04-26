@@ -133,12 +133,24 @@ def bin_by_cells(
     n_bins: tuple[int, ...] = (4, 4, 4),
     *,
     seed: int = 0,
+    quantile_offset: float = 0.0,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Quantile-bin each column of ``features`` into ``n_bins[j]`` bins and combine.
 
     Returns ``(cell_ids, cell_definition)`` where ``cell_ids`` is an int array
     of length ``N`` and ``cell_definition`` is a serialisable dict capturing
     the bin edges per column so the same binning can be reapplied at inference.
+
+    Parameters
+    ----------
+    quantile_offset
+        Shift applied to all internal quantile cut points. Default 0.0 places
+        edges at ``[1/nb, 2/nb, …, (nb-1)/nb]``. A small offset (e.g.
+        ``0.5/nb``) puts cuts at ``[1.5/nb, 2.5/nb, …]`` so cell boundaries
+        do not coincide with the median (50 %ile) of the data — this avoids
+        the visible "cell-edge cliff" at high-density modes (the disc peak in
+        [M/H] sits at the 75 %ile of APOGEE training and would otherwise land
+        exactly on a cell boundary, producing tier-filter discontinuities).
     """
     if features.ndim != 2:
         raise ValueError(f"features must be 2D, got shape {features.shape}")
@@ -146,6 +158,8 @@ def bin_by_cells(
         raise ValueError(
             f"n_bins length {len(n_bins)} does not match feature dim {features.shape[1]}"
         )
+    if not -0.5 < quantile_offset < 0.5:
+        raise ValueError(f"quantile_offset must be in (-0.5, 0.5), got {quantile_offset}")
 
     rng = np.random.default_rng(seed)
     n, _ = features.shape
@@ -155,7 +169,9 @@ def bin_by_cells(
         col = features[:, j].astype(np.float64)
         finite = np.isfinite(col)
         if finite.any():
-            edges = np.quantile(col[finite], np.linspace(0, 1, nb + 1)[1:-1])
+            qs = np.linspace(0, 1, nb + 1)[1:-1] + quantile_offset / nb
+            qs = np.clip(qs, 0.0, 1.0)
+            edges = np.quantile(col[finite], qs)
         else:
             edges = np.zeros(nb - 1, dtype=np.float64)
         idx = np.zeros(n, dtype=np.int64)
@@ -168,6 +184,7 @@ def bin_by_cells(
     definition = {
         "n_bins": list(n_bins),
         "edges_per_col": edges_per_col,
+        "quantile_offset": float(quantile_offset),
     }
     return codes, definition
 

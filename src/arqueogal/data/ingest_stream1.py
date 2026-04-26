@@ -137,7 +137,15 @@ def ingest_stream1(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     )
 
     logger.info("Stream 1: inner merge APOGEE × Gaia on source_id")
-    merged = corrected.merge(enriched, on="source_id", how="inner")
+    # APOGEE allStar carries multiple ASPCAP solutions per Gaia source_id (different
+    # visits, programs, reduction runs). The Gaia DR3 enrichment is one row per
+    # source_id by construction. Hence many_to_one is the load-bearing contract:
+    # we expect repeated source_ids on the left and exactly one on the right.
+    # validate="many_to_one" enforces this; it raises if a future Gaia enrichment
+    # query regression produces duplicates on the right side. The downstream training
+    # driver dedups (training.py:122-135) before splitting so the multi-spectrum
+    # rows do not leak across train/val/test.
+    merged = corrected.merge(enriched, on="source_id", how="inner", validate="many_to_one")
     n_merged = len(merged)
     logger.info(
         "Stream 1: merged %d rows (APOGEE post-cut %d × Gaia %d)",
@@ -197,6 +205,14 @@ def ingest_stream1(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
             "gaia_enriched": len(enriched),
             "merged": n_merged,
             "enrich_checkpoint_dir": str(checkpoint_dir),
+            # Persist the Mészáros+2025 correction summary so the audit trail
+            # survives the parquet write (pandas drops .attrs by default).
+            # Keys preserved verbatim from apply_meszaros2025_corrections().
+            "meszaros_correction_summary": (
+                corrected.attrs.get("meszaros_correction_summary").to_dict("records")
+                if isinstance(corrected.attrs.get("meszaros_correction_summary"), pd.DataFrame)
+                else corrected.attrs.get("meszaros_correction_summary")
+            ),
         },
     )
     write_sidecar(prov)

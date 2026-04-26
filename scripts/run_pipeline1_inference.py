@@ -171,7 +171,16 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("run_pipeline1_inference")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+# Default ensemble: strong-contrastive-v2 (SupCon=1.0 + Barlow=0.5), trained 2026-04-25
+# on full Stream 1, 1 seed. The strong contrastive recipe reduces the 74k-star
+# prior-collapse spike from 18.32% (v1) to 0.20% on Stream 3 while preserving
+# Tier-1 RMSE; see HIGH_SIGMA_RESCUE_REPORT.md (2026-04-25). The legacy 5-seed
+# v1 ensemble at ``20260419_nogit_a0e10aa_ensemble_5label`` is retained for
+# methodology comparison and can be selected explicitly via ``--ensemble-dir``.
 DEFAULT_ENSEMBLE_DIR = (
+    REPO_ROOT / "models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label"
+)
+LEGACY_V1_ENSEMBLE_DIR = (
     REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
 )
 DEFAULT_FROZEN_STATS = REPO_ROOT / "data/processed/pipeline1_features_stream1.provenance.json"

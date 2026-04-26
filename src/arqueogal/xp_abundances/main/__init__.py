@@ -34,6 +34,13 @@ from arqueogal.xp_abundances.main.inference import (
     load_ensemble,
     predict_ensemble,
 )
+from arqueogal.xp_abundances.main.knn_rescue import (
+    KnnRescueArtifact,
+    compute_latents,
+    gpu_knn_search,
+    summarize_neighbors,
+    write_artifact,
+)
 from arqueogal.xp_abundances.main.losses import (
     beta_nll_block_cholesky,
     mahalanobis_residual,
@@ -90,6 +97,7 @@ __all__ = [
     "EnsembleMember",
     "EnsemblePrediction",
     "FeatureLayout",
+    "KnnRescueArtifact",
     "LabelTiers",
     "LossWeights",
     "ModelConfig",
@@ -107,6 +115,7 @@ __all__ = [
     "beta_nll_block_cholesky",
     "bin_by_cells",
     "cluster_precision",
+    "compute_latents",
     "conditional_mi_bootstrap",
     "conditional_mi_ksg",
     "coverage_at_levels",
@@ -114,6 +123,7 @@ __all__ = [
     "decorrelated_subsample",
     "default_pipeline1_layout",
     "fit_calibration",
+    "gpu_knn_search",
     "holdout_rmse",
     "leave_one_coeff_out",
     "load_arrays",
@@ -129,9 +139,11 @@ __all__ = [
     "seed_everything",
     "shuffled_spectrum_null",
     "stratified_split_ids",
+    "summarize_neighbors",
     "supcon_soft_positive",
     "tier_counts",
     "tier_promotion_report",
     "train_ensemble",
     "train_model",
+    "write_artifact",
 ]

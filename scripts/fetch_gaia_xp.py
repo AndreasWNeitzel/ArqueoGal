@@ -1,5 +1,5 @@
 """Fetch raw Gaia DR3 XP continuous-mean-spectrum coefficients for the
-Stream 1 + Stream 3 union of has_xp_continuous sources.
+Stream 1 + Stream 2 + Stream 3 union of has_xp_continuous sources.
 
 Uses AIP's ``gaiadr3.xp_continuous_mean_spectrum`` TAP table via UPLOAD —
 astroquery DataLink (XP_CONTINUOUS retrieval_type) works but is slower and
@@ -68,6 +68,7 @@ def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
 def main() -> None:
     repo = Path(__file__).resolve().parents[1]
     s1_path = repo / "data" / "interim" / "stream1_gaia_dr3_corrected.parquet"
+    s2_path = repo / "data" / "interim" / "stream2_tess_gaia.parquet"
     s3_path = repo / "data" / "interim" / "stream3_gaia_dr3_corrected.parquet"
     ids_out = repo / "data" / "interim" / "xp_source_ids.parquet"
     xp_out = repo / "data" / "interim" / "xp_coeffs_raw.parquet"
@@ -77,15 +78,21 @@ def main() -> None:
         if not p.exists():
             raise SystemExit(f"missing input: {p}")
 
-    logger.info("loading has_xp_continuous source_ids from Stream 1 + Stream 3")
+    logger.info("loading has_xp_continuous source_ids from Stream 1 + Stream 2 + Stream 3")
     s1 = pd.read_parquet(s1_path, columns=["source_id", "has_xp_continuous"])
     s3 = pd.read_parquet(s3_path, columns=["source_id", "has_xp_continuous"])
     s1_xp = s1.loc[s1["has_xp_continuous"], "source_id"]
     s3_xp = s3.loc[s3["has_xp_continuous"], "source_id"]
+    if s2_path.exists():
+        s2 = pd.read_parquet(s2_path, columns=["source_id", "has_xp_continuous"])
+        s2_xp = s2.loc[s2["has_xp_continuous"], "source_id"]
+    else:
+        logger.warning("Stream 2 interim parquet missing at %s — skipping", s2_path)
+        s2_xp = pd.Series([], dtype="int64", name="source_id")
 
     # Union, dedupe, preserve int64.
     union = (
-        pd.concat([s1_xp, s3_xp], ignore_index=True)
+        pd.concat([s1_xp, s2_xp, s3_xp], ignore_index=True)
         .drop_duplicates()
         .astype("int64")
         .sort_values()
@@ -94,11 +101,13 @@ def main() -> None:
     n_src = len(union)
     n_batches = (n_src + XP_BATCH_SIZE - 1) // XP_BATCH_SIZE
     logger.info(
-        "Stream 1 has_xp: %d, Stream 3 has_xp: %d, union: %d (dedup by %d)",
+        "Stream 1 has_xp: %d, Stream 2 has_xp: %d, Stream 3 has_xp: %d, "
+        "union: %d (dedup by %d)",
         len(s1_xp),
+        len(s2_xp),
         len(s3_xp),
         n_src,
-        len(s1_xp) + len(s3_xp) - n_src,
+        len(s1_xp) + len(s2_xp) + len(s3_xp) - n_src,
     )
     logger.info("XP fetch: %d batches of %d via AIP UPLOAD", n_batches, XP_BATCH_SIZE)
 
@@ -125,35 +134,46 @@ def main() -> None:
     size_mb = xp_out.stat().st_size / 1024**2
     logger.info("wrote %s (%.1f MB, %d cols)", xp_out, size_mb, len(df.columns))
 
+    sources = [
+        LocalSource(
+            name="Stream 1 Gaia DR3 corrected",
+            path=str(s1_path.relative_to(repo)),
+            sha256=_sha256_of(s1_path),
+        ),
+        LocalSource(
+            name="Stream 3 Gaia DR3 corrected",
+            path=str(s3_path.relative_to(repo)),
+            sha256=_sha256_of(s3_path),
+        ),
+        LocalSource(
+            name="XP target source_id union",
+            path=str(ids_out.relative_to(repo)),
+            sha256=_sha256_of(ids_out),
+        ),
+        TapSource(
+            name=f"AIP {XP_TABLE} (UPLOAD)",
+            endpoint=AIP_TAP_URL,
+            query=XP_QUERY_ADQL_UPLOAD,
+            n_batches=n_batches,
+            batch_size=XP_BATCH_SIZE,
+        ),
+    ]
+    if s2_path.exists():
+        sources.insert(
+            1,
+            LocalSource(
+                name="Stream 2 TESS × Gaia DR3 corrected",
+                path=str(s2_path.relative_to(repo)),
+                sha256=_sha256_of(s2_path),
+            ),
+        )
+
     prov = Provenance(
         output_file=str(xp_out.relative_to(repo)),
         script="scripts/fetch_gaia_xp.py",
-        sources=[
-            LocalSource(
-                name="Stream 1 Gaia DR3 corrected",
-                path=str(s1_path.relative_to(repo)),
-                sha256=_sha256_of(s1_path),
-            ),
-            LocalSource(
-                name="Stream 3 Gaia DR3 corrected",
-                path=str(s3_path.relative_to(repo)),
-                sha256=_sha256_of(s3_path),
-            ),
-            LocalSource(
-                name="XP target source_id union",
-                path=str(ids_out.relative_to(repo)),
-                sha256=_sha256_of(ids_out),
-            ),
-            TapSource(
-                name=f"AIP {XP_TABLE} (UPLOAD)",
-                endpoint=AIP_TAP_URL,
-                query=XP_QUERY_ADQL_UPLOAD,
-                n_batches=n_batches,
-                batch_size=XP_BATCH_SIZE,
-            ),
-        ],
+        sources=sources,
         cuts_applied=[
-            "has_xp_continuous == True (Stream 1 ∪ Stream 3)",
+            "has_xp_continuous == True (Stream 1 ∪ Stream 2 ∪ Stream 3)",
         ],
         corrections=[
             "coefficient_correlations dropped (data_acquisition.md §6.3 — "
@@ -167,11 +187,12 @@ def main() -> None:
             "scripts/apply_ye2024_xp.py (live, uses vendored NN weights); "
             "(2) normalise c[1:] by c[0]; (3) log10 + z-score c[0]; "
             "(4) downcast to float32 — all three performed by "
-            "scripts/build_pipeline1_features_stream1.py."
+            "scripts/build_pipeline1_features_stream{1,2,3}.py."
         ),
         extra={
             "batch_size": XP_BATCH_SIZE,
             "n_stream1_xp": int(len(s1_xp)),
+            "n_stream2_xp": int(len(s2_xp)),
             "n_stream3_xp": int(len(s3_xp)),
             "n_union": n_src,
         },

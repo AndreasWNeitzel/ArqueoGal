@@ -90,6 +90,12 @@ def build_ensemble_config(
     output_prefix: str = "xp_abundances_main_ensemble",
     inverse_freq_weighting: bool = False,
     inverse_freq_clip: float = 5.0,
+    supcon_w: float = 0.3,
+    beta_nll_w: float = 1.0,
+    beta_val: float = 0.0,
+    barlow_w: float = 0.8,
+    barlow_lam: float = 0.005,
+    early_stop_patience: int = 3,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -102,7 +108,7 @@ def build_ensemble_config(
         pct_start=0.15,
         weight_decay=1e-4,
         grad_clip_norm=1.0,
-        early_stop_patience=3,
+        early_stop_patience=early_stop_patience,
         early_stop_min_delta=1e-4,
         relative_min_delta=False,
         use_c0_scalars=True,
@@ -112,14 +118,18 @@ def build_ensemble_config(
         checkpoint_every_n_epochs=0,  # per-member only keeps best-val
         output_prefix=output_prefix,
         loss_weights=LossWeights(
-            supcon=0.1,
-            beta_nll=1.0,
-            beta=0.0,
+            supcon=supcon_w,
+            beta_nll=beta_nll_w,
+            beta=beta_val,
             supcon_sigma=0.10,
             supcon_label_n_first=None,
+            barlow=barlow_w,
+            barlow_lam=barlow_lam,
         ),
         grad_norm_abort_threshold=500.0,
-        temperature_init=0.10,
+        temperature_init=0.15,  # was 0.10; larger τ softens contrastive
+        # gradient and reduces train-side overfit on SupCon while keeping
+        # the supervised label-clustering signal.
         ensemble_seeds=seeds,
         inverse_freq_weighting=inverse_freq_weighting,
         inverse_freq_clip=inverse_freq_clip,
@@ -135,6 +145,9 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
+    parser.add_argument("--early-stop-patience", type=int, default=3,
+                         help="Epochs of no val improvement before stopping. "
+                         "Default 3; bump to 5+ for longer runs to absorb noise.")
     parser.add_argument(
         "--label-set",
         choices=("21", "5"),
@@ -157,6 +170,26 @@ def main() -> None:
         help="Max w = 1/p(bin) before mean-1 normalisation. Default 5.0.",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--supcon",
+        type=float,
+        default=0.3,
+        help="SupCon weight (default 0.3 = convergence-tuned recipe; previous "
+        "1.0 produced a widening train/val gap on the supcon component while "
+        "β-NLL/Barlow generalised. 0.3 keeps the supervised label-clustering "
+        "signal without the overfit pattern.",
+    )
+    parser.add_argument(
+        "--barlow",
+        type=float,
+        default=0.8,
+        help="Barlow Twins weight (default 0.8 = convergence-tuned; previously "
+        "0.5). Increased to compensate for the lower SupCon, since Barlow's "
+        "off-diagonal regularisation generalises well across train/val.",
+    )
+    parser.add_argument("--barlow-lam", type=float, default=0.005, help="Barlow off-diag scale")
+    parser.add_argument("--beta-nll", type=float, default=1.0)
+    parser.add_argument("--beta", type=float, default=0.0, help="β-NLL temperature (0=plain NLL)")
     args = parser.parse_args()
 
     seeds = tuple(args.seeds)
@@ -180,6 +213,12 @@ def main() -> None:
         output_prefix=output_prefix,
         inverse_freq_weighting=args.inverse_freq,
         inverse_freq_clip=args.inverse_freq_clip,
+        supcon_w=args.supcon,
+        beta_nll_w=args.beta_nll,
+        beta_val=args.beta,
+        barlow_w=args.barlow,
+        barlow_lam=args.barlow_lam,
+        early_stop_patience=args.early_stop_patience,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
     ensemble_dir = args.model_dir / f"{date_tag}_{sha7}_{cfg_hash}{ensemble_suffix}"
@@ -195,6 +234,12 @@ def main() -> None:
         output_prefix=output_prefix,
         inverse_freq_weighting=args.inverse_freq,
         inverse_freq_clip=args.inverse_freq_clip,
+        supcon_w=args.supcon,
+        beta_nll_w=args.beta_nll,
+        beta_val=args.beta,
+        barlow_w=args.barlow,
+        barlow_lam=args.barlow_lam,
+        early_stop_patience=args.early_stop_patience,
     )
     layout = FeatureLayout()
 

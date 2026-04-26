@@ -77,6 +77,9 @@ _TRANSIENT_ERROR_MARKERS: tuple[str, ...] = (
     "503 Service",
     "504 Gateway Timeout",
     "connection reset",
+    "connection aborted",
+    "remote end closed connection",
+    "remotedisconnected",
     "temporarily unavailable",
     # ESA's anonymous async submit queue intermittently 500s under load;
     # pyvo wraps it as DALServiceError. The string form matches both the

@@ -14,12 +14,15 @@ import numpy as np
 import pytest
 
 from arqueogal.data.frozen_stats import (
+    FROZEN_V1_BASIS_FINGERPRINT,
     XP_COEFF_LEN,
     FrozenStatsMismatchError,
     FrozenZScoreStats,
     apply_frozen_zscore,
+    assert_frozen_stats_match,
     load_frozen_zscore_stats,
     verify_basis_fingerprint,
+    verify_frozen_stats_match_parquet,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -368,3 +371,188 @@ def test_load_raises_on_missing_coefficient(tmp_path: Path) -> None:
     p.write_text(json.dumps(payload))
     with pytest.raises(KeyError, match="missing coefficient"):
         load_frozen_zscore_stats(p)
+
+
+# ---- FrozenStatsMismatchError halt + assert_frozen_stats_match ----
+
+
+def test_frozen_stats_mismatch_error_attributes(tmp_path: Path) -> None:
+    """FrozenStatsMismatchError stores expected/observed fingerprints."""
+    p = tmp_path / "prov.json"
+    _write_minimal_provenance(p, fingerprint="a" * 64)
+    stats = load_frozen_zscore_stats(p)
+    try:
+        verify_basis_fingerprint("b" * 64, stats)
+        pytest.fail("Expected FrozenStatsMismatchError")
+    except FrozenStatsMismatchError as e:
+        assert e.expected == "a" * 64
+        assert e.observed == "b" * 64
+        assert "a" * 64 in str(e)
+        assert "b" * 64 in str(e)
+
+
+def test_assert_frozen_stats_match_raises_without_provenance(tmp_path: Path, monkeypatch) -> None:
+    """assert_frozen_stats_match raises if provenance sidecar is missing."""
+    # Mock the repo root to a temp directory without provenance.
+    import os
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        # Create a .git folder so the search finds tmp_path as repo root.
+        (tmp_path / ".git").mkdir()
+        with pytest.raises(RuntimeError, match="provenance sidecar not found"):
+            assert_frozen_stats_match()
+    finally:
+        os.chdir(old_cwd)
+
+
+def test_assert_frozen_stats_match_with_valid_provenance(tmp_path: Path, monkeypatch) -> None:
+    """assert_frozen_stats_match succeeds when provenance fingerprint matches."""
+    import os
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        (tmp_path / ".git").mkdir()
+        (tmp_path / "data" / "processed").mkdir(parents=True)
+        prov_path = tmp_path / "data" / "processed" / "pipeline1_features_stream1.provenance.json"
+        _write_minimal_provenance(
+            prov_path,
+            fingerprint=FROZEN_V1_BASIS_FINGERPRINT,
+        )
+        # Should not raise.
+        assert_frozen_stats_match(expected_fingerprint=FROZEN_V1_BASIS_FINGERPRINT)
+    finally:
+        os.chdir(old_cwd)
+
+
+def test_assert_frozen_stats_match_raises_on_fingerprint_mismatch(
+    tmp_path: Path,
+) -> None:
+    """assert_frozen_stats_match raises if fingerprint mismatches."""
+    import os
+
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        (tmp_path / ".git").mkdir()
+        (tmp_path / "data" / "processed").mkdir(parents=True)
+        prov_path = tmp_path / "data" / "processed" / "pipeline1_features_stream1.provenance.json"
+        _write_minimal_provenance(prov_path, fingerprint="x" * 64)
+        with pytest.raises(FrozenStatsMismatchError, match="basis fingerprint mismatch"):
+            assert_frozen_stats_match(expected_fingerprint="y" * 64)
+    finally:
+        os.chdir(old_cwd)
+
+
+# ---- verify_frozen_stats_match_parquet (defensive resampling check) --------
+
+
+def _make_synthetic_training_parquet(
+    path: Path,
+    *,
+    n: int,
+    bp_mu: float,
+    bp_sigma: float,
+    rp_mu: float,
+    rp_sigma: float,
+    seed: int = 0,
+) -> None:
+    """Synthesise a 2-column parquet with c0 values matching given log-mean and log-sigma."""
+    import pandas as pd
+
+    rng = np.random.default_rng(seed)
+    bp0 = 10.0 ** rng.normal(bp_mu, bp_sigma, n).astype(np.float64)
+    rp0 = 10.0 ** rng.normal(rp_mu, rp_sigma, n).astype(np.float64)
+    pd.DataFrame({"bp_coef_0": bp0, "rp_coef_0": rp0}).to_parquet(path)
+
+
+def _make_stats_for_parquet_check(
+    *,
+    c0_bp_mean_log10: float = -14.4,
+    c0_bp_sigma_log10: float = 0.57,
+    c0_rp_mean_log10: float = -14.44,
+    c0_rp_sigma_log10: float = 0.53,
+) -> FrozenZScoreStats:
+    return FrozenZScoreStats(
+        basis_fingerprint="x" * 64,
+        c0_bp_mean_log10=c0_bp_mean_log10,
+        c0_bp_sigma_log10=c0_bp_sigma_log10,
+        c0_rp_mean_log10=c0_rp_mean_log10,
+        c0_rp_sigma_log10=c0_rp_sigma_log10,
+        coef_norm_bp_mean=np.zeros(XP_COEFF_LEN - 1),
+        coef_norm_bp_sigma=np.ones(XP_COEFF_LEN - 1),
+        coef_norm_rp_mean=np.zeros(XP_COEFF_LEN - 1),
+        coef_norm_rp_sigma=np.ones(XP_COEFF_LEN - 1),
+        sigma_floor=1e-30,
+        n_reference_population=10_000,
+        reference_population_description="synthetic",
+    )
+
+
+def test_verify_frozen_stats_match_parquet_passes_within_tolerance(
+    tmp_path: Path,
+) -> None:
+    """Resampled c0 statistics within tolerance return ok=True diagnostic."""
+    parquet = tmp_path / "stream1.parquet"
+    _make_synthetic_training_parquet(
+        parquet,
+        n=20_000,
+        bp_mu=-14.4,
+        bp_sigma=0.57,
+        rp_mu=-14.44,
+        rp_sigma=0.53,
+    )
+    stats = _make_stats_for_parquet_check()
+    result = verify_frozen_stats_match_parquet(stats, parquet, sample_n=10_000)
+    assert result["ok"] is True
+    assert result["sample_n_actual"] == 10_000
+    assert result["c0_bp_mean_log10_drift"] < 0.05
+
+
+def test_verify_frozen_stats_match_parquet_raises_on_mean_drift(
+    tmp_path: Path,
+) -> None:
+    """Resampled c0 mean far from frozen value triggers FrozenStatsMismatchError."""
+    parquet = tmp_path / "stream1.parquet"
+    # Synthesise with BP mean shifted by 0.5 (>> 0.05 tolerance).
+    _make_synthetic_training_parquet(
+        parquet,
+        n=10_000,
+        bp_mu=-13.9,  # drift +0.5
+        bp_sigma=0.57,
+        rp_mu=-14.44,
+        rp_sigma=0.53,
+    )
+    stats = _make_stats_for_parquet_check(c0_bp_mean_log10=-14.4)
+    with pytest.raises(FrozenStatsMismatchError, match="mean drift"):
+        verify_frozen_stats_match_parquet(stats, parquet, sample_n=5_000)
+
+
+def test_verify_frozen_stats_match_parquet_raises_on_sigma_drift(
+    tmp_path: Path,
+) -> None:
+    """Resampled c0 sigma outside multiplicative tolerance triggers an error."""
+    parquet = tmp_path / "stream1.parquet"
+    # Synthesise with RP sigma 1.5x the frozen value (>> 0.10 ratio tolerance).
+    _make_synthetic_training_parquet(
+        parquet,
+        n=10_000,
+        bp_mu=-14.4,
+        bp_sigma=0.57,
+        rp_mu=-14.44,
+        rp_sigma=0.80,  # ~50% bigger
+    )
+    stats = _make_stats_for_parquet_check(c0_rp_sigma_log10=0.53)
+    with pytest.raises(FrozenStatsMismatchError, match="sigma ratio"):
+        verify_frozen_stats_match_parquet(stats, parquet, sample_n=5_000)
+
+
+def test_verify_frozen_stats_match_parquet_raises_on_missing_file(
+    tmp_path: Path,
+) -> None:
+    """A nonexistent parquet path raises FileNotFoundError."""
+    stats = _make_stats_for_parquet_check()
+    with pytest.raises(FileNotFoundError):
+        verify_frozen_stats_match_parquet(stats, tmp_path / "missing.parquet")

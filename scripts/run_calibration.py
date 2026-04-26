@@ -590,9 +590,13 @@ def main() -> None:
     )
 
     # Cell binning on APOGEE truth (Teff, logg, [M/H]) — block indices 0,1,2.
+    # 4×4×4 quantile binning, matches the production calibration. (Earlier
+    # diagnostic suggested calibration cell edges drove the M/H=0 cliff in
+    # Stream-3 inference, but the actual cause was the mode_ambiguous_grid
+    # cell edge at 0; calibration is empty in shipping checkpoints.)
     cell_features = y_cpu[:, :3].copy()
     cell_ids, cell_def = bin_by_cells(cell_features, n_bins=(4, 4, 4))
-    _LOG.info("binned into %d cells (4x4x4 nominal)", len(np.unique(cell_ids)))
+    _LOG.info("binned into %d cells (4x4x4)", len(np.unique(cell_ids)))
 
     # Pre-calibration reliability + coverage. Coverage and Mahalanobis can't
     # tolerate NaN labels, so we impute missing y with μ_bar (zero contribution

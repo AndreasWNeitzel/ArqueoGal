@@ -95,6 +95,8 @@ def set_aa_style(
         "figure.dpi": 150,
         "savefig.dpi": 300,
         "savefig.bbox": "tight",
+        "pdf.fonttype": 42,  # Embed TrueType fonts; required by A&A and ApJ
+        "ps.fonttype": 42,  # Embed TrueType fonts in PostScript
     }
     if colorblind:
         rc["axes.prop_cycle"] = mpl.cycler(color=list(WONG_PALETTE))

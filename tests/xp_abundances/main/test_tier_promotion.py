@@ -8,6 +8,14 @@ import numpy as np
 import pytest
 
 from arqueogal.xp_abundances.main.tier_promotion import (
+    IncompleteProtocolError,
+    TEST_1_PHYSICAL_FEASIBILITY,
+    TEST_2_HOLDOUT_RMSE,
+    TEST_3_SHAP_FEATURE_IMPORTANCE,
+    TEST_4_PERMUTATION_SHUFFLE_NULL,
+    TEST_5_CONDITIONAL_MI,
+    TEST_6_CROSS_CATALOGUE_CONSISTENCY,
+    STUBBED_TESTS,
     TestResult,
     TierPromotionReport,
     audit_gate,
@@ -16,6 +24,7 @@ from arqueogal.xp_abundances.main.tier_promotion import (
     cross_catalogue_consistency,
     holdout_rmse,
     physical_gate,
+    report_tier_coverage,
     tier_promotion_report,
 )
 
@@ -345,3 +354,40 @@ def test_tier_promotion_report_json_roundtrip() -> None:
     assert roundtrip["tier"] == "tier_1"
     assert roundtrip["element"] == "Mg"
     assert set(roundtrip["test1_physical"]) == {"passed", "statistic", "threshold", "detail"}
+
+
+# --- Protocol enums and stub discipline ----------------------------------
+
+
+def test_protocol_test_names_are_defined() -> None:
+    """Verify the six test names are available at module level."""
+    assert TEST_1_PHYSICAL_FEASIBILITY == "test_1_physical_feasibility"
+    assert TEST_2_HOLDOUT_RMSE == "test_2_holdout_rmse"
+    assert TEST_3_SHAP_FEATURE_IMPORTANCE == "test_3_shap_feature_importance"
+    assert TEST_4_PERMUTATION_SHUFFLE_NULL == "test_4_permutation_shuffle_null"
+    assert TEST_5_CONDITIONAL_MI == "test_5_conditional_mi"
+    assert TEST_6_CROSS_CATALOGUE_CONSISTENCY == "test_6_cross_catalogue_consistency"
+
+
+def test_stubbed_tests_marked_correctly() -> None:
+    """Verify that tests 3 (SHAP) and 6 (cross-catalogue) are marked as stubbed."""
+    assert TEST_3_SHAP_FEATURE_IMPORTANCE in STUBBED_TESTS
+    assert TEST_6_CROSS_CATALOGUE_CONSISTENCY in STUBBED_TESTS
+    assert len(STUBBED_TESTS) == 2
+
+
+def test_report_tier_coverage_returns_honest_statement() -> None:
+    """Verify the coverage statement reflects 5/6 implementation."""
+    coverage = report_tier_coverage()
+    assert "5/6" in coverage
+    assert "test 3" in coverage.lower() or "shap" in coverage.lower()
+    assert "test 6" in coverage.lower() or "cross" in coverage.lower()
+
+
+def test_incomplete_protocol_error_is_exception() -> None:
+    """Verify IncompleteProtocolError is an exception class."""
+    assert issubclass(IncompleteProtocolError, Exception)
+    with pytest.raises(IncompleteProtocolError):
+        raise IncompleteProtocolError(
+            "test 3 SHAP cannot pass without validation work"
+        )

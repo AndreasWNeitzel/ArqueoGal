@@ -63,7 +63,7 @@ class MahalanobisOODBundle:
         }
 
     @classmethod
-    def from_dict(cls, blob: dict[str, Any]) -> "MahalanobisOODBundle":
+    def from_dict(cls, blob: dict[str, Any]) -> MahalanobisOODBundle:
         return cls(
             feature_mean=np.asarray(blob["feature_mean"], dtype=np.float64),
             feature_precision=np.asarray(blob["feature_precision"], dtype=np.float64),
@@ -239,11 +239,150 @@ def combined_ood_status(
     return (mahal.astype(np.int8) + ens.astype(np.int8)).astype(np.int8)
 
 
+# -----------------------------------------------------------------------------
+# Aux-feature Mahalanobis OOD detector
+# -----------------------------------------------------------------------------
+#
+# The existing fit_mahalanobis_ood / flag_mahalanobis_ood are feature-space
+# agnostic; the ArqueoGal Phase A2 v1 release fits them on the 108-D XP block
+# only. The outlier_flagging review (META_META §14.3) found that aux-feature
+# NaN propagates silently because the XP-block detector cannot see aux
+# anomalies. This second bundle, fit on the aux feature space (parallax,
+# photometry, dust prior, distance, IR), gives a separate aux-OOD flag.
+#
+# Design choices:
+#
+# - One bundle per feature space, not a joint covariance. Joint Mahalanobis
+#   on 108 + ~15 aux dims is ill-conditioned (curse of dimensionality on
+#   ~150k training samples) and conflates XP-tail outliers with aux-extreme
+#   outliers, which have different release-side semantics.
+# - Aux features must be on the same scale as training. Caller is expected
+#   to apply the same z-scoring / normalisation used at training.
+# - The bundle is serialised exactly the same as the XP bundle and stored
+#   alongside it in the model checkpoint.
+#
+# The flag is integrated into release.py as ood_aux_mahalanobis_flag in the
+# _OOD_FLAGS tuple; firing → Tier 3 for all elements (same semantics as the
+# XP flag).
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class DualMahalanobisOOD:
+    """Pair of Mahalanobis bundles, one for XP feature space and one for aux.
+
+    Both bundles are independent fits on the *training-set* finite rows of
+    each feature space. ``score`` and ``flag`` operate on the bundle that
+    matches the calling site.
+
+    Attributes
+    ----------
+    xp : MahalanobisOODBundle
+        Bundle fit on the 108-D XP feature block (bp_coef_norm_1..54 +
+        rp_coef_norm_1..54 after frozen-stats z-scoring).
+    aux : MahalanobisOODBundle
+        Bundle fit on the aux feature block (parallax, photometry colors,
+        distance, dust prior, IR magnitudes — exact composition is set by
+        the caller and matches the model's aux input definition).
+    """
+
+    xp: MahalanobisOODBundle
+    aux: MahalanobisOODBundle
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"xp": self.xp.to_dict(), "aux": self.aux.to_dict()}
+
+    @classmethod
+    def from_dict(cls, blob: dict[str, Any]) -> DualMahalanobisOOD:
+        return cls(
+            xp=MahalanobisOODBundle.from_dict(blob["xp"]),
+            aux=MahalanobisOODBundle.from_dict(blob["aux"]),
+        )
+
+
+def fit_dual_mahalanobis_ood(
+    xp_features: np.ndarray,
+    aux_features: np.ndarray,
+    *,
+    p_threshold: float = 0.99,
+    xp_regularization: float = 1e-6,
+    aux_regularization: float = 1e-4,
+) -> DualMahalanobisOOD:
+    """Fit independent Mahalanobis bundles on XP and aux feature spaces.
+
+    Parameters
+    ----------
+    xp_features : (N, 108) array
+        XP feature block — typically the post-frozen-stats z-scored
+        bp_coef_norm_1..54 + rp_coef_norm_1..54.
+    aux_features : (N, A) array
+        Auxiliary feature block — caller-defined, must match the model's
+        aux input. Typical: parallax, BP-RP color, J-K color, A_V,
+        distance modulus, M_G after correction.
+    p_threshold : float
+        Same quantile applied to both bundles.
+    xp_regularization, aux_regularization : float
+        Diagonal-jitter for each covariance inverse. The aux block has
+        wider per-feature dynamic range and benefits from a slightly
+        looser regulariser; defaults are heuristic.
+
+    Notes
+    -----
+    The two bundles are fit on the same row-set after each space's
+    finite-row mask is applied independently. A row that is finite in XP
+    but not in aux contributes only to the XP bundle.
+    """
+    if xp_features.ndim != 2 or aux_features.ndim != 2:
+        raise ValueError(
+            f"both feature blocks must be 2D; got xp {xp_features.shape}, aux {aux_features.shape}",
+        )
+    if xp_features.shape[0] != aux_features.shape[0]:
+        raise ValueError(
+            f"row counts must match; got xp {xp_features.shape[0]}, aux {aux_features.shape[0]}",
+        )
+    xp_bundle = fit_mahalanobis_ood(
+        xp_features,
+        p_threshold=p_threshold,
+        regularization=xp_regularization,
+    )
+    aux_bundle = fit_mahalanobis_ood(
+        aux_features,
+        p_threshold=p_threshold,
+        regularization=aux_regularization,
+    )
+    return DualMahalanobisOOD(xp=xp_bundle, aux=aux_bundle)
+
+
+def flag_dual_mahalanobis_ood(
+    xp_features: np.ndarray,
+    aux_features: np.ndarray,
+    bundle: DualMahalanobisOOD,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-star (xp_ood_flag, aux_ood_flag) pair from a dual bundle.
+
+    Returns
+    -------
+    xp_flag : (B,) bool array
+        True where XP feature is above training XP p_threshold.
+    aux_flag : (B,) bool array
+        True where aux feature is above training aux p_threshold.
+
+    Either flag firing → Tier 3 (release.py treats both as joint OOD per
+    META_META §14.3 outlier_flagging follow-up).
+    """
+    xp_flag = flag_mahalanobis_ood(xp_features, bundle.xp)
+    aux_flag = flag_mahalanobis_ood(aux_features, bundle.aux)
+    return xp_flag, aux_flag
+
+
 __all__ = [
+    "DualMahalanobisOOD",
     "MahalanobisOODBundle",
     "combined_ood_status",
     "ensemble_disagreement_ratio",
+    "fit_dual_mahalanobis_ood",
     "fit_mahalanobis_ood",
+    "flag_dual_mahalanobis_ood",
     "flag_ensemble_ood",
     "flag_mahalanobis_ood",
     "score_mahalanobis_ood",

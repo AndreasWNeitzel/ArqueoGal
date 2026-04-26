@@ -73,6 +73,27 @@ from torch.utils.data import DataLoader
 
 _EPS: float = 1e-12
 
+# --- Audit test protocol identity and stub tracking ------
+
+AUDIT_TEST_1_LOOCO: Final[str] = "audit_test_1_looco"
+AUDIT_TEST_2_PERMUTATION: Final[str] = "audit_test_2_permutation"
+AUDIT_TEST_3_SHAP_VALUES: Final[str] = "audit_test_3_shap_values"
+AUDIT_TEST_4_SHUFFLED_NULL: Final[str] = "audit_test_4_shuffled_null"
+AUDIT_TEST_5_CONDITIONAL_MI: Final[str] = "audit_test_5_conditional_mi"
+AUDIT_TEST_6_DECORRELATED_SUBSAMPLE: Final[str] = "audit_test_6_decorrelated_subsample"
+
+STUBBED_AUDIT_TESTS: Final[frozenset[str]] = frozenset({
+    AUDIT_TEST_3_SHAP_VALUES,
+})
+
+
+def report_audit_coverage() -> str:
+    """Return the canonical audit coverage statement for the release."""
+    return (
+        "5/6 (test 3 SHAP values pending; tests 1, 2, 4, 5, 6 implemented)"
+    )
+
+
 #: Audit-protocol version. Bumped v1 → v1.1 on 2026-04-19 when the 2-D XP
 #: summary was deprecated from Test 5 in favour of PCA-summary KSG CMI.
 #: See the module docstring, ``docs/research_brief.md §9.2.1`` and the
@@ -609,7 +630,14 @@ def audit_report(  # noqa: PLR0913 — orchestrator with per-test knobs
 
 __all__ = [
     "AUDIT_PROTOCOL_VERSION",
+    "AUDIT_TEST_1_LOOCO",
+    "AUDIT_TEST_2_PERMUTATION",
+    "AUDIT_TEST_3_SHAP_VALUES",
+    "AUDIT_TEST_4_SHUFFLED_NULL",
+    "AUDIT_TEST_5_CONDITIONAL_MI",
+    "AUDIT_TEST_6_DECORRELATED_SUBSAMPLE",
     "DEFAULT_PCA_COMPONENTS_TEST5",
+    "STUBBED_AUDIT_TESTS",
     "AuditReport",
     "audit_report",
     "conditional_mi_ksg",
@@ -617,6 +645,7 @@ __all__ = [
     "leave_one_coeff_out",
     "mutual_information_ksg",
     "permutation_feature_importance",
+    "report_audit_coverage",
     "shuffled_spectrum_null",
     "test5_conditional_mi",
 ]

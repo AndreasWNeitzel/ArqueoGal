@@ -267,7 +267,15 @@ def fit_bimodality_grid(
     if logg_edges is None:
         logg_edges = np.arange(0.0, 4.001, 0.30)
     if mh_edges is None:
-        mh_edges = np.arange(-3.0, 0.501, 0.20)
+        # Edges shifted off-grid by half a bin width on the [M/H] axis to
+        # avoid placing a cell boundary at exactly [M/H] = 0 dex. The original
+        # `np.arange(-3.0, 0.501, 0.20)` put an edge at 0, which produced a
+        # tier-filter cliff in Stream-3 inference (mode_ambiguous_flag fired
+        # for 65% of stars at -0.005 dex but 0% at +0.005 dex because the
+        # adjacent (Teff, logg) cells on either side of the boundary had
+        # very different bimodal-coverage statistics). Putting 0.0 in the
+        # middle of a cell removes the boundary effect.
+        mh_edges = np.arange(-2.9, 0.401, 0.20)
 
     teff_edges = np.asarray(teff_edges, dtype=np.float64)
     logg_edges = np.asarray(logg_edges, dtype=np.float64)

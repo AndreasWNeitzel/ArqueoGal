@@ -11,15 +11,24 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from arqueogal.xp_abundances.main.audit import (
+    AUDIT_TEST_1_LOOCO,
+    AUDIT_TEST_2_PERMUTATION,
+    AUDIT_TEST_3_SHAP_VALUES,
+    AUDIT_TEST_4_SHUFFLED_NULL,
+    AUDIT_TEST_5_CONDITIONAL_MI,
+    AUDIT_TEST_6_DECORRELATED_SUBSAMPLE,
     AuditReport,
+    STUBBED_AUDIT_TESTS,
     audit_report,
     conditional_mi_ksg,
     decorrelated_subsample,
     leave_one_coeff_out,
     mutual_information_ksg,
     permutation_feature_importance,
+    report_audit_coverage,
     shuffled_spectrum_null,
 )
+from arqueogal.xp_abundances.main.tier_promotion import IncompleteProtocolError
 
 # --- tiny deterministic model ----------------------------------------------
 
@@ -304,3 +313,39 @@ def test_audit_report_without_optional_inputs() -> None:
     assert report.looco_delta_rmse.shape == (0, 1)
     assert np.isnan(report.shuffled_null_rmse).all()
     assert report.permutation_importance.shape == (D, 1)
+
+
+# --- Audit protocol enums and stub discipline ----------------------------------
+
+
+def test_audit_protocol_test_names_are_defined() -> None:
+    """Verify the six audit test names are available at module level."""
+    assert AUDIT_TEST_1_LOOCO == "audit_test_1_looco"
+    assert AUDIT_TEST_2_PERMUTATION == "audit_test_2_permutation"
+    assert AUDIT_TEST_3_SHAP_VALUES == "audit_test_3_shap_values"
+    assert AUDIT_TEST_4_SHUFFLED_NULL == "audit_test_4_shuffled_null"
+    assert AUDIT_TEST_5_CONDITIONAL_MI == "audit_test_5_conditional_mi"
+    assert AUDIT_TEST_6_DECORRELATED_SUBSAMPLE == "audit_test_6_decorrelated_subsample"
+
+
+def test_stubbed_audit_tests_marked_correctly() -> None:
+    """Verify that only test 3 (SHAP) is marked as stubbed in audit.py."""
+    assert AUDIT_TEST_3_SHAP_VALUES in STUBBED_AUDIT_TESTS
+    assert len(STUBBED_AUDIT_TESTS) == 1
+
+
+def test_report_audit_coverage_returns_honest_statement() -> None:
+    """Verify the coverage statement reflects 5/6 implementation."""
+    coverage = report_audit_coverage()
+    assert "5/6" in coverage
+    assert "test 3" in coverage.lower() or "shap" in coverage.lower()
+    assert "implemented" in coverage.lower()
+
+
+def test_incomplete_protocol_error_is_shared_exception() -> None:
+    """Verify IncompleteProtocolError is shared between modules."""
+    assert issubclass(IncompleteProtocolError, Exception)
+    with pytest.raises(IncompleteProtocolError):
+        raise IncompleteProtocolError(
+            "audit test 3 SHAP cannot pass without validation work"
+        )

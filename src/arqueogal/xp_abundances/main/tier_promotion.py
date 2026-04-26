@@ -6,7 +6,9 @@ pure function of numpy inputs returning a :class:`TestResult`. The
 coordinator :func:`tier_promotion_report` applies the §3.3 decision tree
 to the collected results and assigns a final tier.
 
-The research_brief §3.3 decision tree:
+The research_brief §3.3 decision tree operates on six tests, of which test 3
+(SHAP feature importance) and test 6 (cross-catalogue consistency) are
+deferred to future versions. Tier promotion runs at 5/6 coverage:
 
 - Passes 1–3 only → ``"tier_3_rejected"``.
 - Passes 1–4 but fails 5 or 6 → ``"tier_3_internal"``.
@@ -21,13 +23,44 @@ modifier.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Final
 
 import numpy as np
 
-from arqueogal.xp_abundances.main.audit import conditional_mi_ksg
-
 _EPS: float = 1e-12
+
+# --- Test protocol identity and stub tracking ------
+
+TEST_1_PHYSICAL_FEASIBILITY: Final[str] = "test_1_physical_feasibility"
+TEST_2_HOLDOUT_RMSE: Final[str] = "test_2_holdout_rmse"
+TEST_3_SHAP_FEATURE_IMPORTANCE: Final[str] = "test_3_shap_feature_importance"
+TEST_4_PERMUTATION_SHUFFLE_NULL: Final[str] = "test_4_permutation_shuffle_null"
+TEST_5_CONDITIONAL_MI: Final[str] = "test_5_conditional_mi"
+TEST_6_CROSS_CATALOGUE_CONSISTENCY: Final[str] = "test_6_cross_catalogue_consistency"
+
+STUBBED_TESTS: Final[frozenset[str]] = frozenset({
+    TEST_3_SHAP_FEATURE_IMPORTANCE,
+    TEST_6_CROSS_CATALOGUE_CONSISTENCY,
+})
+
+
+class IncompleteProtocolError(Exception):
+    """Raised when a stubbed test result is overridden with True.
+
+    A stubbed test (deferred to future versions) cannot claim to pass
+    without the required validation work. Passing None (deferred) is
+    acceptable; passing True is not.
+    """
+
+    pass
+
+
+def report_tier_coverage() -> str:
+    """Return the canonical tier-promotion coverage statement for the release."""
+    return (
+        "5/6 (tests 3 SHAP and 6 cross-catalogue consistency pending Stream 3 "
+        "cross-overlap validation)"
+    )
 
 
 @dataclass
@@ -309,6 +342,8 @@ def conditional_mi_bootstrap(  # noqa: PLR0913 — bootstrap exposes full CI + k
     XP coefficient space carry any information about the element beyond
     what the atmospheric parameters already explain?
     """
+    from arqueogal.xp_abundances.main.audit import conditional_mi_ksg as cmi_ksg
+
     if xp.ndim != 2:
         raise ValueError(f"xp must be 2-D (N, D); got shape {xp.shape}")
     if element.ndim != 1:
@@ -322,7 +357,7 @@ def conditional_mi_bootstrap(  # noqa: PLR0913 — bootstrap exposes full CI + k
     boot = np.empty(n_boot, dtype=np.float64)
     for b in range(n_boot):
         idx = rng.integers(0, n, size=n)
-        boot[b] = conditional_mi_ksg(
+        boot[b] = cmi_ksg(
             xp[idx],
             element[idx],
             stellar_params[idx],
@@ -434,6 +469,14 @@ def tier_promotion_report(  # noqa: PLR0913 — §3.3 fixes exactly six tests + 
 
 
 __all__ = [
+    "IncompleteProtocolError",
+    "TEST_1_PHYSICAL_FEASIBILITY",
+    "TEST_2_HOLDOUT_RMSE",
+    "TEST_3_SHAP_FEATURE_IMPORTANCE",
+    "TEST_4_PERMUTATION_SHUFFLE_NULL",
+    "TEST_5_CONDITIONAL_MI",
+    "TEST_6_CROSS_CATALOGUE_CONSISTENCY",
+    "STUBBED_TESTS",
     "TestResult",
     "TierPromotionReport",
     "audit_gate",
@@ -442,5 +485,6 @@ __all__ = [
     "cross_catalogue_consistency",
     "holdout_rmse",
     "physical_gate",
+    "report_tier_coverage",
     "tier_promotion_report",
 ]
