@@ -1,135 +1,61 @@
-# ArqueoGal Visual Gallery
+# ArqueoGal Pipeline-1 Visual Gallery (hybrid release v5)
 
-**Purpose.** Every stage of the ArqueoGal pipeline has a visualization here.
-Walk top-to-bottom and you see the full data → model → science story without
-reading code. Used for reporting (FCT deliverables, methods paper, internal
-review) and for honest self-inspection during development.
+**Purpose.** Every stage of the deployment graph has a visualisation here.
+Walk top-to-bottom and you see exactly what the pipeline does at every step,
+from the TAP fetch of raw Gaia DR3 records through to the final hybrid
+catalog. The gallery is the auditable evidence that the deployment is
+producing what we claim — when a stage's plots look wrong, the deployment is
+wrong, and you know which script to fix.
 
-**Version tracking.** Figures are labeled with the release they correspond to:
-`v1` (frozen 2026-04-19, tag `pipeline1-v1-2026-04-19`), `v1.1` (2026-04-21,
-inverse-frequency [M/H] weighting, pending tag), `v1.2` (2026-04-21,
-σ-gate on downstream feature matrix, pending tag). Superseded-but-preserved
-figures sit under `../pipeline*/run_a/` and are labeled as historical.
+**Canonical model:** strong-contrastive-v2 ensemble (SupCon=1.0 + β-NLL=1.0
++ Barlow=0.5, single seed) plus the latent-kNN rescue, composed by
+`release_pipeline.attach_hybrid_columns` into the v5 hybrid surface.
 
-**Build.** Each stage has figures produced by `scripts/gallery/plot_<stage>.py`.
-Re-emit the whole gallery via `scripts/gallery/build_all.sh` (to be added in
-batch 7).
-
----
-
-## Table of contents
-
-| # | Stage | What it shows | README | Status |
-|--:|---|---|---|---|
-| 00 | [Data sources](00_data_sources/README.md) | Streams 1/2/3, APOGEE, Andrae+23, Hon+21 — sky footprint, counts, HRD | `00_data_sources/` | scaffold |
-| 01 | [Gaia XP (raw)](01_gaia_xp_raw/README.md) | XP coef distributions, reconstructed SEDs by HRD cell, c0 vs G | `01_gaia_xp_raw/` | scaffold |
-| 02 | [Ye+2024 correction](02_ye_correction/README.md) | Before/after SED, Δcoef distribution, NO_SYNTH_PHOT flag map | `02_ye_correction/` | scaffold |
-| 03 | [Hermite reprojection](03_hermite_reprojection/README.md) | 110-coef reprojection fidelity, per-coef z-score pre/post | `03_hermite_reprojection/` | scaffold |
-| 04 | [Extinction](04_extinction/README.md) | Edenhofer / Lallement / SFD / nbhd-median A_V side-by-side | `04_extinction/` | scaffold |
-| 05 | [IR photometry](05_ir_photometry/README.md) | 2MASS JHK + AllWISE W1W2 coverage, missingness map | `05_ir_photometry/` | scaffold |
-| 06 | [Selection function](06_selection_function/README.md) | ω_i = Ye × IR × ϖ × A_V — per-factor decomposition | `06_selection_function/` | scaffold |
-| 07 | [APOGEE labels](07_apogee_labels/README.md) | Label coverage matrix, Meszaros+25 Δ per element, NaN rates | `07_apogee_labels/` | scaffold |
-| 08 | [Kinematics](08_kinematics/README.md) | E–L_z, action plane, eccentricity, orbit-family fractions | `08_kinematics/` | scaffold |
-| 09 | [Feature matrix](09_feature_matrix/README.md) | NN input (110 XP + 43 aux): schema + distributions | `09_feature_matrix/` | scaffold |
-| 10 | [Contrastive pretraining](10_contrastive_pretraining/README.md) | Loss trajectory, positive-pair examples, halfway + final embeddings | `10_contrastive_pretraining/` | partial (halfway UMAPs exist) |
-| 11 | [Supervised training](11_supervised_training/README.md) | Per-seed curves, grad norms, LR schedule, per-label NLL, inv-freq weights | `11_supervised_training/` | partial |
-| 12 | [Pipeline-1 validation](12_pipeline1_validation/README.md) | Pred-vs-truth, residual Gaussians, σ reliability, coverage, residual stratified | `12_pipeline1_validation/` | partial (batch 2 adds stratified) |
-| 13 | [Ensemble + uncertainty](13_ensemble_uncertainty/README.md) | Aleatoric vs epistemic, OOD Mahalanobis, disagreement, regime-B | `13_ensemble_uncertainty/` | scaffold |
-| 14 | [Pipeline-1 inference](14_pipeline1_inference/README.md) | Stream-3 predictions: HRD, sky, chemistry, OOD rate map | `14_pipeline1_inference/` | scaffold |
-| 17 | [Pipeline-1 regime diagnostics](17_pipeline1_regime_diagnostics/README.md) | `release_tier` composition vs G / Av / distance / sky / HR / chem + σ by tier + flag mix | `17_pipeline1_regime_diagnostics/` | v1 |
-| 99 | [Methods-paper subset](99_methods_paper/README.md) | Curated paper-ready subset with final captions + PDF | `99_methods_paper/` | batch 7 |
-
-Stages 15–16 (population-classifier features + UMAP/HDBSCAN classification)
-were moved to `reports/gallery/archive/` on 2026-04-22 when population
-classification spun out into the separate **Starfold** repository.
-
-Legend: **scaffold** = directory + README only, no figures yet; **partial** =
-some figures exist, more planned in later batches; **done** = all planned
-figures exist and are current.
+**Schema:** v5. Reproduces from `bash scripts/run_full_pipeline.sh` plus
+`bash scripts/gallery/build_all.sh`. Build time: ~15 min on RTX 3060.
 
 ---
 
-## Narrative read-through
+## Stages, in deployment order
 
-**Stage 00 — sources.** Three streams feed the pipeline. Stream 1 is the
-training corpus: APOGEE DR19 × Gaia DR3 (354 k RGB after cuts). Stream 2 is
-TESS/Kepler red giants with asteroseismic ages, used for information-content
-audit and as a held-out natural experiment; not in the training loop. Stream 3
-is the deployment sample: Andrae+2023 RGB × Gaia DR3 XP (Option-C: 800 k
-uniform + 500 k volume-limited arms).
+| # | Stage | What the deploy step is | What we plot | Source script | Plot script |
+|---:|---|---|---|---|---|
+| 00 | Source coverage | Stream-1 (APOGEE × Gaia, ~324 k) and Stream-3 (Andrae+23 RGB × Gaia DR3, ~614 k) row counts and sky maps | sky Mollweide + cumulative-G histogram per stream | `data/ingest_stream1.py`, `ingest_stream3.py` | `plot_00_source_coverage.py` |
+| 01 | Gaia DR3 corrections | Lindegren+21 parallax zpt + Riello+21 G-mag cubic | Δparallax vs G; Δ(G_corr − G_raw) vs colour | `data/gaia_corrections.py`, `scripts/apply_gaia_corrections.py` | `plot_01_gaia_corrections.py` |
+| 02 | Raw Gaia XP | 55 BP + 55 RP Hermite coefficients per star | per-coef distribution; example-star SED reconstructions across HRD cells | `data/ingest_xp.py`, `scripts/fetch_gaia_xp.py` | `plot_02_gaia_xp_raw.py` |
+| 03 | Ye+2024 NN flux correction | per-star multiplicative correction against synthetic photometry | before/after SED stacks; Δcoef distribution; NO_SYNTH_PHOT flag map | `data/gaia_xp.py`, `scripts/apply_ye2024_xp.py` | `plot_03_ye_correction.py` |
+| 04 | Hermite normalisation + frozen z-score | coefs 1-54 / coef 0; log+z-score on coef 0; per-coef z-score from frozen v1 stats (`0d34b565...`) | per-coef Hermite z-score histograms (Stream 1 vs Stream 3, frozen-stats verified) | `data/frozen_stats.py` | `plot_04_hermite_zscore.py` |
+| 05 | Distance fusion | Bailer-Jones+2021 photogeo + Edenhofer+24 / Lallement+22 / SFD A_V cascade | per-source distance histograms; A_V map stacked by source; budget compliance | `data/distances.py`, `data/dust_maps.py` | `plot_05_distance_extinction.py` |
+| 06 | IR photometry join | 2MASS JHK + AllWISE W1/W2 per Stream-1 / Stream-3 source | coverage sky map; missingness vs G; J-K vs G-K colour-colour | `data/ir_photometry.py`, `scripts/fetch_ir_photometry.py` | `plot_06_ir_photometry.py` |
+| 07 | APOGEE DR19 labels + Mészáros+2025 [X/M] correction | RGB-only validity guard; Table 3 polynomial corrections for 14 elements | per-element NaN rate; Mészáros Δ vs Teff per element; pairwise hexbin | `data/apogee_dr19.py` | `plot_07_apogee_labels.py` |
+| 08 | Stream-1 APOGEE × Gaia join | many-to-one tie-break on Δmag within 300 mas / 0.1 mag (ADR-0001) | merge cardinality histogram; multi-spectrum dedup statistics | `data/ingest_stream1.py`, `data/dedup.py`, `scripts/build_stream1_apogee_gaia.py` | `plot_08_stream1_join.py` |
+| 09 | Selection function ω(s) | Ye × IR × ϖ × A_V (per-factor) | per-factor decomposition; ω(s) total sky map; ω vs G | `data/selection_function.py`, `scripts/build_selection_function_v1.py` | `plot_09_selection_function.py` |
+| 10 | Kinematic enrichment | Galpy actions (J_R, L_z, J_z), eccentricity from astrometry + RV | E vs L_z plane; action diagram; orbit-family fractions | `data/enrich_kinematics.py`, `data/kinematics.py` | `plot_10_kinematics.py` |
+| 11 | Geometry enrichment | Galactocentric (X, Y, Z, R_gal, v_φ) | R_gal vs Z scatter; (X, Y) Galactic plane projection | `data/enrich_geometry.py` | `plot_11_geometry.py` |
+| 12 | Pipeline-1 feature matrix | 110 XP + 43 aux features per star, post-frozen-stats | feature distribution panels (XP block + aux block); correlation heatmap; layout schema | `scripts/build_pipeline1_features_stream1.py`, `build_pipeline1_features_stream3.py` | `plot_12_feature_matrix.py` |
+| 13 | Strong-contrastive-v2 training | single-stage SupCon=1.0 + β-NLL=1.0 + Barlow=0.5, full 290k Stream-1, 12 epochs, 1 seed | training curves (4 loss components); grad-norm + τ stability | `scripts/run_ensemble.py` (now defaults to strong-contrastive-v2 recipe) | `plot_13_training.py` |
+| 14 | Stream-3 inference (regressor) | strong-contrastive-v2 forward pass on 614k Stream-3 | per-element σ histograms; pred-vs-G; σ-inflation rate per element | `scripts/run_pipeline1_inference.py`, `xp_abundances/main/inference.py` | `plot_14_regressor_inference.py` |
+| 15 | Latent-kNN rescue | encoder z + GPU cosine kNN (K=50) against Stream-1 training pool | distance-to-top-1 distribution; kNN-IQR vs σ_regressor per element | `scripts/run_knn_rescue.py`, `xp_abundances/main/knn_rescue.py` | `plot_15_knn_rescue.py` |
+| 16 | OOD gates | Mahalanobis on 108-D XP + dual-Mahalanobis on aux + latent support | per-gate ROC/score distributions; aux-vs-XP scatter coloured by joint flag | `xp_abundances/main/ood.py`, `scripts/build_latent_support_gate.py` | `plot_16_ood_gates.py` |
+| 17 | Hybrid composer | regressor when σ ≤ threshold; kNN-median when σ > threshold AND kNN finite; regressor_caveat otherwise | per-element source split (stacked bar); per-element hybrid_tier counts | `data/release_pipeline.py:attach_hybrid_columns` | `plot_17_hybrid_composer.py` |
+| 18 | Hybrid Kiel + chemistry on Stream 3 | the catalog's user-facing planes | hybrid Kiel (Tier-1) split by source; hybrid chemistry plane faceted by tier | (same parquet as 17) | `plot_18_hybrid_inference_planes.py` |
+| 19 | Release-tier composition | composite + per-element; v3 + v4 caveat flags | regime diagnostics: tier composition vs G / Av / distance / sky / HR / chem; σ-by-tier; flag-contribution | `xp_abundances/main/release.py`, `data/release_pipeline.py:run_release_pipeline` | `plot_19_release_tier_regime.py` |
+| 20 | Pred-vs-truth on splits | 70/15/15 train/val/test, LOO kNN on train, frozen kNN on val/test | 3 splits × 5 labels hexbin scatter (n / RMSE / bias / std) + Kiel & chem truth-vs-pred | (recomputed in-script) | `plot_20_pred_vs_truth_splits.py` |
+| 21 | 3-component GMM cluster tracking | structure-preservation criterion 2 of methods.md §3.6 | truth-derived GMM colours followed into pred plane; centroid drift, ARI, purity | (recomputed in-script) | `plot_21_gmm_cluster_tracking.py` |
+| 22 | Per-class contamination | criterion 3 | confusion matrix + precision/recall/F1 + flow + Hellinger/TV per cluster | (recomputed in-script) | `plot_22_contamination.py` |
+| 23 | Hybrid stress battery | 7-test integration suite | summary panel: 5-fold CV, σ-coverage, K-sensitivity, leakage Δ, permutation importance, multi-spectrum consistency | `tests/integration/test_hybrid_stress_battery.py` (run with `--run-stress`) | `plot_23_stress_battery.py` |
 
-**Stage 01 — raw XP.** Each Gaia DR3 RVS/XP star supplies 55 BP + 55 RP Hermite
-coefficients. Coef 0 carries the absolute flux scale; coefs 1–54 are the shape.
-Stars at fainter G have noisier high-order coefs — this drives the SNR floor
-at G ≈ 17.
-
-**Stage 02 — Ye+2024.** Flux-level correction against synthetic photometry
-for flux-zero-point drifts. Applied to all stars; those with `NO_SYNTH_PHOT`
-set are flagged OOD and excluded from training. Correction effect is typically
-a few %, concentrated at the blue end.
-
-**Stage 03 — Hermite reprojection.** Ye-corrected *flux samples* are
-reprojected onto a 110-dim Hermite basis consistent with Gaia's internal
-representation. Residual RMS is well below the per-coef noise floor.
-Per-coefficient z-score stats are **frozen at v1 fit** (basis fingerprint
-`0d34b565…`); Stream 3 inference reuses them — do not refit.
-
-**Stage 04 — extinction.** A_V per star composed from: Edenhofer+2024
-(d < 1.25 kpc, highest precision), Lallement+2022 (1.25–3 kpc), SFD asymptotic
-beyond 3 kpc, GSP-Phot neighborhood-median for stars missing all three.
-Provenance per star in `stream3_av.provenance.json`.
-
-**Stage 05 — IR photometry.** 2MASS JHK + AllWISE W1 W2 from VizieR
-cross-match. Missingness tracked via `ir_missing_flag`; bright stars can
-saturate W1 so coverage is non-monotone in G.
-
-**Stage 06 — selection function.** ω_i = ω_Ye · ω_IR · ω_ϖ · ω_Av. Used
-as per-star weight in downstream density estimates and as a diagnostic
-overlay; does NOT enter training as a sample weight (research_brief §11.2).
-
-**Stage 07 — APOGEE labels.** Training targets after Meszaros+25 [X/M]/Teff
-corrections. Element-level NaN rates vary (V ~5.3%, Mg/Fe ~1.6%, α/M 0%);
-`beta_nll_block_cholesky` handles them via the `mask=` path.
-
-**Stage 08 — kinematics.** Actions (J_R, J_z, L_z), energy E, eccentricity ε
-from Galpy/agama with MWPotential14. Downstream consumers (Starfold, or any
-utility module that reuses the kinematics output) join on `source_id`; NOT
-fed to Pipeline 1.
-
-**Stage 09 — feature matrix.** Pipeline-1 input = 110 XP coefs + 43 aux
-(A_V, parallax, IR magnitudes, flags). Schema contract lives in
-`data/DESIGN.md`.
-
-**Stages 10–11 — training.** Contrastive pretraining on XP+aux yields a
-trunk encoder; halfway-UMAP inspection is in `reports/pipeline1/halfway/`.
-Supervised fine-tuning with β-NLL block-Cholesky loss over 5 label-channels
-(Teff, logg, [M/H], [α/M], [Mg/H]), inverse-frequency [M/H] weighting
-(v1.1 onwards), 5-seed ensemble.
-
-**Stages 12–13 — validation + uncertainty.** Ensemble moment-match per star:
-Σ̄ = mean(Σ_k) + between(μ_k). OOD rejection = Mahalanobis on XP block ∪
-ensemble disagreement on any of (Teff, logg, [M/H], [α/M], [Mg/H]).
-Regime-B envelope excludes warm-upper-RGB / |b|<5° stars from per-star Tier-1.
-
-**Stage 14 — inference.** Stream-3 volume-limited and uniform arms; 613 k
-predictions union with OOD/regime flags per star. This is where this repo's
-chain ends; the predictions (plus Stream-3 kinematics) are the inputs
-Starfold consumes.
+Stages 15-16 (population classification) moved to the **Starfold** repository
+on 2026-04-22; the historical artefacts live under
+`reports/gallery/_archive_pre_hybrid_2026-04-25/`.
 
 ---
 
-## Known absences
+## How to rebuild from scratch
 
-- **SHAP per-star saliency** (audit test 3 stub). Permutation-importance bar
-  ships in batch 3 as the interim proxy.
-- **Cross-catalogue consistency** (tier-promotion test 6 stub). No figure
-  until that gate is actually wired.
-- **FIRE-2 method-validation track** (Subtask 5.1) — lives under
-  `data/fire2/`; strictly separated from real-data science per project invariant.
-  Its visuals will land in a separate `reports/fire2/` tree, not this gallery.
+1. Run the full deploy: `bash scripts/run_full_pipeline.sh`
+2. Run the gallery: `bash scripts/gallery/build_all.sh`
 
----
-
-## How to re-emit everything
-
-(Will be added in batch 7 as `scripts/gallery/build_all.sh`.)
+Each plot script reads only the canonical artefacts that the deploy produced,
+so a wrong plot means a wrong artefact, which means a wrong deploy step. The
+gallery is the audit surface.
