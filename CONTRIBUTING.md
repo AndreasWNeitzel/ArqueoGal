@@ -44,7 +44,7 @@ ubuntu-latest.
   matching `DESIGN.md` in the **same commit** (invariant 15).
 - Any new data-layer module must ship with a production-size stratified
   smoke test; 100-row tests on `gaiaxpy` or other external libraries
-  are integration placebo (CLAUDE.md "Testing expectations").
+  are integration placebo (AGENTS.md "Testing expectations").
 
 ## Pull requests
 

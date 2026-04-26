@@ -161,7 +161,7 @@ class XpFeatureAdapter(nn.Module):
             f"{'...' if len(bad_cols) > 8 else ''}. "
             "Inference drivers must apply np.nan_to_num (or equivalent NaN "
             "sanitisation) upstream of the model, mirroring training.py. "
-            "See CLAUDE.md 'nan_to_num train/inference boundary' footgun."
+            "See AGENTS.md 'nan_to_num train/inference boundary' footgun."
         )
 
     def extra_repr(self) -> str:

@@ -5,7 +5,7 @@ The dataclasses are frozen + slotted, so the only meaningful tests are:
    field names being load-bearing).
 2. Construction with custom values is rejected when types are wrong (slots
    make this implicit but the tests document the contract).
-3. The default LossWeights match the TESS_ML joint-loss recipe in CLAUDE.md
+3. The default LossWeights match the TESS_ML joint-loss recipe in AGENTS.md
    notes: supcon=1.0, beta_nll=1.0, beta=0.5, barlow=0.0 (off by default).
 4. ``loss_weights`` is constructed via ``field(default_factory=LossWeights)``,
    so the default is shared across all default-constructed configs.
@@ -22,7 +22,7 @@ from arqueogal.xp_abundances.main.config import LossWeights, TrainingConfig
 
 
 def test_loss_weights_defaults_match_joint_recipe() -> None:
-    """SupCon=1.0, β-NLL=1.0, β=0.5, Barlow=0.0 (off) per CLAUDE.md notes."""
+    """SupCon=1.0, β-NLL=1.0, β=0.5, Barlow=0.0 (off) per AGENTS.md notes."""
     w = LossWeights()
     assert w.supcon == 1.0
     assert w.beta_nll == 1.0

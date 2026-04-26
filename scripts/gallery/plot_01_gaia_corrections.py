@@ -1,6 +1,6 @@
 """Stage 01: Gaia DR3 corrections (Lindegren+2021 parallax zpt + Riello+2021 G-mag cubic).
 
-CLAUDE.md hard rule #11: parallax zpt and G-mag corrections are mandatory at
+AGENTS.md hard rule #11: parallax zpt and G-mag corrections are mandatory at
 ingestion. ``apply_gaia_corrections`` writes ``parallax_corr`` and
 ``phot_g_mean_mag_corr`` (or just verifies they exist).
 

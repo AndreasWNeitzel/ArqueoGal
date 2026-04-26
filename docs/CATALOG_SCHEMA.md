@@ -141,7 +141,7 @@ All predictions are posterior means (Bayesian NNs with BayesByBackprop or ensemb
 
 | Column | Type | Unit | Valid Range | NaN Meaning | Notes |
 |---|---|---|---|---|---|
-| `regime_b_flag` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Regime B (Galactic plane, warm RGB): systematic T_eff over-prediction ~1σ. Fires on ~0.04 % of stars; the v5 ablation showed no measurable T1+T2 RMSE effect. The systematic itself is a methods-paper finding (CLAUDE.md footgun), not a release-blocker. |
+| `regime_b_flag` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Regime B (Galactic plane, warm RGB): systematic T_eff over-prediction ~1σ. Fires on ~0.04 % of stars; the v5 ablation showed no measurable T1+T2 RMSE effect. The systematic itself is a methods-paper finding (AGENTS.md footgun), not a release-blocker. |
 | `mode_ambiguous_flag` | bool | | {True, False} | False (default) | **v5 active gate (per-element, [α/M] only).** Disc α/M bimodality at fixed (Teff, log g, [M/H]). Gaussian-NLL μ-collapse risk. Demotes only `release_tier__alpha_m` to Tier 2. Other elements unaffected. The v5 ablation showed +12 % α/M T1 RMSE inflation when this gate is removed; zero effect for the other elements. |
 | `ood_disagreement_flag` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Designed for multi-member ensemble disagreement; cannot fire with a single-member ensemble. Re-evaluate when the ensemble grows to ≥ 2 members. |
 | `aux_missing_any` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Any auxiliary feature (parallax, extinction, position) is NaN at inference. Stars carrying this flag had ~4-6 % T1 RMSE inflation if kept in T1, but T1+T2 RMSE was unchanged, i.e. the demotion was pure relabeling. Column retained as a soft caveat for consumer-side filtering. |
@@ -347,7 +347,7 @@ When the release pipeline is run with the hybrid composer (`build_hybrid_release
 | 5. Regime-B caveat | PASS | Teff over-prediction ~1σ in |b|<5°, warm-RGB region. |
 | 6. Cross-catalogue consistency | PENDING | Stub; comparison with Andrae+2023, GALAH pending deliverable D-Cat-d (Feb 2027). |
 
-**v1 release carries 5/6 coverage explicitly.** Tests 3 and 6 stubs are documented in research_brief.md §3.3.1 and CLAUDE.md §3. No exception to the protocol; stub status is transparent in the release note.
+**v1 release carries 5/6 coverage explicitly.** Tests 3 and 6 stubs are documented in research_brief.md §3.3.1 and AGENTS.md §3. No exception to the protocol; stub status is transparent in the release note.
 
 ---
 

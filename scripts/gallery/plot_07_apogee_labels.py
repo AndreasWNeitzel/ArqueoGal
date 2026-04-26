@@ -2,7 +2,7 @@
 
 What the deploy did: ``data.apogee_dr19`` ingested DR19 ASPCAP and applied
 the Mészáros+2025 Table-3 polynomial corrections per element on RGB-only
-stars (logg < 3.8). CLAUDE.md hard rule #13 — corrections are mandatory
+stars (logg < 3.8). AGENTS.md hard rule #13 — corrections are mandatory
 before training.
 
 What we plot: per-label NaN rates, Teff vs logg pseudo-Kiel from APOGEE

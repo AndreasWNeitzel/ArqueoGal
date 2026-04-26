@@ -19,7 +19,7 @@ What we plot, 2 × 4 layout:
 Why the cut: Pipeline 1 trains and predicts on RGB + RC giants only. The
 log g < 3.8 dex cap is set by Mészáros+2025 Table 3 polynomial validity
 (the [X/M] corrections were calibrated only for RGB giants and the
-embedded RC subset). CLAUDE.md hard rule #5 additionally caps inference
+embedded RC subset). AGENTS.md hard rule #5 additionally caps inference
 at G ≤ 17 (XP-native regime).
 """
 

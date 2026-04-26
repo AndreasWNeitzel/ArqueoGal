@@ -13,7 +13,7 @@
 # ``reports/figures/real_data_plots/comprehensive``.
 #
 # This script assumes the rapids/PyTorch env is already activated (see
-# CLAUDE.md). It does NOT install dependencies.
+# AGENTS.md). It does NOT install dependencies.
 
 set -euo pipefail
 

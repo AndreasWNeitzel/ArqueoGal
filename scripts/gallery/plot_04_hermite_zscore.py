@@ -1,7 +1,7 @@
 """Stage 04: Hermite normalisation + frozen v1 z-score (basis fingerprint 0d34b565...).
 
 What the deploy did: per-coefficient z-scoring using the FROZEN training-pool
-mean and std — never refit on Stream 3 (CLAUDE.md hard rule #16). The frozen
+mean and std — never refit on Stream 3 (AGENTS.md hard rule #16). The frozen
 stats live in ``data/processed/pipeline1_features_stream1.provenance.json``
 and ``data.frozen_stats.verify_basis_fingerprint`` raises
 ``FrozenStatsMismatchError`` on drift.
