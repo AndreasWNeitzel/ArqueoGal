@@ -1,7 +1,0 @@
-{
-  "tier_distribution": "reports/figures/real_data_plots/fig_tier_distribution.pdf",
-  "ood_distribution": "reports/figures/real_data_plots/fig_ood_distribution.pdf",
-  "sigma_per_tier": "reports/figures/real_data_plots/fig_sigma_per_tier.pdf",
-  "hrd_tier1": "reports/figures/real_data_plots/fig_hrd_tier1.pdf",
-  "alpha_m_vs_fe_h": "reports/figures/real_data_plots/fig_alpha_m_vs_fe_h.pdf"
-}

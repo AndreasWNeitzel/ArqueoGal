@@ -1,4 +1,0 @@
-gate: 613,939 rows, flag_rate=39.1229%
-pipeline1_predictions_stream3_joint.parquet: merged (613,939 rows, 0 missing gate values), flag_rate=39.1229%
-pipeline1_predictions_stream3_joint_volume.parquet: merged (249,092 rows, 0 missing gate values), flag_rate=8.0472%
-pipeline1_predictions_stream3_joint_uniform.parquet: merged (364,847 rows, 0 missing gate values), flag_rate=60.3393%

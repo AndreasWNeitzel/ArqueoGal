@@ -8,8 +8,25 @@ AGENTS.md
 # Logs
 logs/
 
-# PDF Reports
-reports/figures/**/*.pdf
+# Reports tree: stays local, not part of the GitHub publication surface.
+# Includes gallery PNGs, training-run logs, calibration JSONs, audit chain
+# reports, sanity-battery figures, and figure outputs.
+reports/
+# ...but whitelist the dated technical surveys referenced from docs/plan/.
+!reports/codebase_survey_2026-04-19.md
+!reports/storage_cleanup_2026-04-19.md
+
+# Methods-paper drafts: stays local until journal submission.
+paper/
+
+# Multi-agent review-of-reviews drafts: internal-only.
+review_of_reviews/
+
+# Internal review workspaces and ad-hoc agent output.
+.expert_review_*/
+
+# WSL2 / system tuning configs: local infrastructure, not for publication.
+etc/
 
 # Data — never committed
 data/raw/
@@ -60,11 +77,10 @@ Thumbs.db
 # aim experiment tracking DB (Phase 5)
 .aim/
 
-# Expert-review workspaces (untracked, agent-generated reports)
-.expert_review_*/
-
 # Local D-Cat-b release-format candidates (large parquets; regenerated from
 # tracked code, not part of the GitHub release surface).
 release/D-Cat-b/
 release/test_ablations_*/predictions_stream*.parquet
 release/test_ablations_*/predictions_stream*.parquet.provenance.json
+# release/test_ablations_*/REPORT.md and ablations.json ARE tracked: they
+# are the empirical evidence ADR-0015 cites.

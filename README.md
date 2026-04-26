@@ -40,7 +40,7 @@ Population classification (formerly Pipeline 2 inside this repo) was spun out to
 
 ```
 ArqueoGal/
-├── docs/            ← project references (research_brief, data_acquisition, data_overview)
+├── docs/            ← project references (research_brief, data_acquisition, data_overview, plan, decisions, protocols)
 ├── configs/         ← YAML configs (main/ vs experimental/)
 ├── src/arqueogal/
 │   ├── data/                    ← ingestion, cross-matching, feature engineering
@@ -49,9 +49,11 @@ ArqueoGal/
 ├── scripts/         ← CLI entry points (ingestion, corrections, feature emission, plotting)
 ├── notebooks/       ← exploration and visualisation
 ├── tests/           ← mirrors src/ with separate trees for main/ and experimental/
-├── reports/         ← figures (reports/figures/data_overview/ is the canonical overview)
-├── data/            ← raw, interim, processed, external (gitignored; 5 GB budget)
-└── models/          ← serialised checkpoints (gitignored)
+├── release/         ← release-tier ablation evidence (REPORT.md + ablations.json); large parquets gitignored
+├── data/            ← raw, interim, processed, external (gitignored; 10 GB budget)
+├── models/          ← serialised checkpoints (gitignored)
+├── reports/         ← runner-script outputs (gallery PNGs, training-run logs, audit chains, sanity-battery figures); gitignored except for two technical surveys
+└── paper/           ← methods-paper drafts (gitignored)
 ```
 
 Main-pipeline code is frozen during deliverable sprints; feature work goes to `experimental/` and is promoted only after beating main by a documented margin. See `docs/research_brief.md` §11 for the promotion bar.
