@@ -1,4 +1,4 @@
-# `arqueogal.xp_abundances.experimental` — Design
+# `arqueogal.xp_abundances.experimental`. Design
 
 ## Status
 
@@ -16,19 +16,19 @@ See research_brief §8 for full rationale.
 
 ```
 arqueogal.xp_abundances.experimental
-├── normalising_flows/   — §8.1 Conditional NF over label vector (zuko / nflows).
+├── normalising_flows/, §8.1 Conditional NF over label vector (zuko / nflows).
 │                          Non-Gaussian, multi-modal label posteriors; valuable for
 │                          transition-region [α/M] and boundary stars.
-├── transformer/         — §8.2 Transformer-on-spectra with masked prediction
+├── transformer/, §8.2 Transformer-on-spectra with masked prediction
 │                          (StellarPerceptron-style; Leung & Bovy 2024, arXiv:2411.04750).
 │                          Missing-input tolerance, natural multi-task.
-├── physics_informed/    — §8.3 Forward-modelled XP spectrum (PHOENIX/MARCS convolved to XP
+├── physics_informed/, §8.3 Forward-modelled XP spectrum (PHOENIX/MARCS convolved to XP
 │                          response) as prior regulariser. Only path to honest OOD detection.
 │                          Gateway to SBI.
-├── diffusion/           — §8.4 Conditional diffusion for label density estimation
+├── diffusion/, §8.4 Conditional diffusion for label density estimation
 │                          (Rouhiainen+2024 style). B&S 2024 flag as natural next step from
 │                          their CL framework.
-└── multimodal_cl/       — §8.5 Buck & Schwarz 2024-style CLIP on RVS + XP.
+└── multimodal_cl/, §8.5 Buck & Schwarz 2024-style CLIP on RVS + XP.
                             KEY CONSTRAINT: RVS is training-time only; inference is XP-only
                             (preserves full G ≤ 17.65 applicability). Test on DR19 overlap
                             (~700 k, 15× B&S's 44 780). Replace B&S's 1-layer MLP XP encoder
@@ -49,7 +49,7 @@ An experimental method is promoted to `main/` only when all four hold:
 4. Matches or exceeds `main/`'s calibration quality (per-cell reliability diagram error
    ≤ main's).
 
-Promotion is a conscious, documented act — a PR with the comparison report card, not a
+Promotion is a conscious, documented act, a PR with the comparison report card, not a
 refactor commit.
 
 ## Hard rules

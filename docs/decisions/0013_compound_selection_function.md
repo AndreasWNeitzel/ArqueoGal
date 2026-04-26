@@ -6,7 +6,7 @@
 
 Initial selection-function design (#100, v1.0) was a 2-D grid of |b| × G capturing
 the Ye+2024 `NO_SYNTH_PHOT` flag rate across the sky. Stream 1 diagnostic showed
-134× ratio between low-|b| (10.48% flag rate) and high-|b| (0.08%) — substantial
+134× ratio between low-|b| (10.48% flag rate) and high-|b| (0.08%), substantial
 enough that the selection function is a first-class scientific feature of the
 catalogue, not a footnote.
 
@@ -24,7 +24,7 @@ Pre-Phase-3 scope discussion (2026-04-19) expanded this:
 3. Parallax/extinction availability gates (0/1, not soft).
 
 Computed at feature-matrix build time using Andrae+2023 Teff/log g estimates
-pre-inference (not the model's own predictions — avoids circular dependency).
+pre-inference (not the model's own predictions, avoids circular dependency).
 
 ## Rationale
 
@@ -40,10 +40,10 @@ pre-inference (not the model's own predictions — avoids circular dependency).
 
 ## Alternatives rejected
 
-- **Simple |b| step function** — under-represents the magnitude dependence.
-- **2-D |b| × G grid** — initial v1.0; misses Teff/log g dependence.
-- **Post-inference weighting using model predictions** — circularity.
-- **Omit selection function from release** — makes volume-complete analysis
+- **Simple |b| step function**: under-represents the magnitude dependence.
+- **2-D |b| × G grid**: initial v1.0; misses Teff/log g dependence.
+- **Post-inference weighting using model predictions**: circularity.
+- **Omit selection function from release**: makes volume-complete analysis
   impossible for downstream users.
 
 ## Consequences
@@ -59,4 +59,4 @@ pre-inference (not the model's own predictions — avoids circular dependency).
 
 The decision to use Andrae+2023 Teff/log g estimates (rather than the pipeline's own
 model predictions) for the pre-inference selection weight is the right
-circularity-prevention choice — a subtle point worth documenting.
+circularity-prevention choice, a subtle point worth documenting.

@@ -1,4 +1,4 @@
-# ADR-0006: Stream 3 Option C — dual samples (uniform + volume-limited)
+# ADR-0006: Stream 3 Option C, dual samples (uniform + volume-limited)
 
 **Date**: 2026-04-19 · **Status**: Accepted, Phase 3 pending execution
 
@@ -50,7 +50,7 @@ sidecars per matrix documenting sampling method.
   density. Clusters HDBSCAN finds may be binning artifacts.
 - **Single sample (volume-limited)**: Pipeline 1 audit has uneven statistical power;
   rare cells in parameter space are undersampled.
-- **Two samples with full overlap**: inefficient — inflates storage without purpose.
+- **Two samples with full overlap**: inefficient, inflates storage without purpose.
 - **Option B (oversample rare strata in volume-limited)**: better for population
   discovery but complicates natural-density analysis. Deferred as potential v2 work.
 

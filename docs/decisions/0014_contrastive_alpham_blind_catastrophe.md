@@ -1,4 +1,4 @@
-# ADR 0014 — Contrastive α/M-blindness catastrophe and β-NLL σ-inflation
+# ADR 0014. Contrastive α/M-blindness catastrophe and β-NLL σ-inflation
 
 **Status:** accepted
 **Date:** 2026-04-21
@@ -25,7 +25,7 @@ together and found two catastrophes:
    supervised-head predictions at ``[α/M] ≈ +0.11`` with very small dispersion
    and ``[M/H] ≈ -1.0 ± 0.2``. Their APOGEE-truth values (for the
    validation-set subsample) span an order of magnitude wider. The head is
-   not just biased — it's collapsed into a prototype that ignores the input.
+   not just biased, it's collapsed into a prototype that ignores the input.
 
 ## Diagnosis
 
@@ -33,10 +33,10 @@ Two compounding bugs were responsible. Each bug, on its own, the DESIGN
 documents *warned about*; neither was visible in a single-stage unit test
 because their symptoms only show up in the **composition** of the two stages.
 
-### Bug A — contrastive encoder trained α/M-blind
+### Bug A, contrastive encoder trained α/M-blind
 
 `scripts/run_contrastive_pretrain.py` built its `LossWeights` with
-``supcon_label_n_first=3`` — SupCon's Gaussian-kernel pair weight used only
+``supcon_label_n_first=3``. SupCon's Gaussian-kernel pair weight used only
 the first three labels ``(Teff, logg, [M/H])``. Rationale at the time: "Tier-1
 atmospherics only; leave chemistry for supervised fine-tune so we don't
 double-count." What actually happened:
@@ -49,7 +49,7 @@ double-count." What actually happened:
 
 This matches observation (1) exactly.
 
-### Bug B — β-NLL at β=0.5 absorbs μ-bias into σ on a quasi-frozen encoder
+### Bug B, β-NLL at β=0.5 absorbs μ-bias into σ on a quasi-frozen encoder
 
 `scripts/run_ensemble.py` used ``LossWeights(supcon=0, beta_nll=1, beta=0.5)``
 with ``encoder_lr_ratio=0.1``. Seitzer's β-NLL variance-weighting
@@ -60,32 +60,32 @@ with ``encoder_lr_ratio=0.1``. Seitzer's β-NLL variance-weighting
   head cannot learn the correct μ because the encoder is already α/M-blind
   (Bug A). The residual is large and systematic.
 - β-NLL's down-weighting concentrates the head on *fitting σ* such that the
-  weighted loss is small — this is exactly the pathology Seitzer's paper
+  weighted loss is small, this is exactly the pathology Seitzer's paper
   discusses: β=0.5 is a compromise that *partially* absorbs μ-bias into σ
   instead of exposing it as mean error.
 - With the encoder quasi-frozen (encoder_lr_ratio=0.1), the head has no
-  escape route — it cannot ask the encoder for a better feature. It
+  escape route, it cannot ask the encoder for a better feature. It
   collapses onto a single prototype that minimises the detached-σ-weighted
   NLL: the ``[α/M]=+0.11, [M/H]=-1`` attractor.
 
 This matches observation (2) exactly, and also matches methods-paper
 Finding #3 ("β=0.5 absorbs per-cell μ bias into inflated σ; β=0 exposes
-the bias as explicit mean error") — which was identified earlier as a
+the bias as explicit mean error"), which was identified earlier as a
 *methodology result*, not a production-blocker. It became a
 production-blocker once Bug A degraded the encoder enough that the head had
 no good μ available for many cells.
 
 ## Decisions
 
-### D1 — contrastive uses all 5 production labels, not just Tier-1
+### D1, contrastive uses all 5 production labels, not just Tier-1
 
 `run_contrastive_pretrain.py` sets ``supcon_label_n_first=None`` and passes
 ``LabelTiers.five_label()``. The SupCon kernel now weights on
-``{Teff, logg, [M/H], [α/M], [Mg/H]}`` — matching the supervised head's
+``{Teff, logg, [M/H], [α/M], [Mg/H]}``, matching the supervised head's
 label space exactly. Stars with different chemistry at the same atmospherics
 are no longer treated as maximally positive.
 
-### D2 — SupCon is NaN-safe
+### D2. SupCon is NaN-safe
 
 `supcon_soft_positive` now masks any pair where either label row has a NaN
 in any dim → weight 0. Required because per-element abundances have 1-5%
@@ -93,7 +93,7 @@ NaN rates (V ~5.3%, Mg/Fe ~1.6%); without the mask, ``d2 = (ya - yk)²``
 NaN-propagates and the whole loss is NaN from epoch 0. First observed
 2026-04-21 when switching from ``n_first=3`` to all labels.
 
-### D3 — ensemble switches to β=0 with a small SupCon auxiliary
+### D3, ensemble switches to β=0 with a small SupCon auxiliary
 
 `run_ensemble.py` sets ``LossWeights(supcon=0.1, beta_nll=1.0, beta=0.0)``
 and ``grad_norm_abort_threshold=500.0`` (β=0 canary). Rationale:
@@ -109,7 +109,7 @@ and ``grad_norm_abort_threshold=500.0`` (β=0 canary). Rationale:
   letting NaN grads propagate silently.
 
 ADR 0011's "β=0.5 retained as default" remains valid *as a methodology
-baseline* — we still want to compare calibration under both regimes when
+baseline*, we still want to compare calibration under both regimes when
 writing up Finding #3. But β=0 is the production retrain choice for
 Pipeline 1 v2.
 
@@ -123,9 +123,9 @@ Pipeline 1 v2.
   from v1.0 and v1.1 are not to be used for science downstream of this
   date. Pipeline 2 feature matrix and classifier also rerun.
 - `docs/plan/06_methods_paper.md` Finding #3 is now also an empirical
-  production result, not only a methodology finding — update when writing
+  production result, not only a methodology finding, update when writing
   the paper outline.
-- No change to Tier-promotion protocol (research_brief §3.3) — tiers
+- No change to Tier-promotion protocol (research_brief §3.3), tiers
   are label-space promotion, not training-recipe decisions.
 
 ## Verification (acceptance criteria)

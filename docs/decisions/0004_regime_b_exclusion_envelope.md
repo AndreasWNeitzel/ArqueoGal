@@ -13,7 +13,7 @@ Pipeline 1's dust-map budget (no better 3D maps available at |b|<5°).
 
 Per-star boolean exclusion flag `pipeline1_tier1_release = False` when (|b|<5° AND
 predicted Teff > 4750 K AND predicted log g < 2.1), with small buffer around cell
-boundaries. Excluded stars are carried in D-Cat-b as **population-level only** — the
+boundaries. Excluded stars are carried in D-Cat-b as **population-level only**: the
 predictions exist and can support population statistics, but per-star reliability is
 not claimed.
 
@@ -33,12 +33,12 @@ not claimed.
 
 ## Alternatives rejected
 
-- **Fix the extinction handling with Bayestar19 + 3D dust at low |b|** — budget-busting
+- **Fix the extinction handling with Bayestar19 + 3D dust at low |b|**: budget-busting
   (~3 GB) and out of scope for v1.
-- **Post-hoc μ correction per cell** — rejected at the earlier calibration iteration
+- **Post-hoc μ correction per cell**: rejected at the earlier calibration iteration
   (ADR-0003 sibling) because μ correction is label redefinition disguised as
   calibration; violates scientific honesty of the release.
-- **Per-star retention with warning flag only** — tempting but pushes the burden of
+- **Per-star retention with warning flag only**: tempting but pushes the burden of
   interpretation onto downstream users who may not apply it consistently. Exclusion
   is cleaner.
 

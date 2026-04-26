@@ -1,4 +1,4 @@
-# Phase 06 — Methods paper(s)
+# Phase 06. Methods paper(s)
 
 **Status: Tracked, not actively drafted. Content spine identified.**
 
@@ -9,7 +9,7 @@ or all of which could form a methods paper:
 
 1. Noise-floor + PCA result: 43 effective modes of abundance-relevant information
    remain after Ye+2024 correction; PC1 carries 73.7% on the 43-D truncation.
-2. Label scaling is necessary for multi-task NLL training — previously missing in
+2. Label scaling is necessary for multi-task NLL training, previously missing in
    published XP pipelines.
 3. β-NLL at β=0.5 absorbs per-cell μ bias into inflated σ. Publishable negative
    result about a widely-used loss choice. β=0 exposes the bias as explicit mean
@@ -30,7 +30,7 @@ Additional from §9.2 audit:
    ~zero for [M/H], [α/M], [Mg/H]) relative to PCA summaries. Methodology note for
    §9.2-style audits.
 9. [α/M]'s zero PCA-CMI despite unambiguous shuffle-null and joint-shuffle signals
-   — H2 finding that aux features absorb [α/M]'s variance more than other chemistry
+. H2 finding that aux features absorb [α/M]'s variance more than other chemistry
    labels.
 10. The three-diagnostic triage (CMI / permutation / aux-only baseline) resolves
     §9.2 shuffle-null failures into either label-specific per-star-release decisions

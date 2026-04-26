@@ -27,9 +27,9 @@ splits across members.
 
 ## Alternatives rejected
 
-- **Vary data splits across members** — confounds epistemic and data coverage.
-- **Independent ensemble members (fresh pretrain each)** — budget-busting.
-- **Bayesian NN / MC dropout** — would eliminate ensemble ambiguity but is a much
+- **Vary data splits across members**: confounds epistemic and data coverage.
+- **Independent ensemble members (fresh pretrain each)**: budget-busting.
+- **Bayesian NN / MC dropout**: would eliminate ensemble ambiguity but is a much
   larger architectural change.
 
 ## Consequences

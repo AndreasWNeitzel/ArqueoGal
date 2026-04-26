@@ -6,7 +6,7 @@
 
 The §9.2 shuffled-spectrum null test surfaced apparent failure for Teff and log g
 (skill_ratio 0.714 and 0.870, failing the literal §4 gate). The initial reading was
-"prior-augmented tier-1-caveat" — that XP color and parallax carry most of the label
+"prior-augmented tier-1-caveat", that XP color and parallax carry most of the label
 and the shuffle-null failure is about the distribution of information rather than
 spectral vs non-spectral origin.
 

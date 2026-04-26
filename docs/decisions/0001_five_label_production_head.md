@@ -5,7 +5,7 @@
 > **Note (2026-04-22):** references to "Pipeline 2" below describe the
 > original in-repo population-classification module, which has since been spun
 > out into the **Starfold** repository. The consequence recorded here (5-D
-> covariance footprint for downstream consumers) still applies — it now
+> covariance footprint for downstream consumers) still applies, it now
 > applies to Starfold rather than an in-tree Pipeline 2. The historical
 > reasoning is preserved as-is.
 
@@ -36,12 +36,12 @@ Empirical comparison at 2026-04-19 showed:
   5-label did not (max 1.78).
 
 The original hypothesis that "Tier-3 gradients corrupt the Tier-1 representation" was
-NOT supported — per-cell bias on Teff and [M/H] is ~unchanged between label counts.
+NOT supported, per-cell bias on Teff and [M/H] is ~unchanged between label counts.
 But the joint-tail improvement is real, and it matters for scientific use of the full
 covariance matrix.
 
 Scientific reframing: D-Cat-b's scope is "XP abundances for stars without APOGEE,
-scientifically defensible per §3.3 tier-promotion protocol" — NOT "all 21 labels".
+scientifically defensible per §3.3 tier-promotion protocol". NOT "all 21 labels".
 Uncalibrated per-star predictions for 16 additional elements are liability, not
 surface area. Future additional elements go through **separate specialist heads**
 (AspGap hydra pattern) on the shared pretrained encoder, each §3.3-audited
@@ -49,9 +49,9 @@ independently before release.
 
 ## Alternatives rejected
 
-- **Ship 21-label** — better "surface area" nominally but worse calibration per label
+- **Ship 21-label**: better "surface area" nominally but worse calibration per label
   reliability in the release-gate sense. Liability, not value.
-- **Drop to 3 labels (Tier 1 only)** — considered and rejected because α-process
+- **Drop to 3 labels (Tier 1 only)**: considered and rejected because α-process
   chemistry is scientifically load-bearing for Galactic archaeology and [Mg/H] is
   the strongest individual α-tracer in XP (Mg b + MgH).
 

@@ -1,4 +1,4 @@
-# ArqueoGal — Data Acquisition & Preprocessing Plan
+# ArqueoGal: Data Acquisition & Preprocessing Plan
 
 **Author:** Andreas Neitzel (Co-I, PhD student, CAUP/IA)
 **Scope:** This document defines the complete data acquisition, cross-matching, and preprocessing pipeline for Andreas Neitzel's workspace contributions to ArqueoGal. It is the primary reference for every data-related task and should be consulted before writing any data-handling code.
@@ -53,7 +53,7 @@
 ### Python packages (already in the `rapidsenv` venv)
 
 ```
-pyvo                 # TAP queries — primary interface for Gaia/AIP/GAVO
+pyvo                 # TAP queries, primary interface for Gaia/AIP/GAVO
 requests             # direct HTTPS downloads
 astropy              # FITS I/O, coordinates, units
 pandas, polars       # tabular
@@ -85,7 +85,7 @@ data/
 │   │   └── gedr3dist_subset.parquet        # only our source_ids
 │   ├── starhorse2/
 │   │   └── aqueiroz2023_apogee_dr17.fits.gz
-│   │   └── aqueiroz2023_gaia_rvs.fits.gz   # only if needed — large
+│   │   └── aqueiroz2023_gaia_rvs.fits.gz   # only if needed, large
 │   └── dust/
 │       └── edenhofer2024/                  # managed by dustmaps package
 ├── interim/                                # cross-matched, cleaned, single-stream
@@ -97,7 +97,7 @@ data/
 │   └── pipeline1_inference.parquet         # Gaia RGB+RC with XP, no labels
 │                                           # (Starfold downstream consumes Pipeline 1 prediction parquets
 │                                           #  produced from this matrix; kinematics may be exposed as a utility
-│                                           #  or duplicated in Starfold — choice deferred.)
+│                                           #  or duplicated in Starfold, choice deferred.)
 ├── external/                               # third-party shared catalogues
 │   └── hot_stuff/                          # anything else if needed
 └── provenance/                             # JSON provenance files (one per Parquet)
@@ -106,7 +106,7 @@ data/
 
 ---
 
-## 3. Stream 1 — APOGEE DR19 × Gaia DR3
+## 3. Stream 1. APOGEE DR19 × Gaia DR3
 
 ### 3.1 Primary source
 
@@ -123,13 +123,13 @@ data/
 Read HDU 2 (the aggregated catalogue), select only the columns actually used. Approximate size of selected-column subset: **~150 MB uncompressed, ~50 MB Parquet**.
 
 **Identifiers and cross-match keys:**
-- `sdss_id`, `apogee_id`, `source_id` (Gaia DR3 — DR19 publishes this directly; no manual cross-match needed!)
+- `sdss_id`, `apogee_id`, `source_id` (Gaia DR3. DR19 publishes this directly; no manual cross-match needed!)
 
 **Atmospheric parameters (calibrated):**
 - `teff`, `e_teff`, `logg`, `e_logg`, `m_h_atm`, `e_m_h_atm` (overall [M/H]), `alpha_m_atm`, `e_alpha_m_atm`, `vsini`, `vmicro`, `vmacro`
 
 **Individual abundances (calibrated, [X/H] and per-element where published):**
-- DR19 releases ~24 measurements of 21 elements. Keep: `c_h_atm`, `n_h_atm`, `o_h_atm`, `na_h_atm`, `mg_h_atm`, `al_h_atm`, `si_h_atm`, `s_h_atm`, `k_h_atm`, `ca_h_atm`, `ti_h_atm`, `v_h_atm`, `cr_h_atm`, `mn_h_atm`, `fe_h_atm`, `ni_h_atm`, `ce_h_atm` — each with `e_*` uncertainty.
+- DR19 releases ~24 measurements of 21 elements. Keep: `c_h_atm`, `n_h_atm`, `o_h_atm`, `na_h_atm`, `mg_h_atm`, `al_h_atm`, `si_h_atm`, `s_h_atm`, `k_h_atm`, `ca_h_atm`, `ti_h_atm`, `v_h_atm`, `cr_h_atm`, `mn_h_atm`, `fe_h_atm`, `ni_h_atm`, `ce_h_atm`, each with `e_*` uncertainty.
 - Also `c_fe`, `n_fe`, and derived C/N if DR19 provides it; if not, compute `c_n = c_fe - n_fe` at ingestion.
 - **Note on column naming**: DR19 may use suffix `_atm` or `_1`/`_raw` variants. Use calibrated values (no suffix or `_atm`); the `raw_*` columns are diagnostic only. Cross-check against the Astra documentation at https://www.sdss.org/dr19/mwm/astra/accessing-astra-files/ at ingestion time.
 
@@ -161,7 +161,7 @@ DR19 abundances exhibit residual Teff-dependent trends along the giant branch. M
 
 ### 3.5 Cross-match with Gaia DR3
 
-**DR19 publishes `source_id` directly in the summary file** (via SDSS-V's internal cross-match). Verify at ingestion: `df['source_id'].isna().sum()` should be small (<1% of rows). For unmatched stars, do not attempt manual positional cross-match; drop them — the sample is already large enough.
+**DR19 publishes `source_id` directly in the summary file** (via SDSS-V's internal cross-match). Verify at ingestion: `df['source_id'].isna().sum()` should be small (<1% of rows). For unmatched stars, do not attempt manual positional cross-match; drop them, the sample is already large enough.
 
 ### 3.6 Gaia DR3 enrichment query (at AIP)
 
@@ -198,7 +198,7 @@ LEFT JOIN gaiadr3.astrophysical_parameters AS ap USING (source_id)
 WHERE g.source_id IN (__batch__)
 ```
 
-Keep `has_xp_continuous` and `has_rvs` — the former is the prerequisite for fetching XP coefficients in §6.
+Keep `has_xp_continuous` and `has_rvs`, the former is the prerequisite for fetching XP coefficients in §6.
 
 ### 3.7 Apply Gaia corrections
 
@@ -206,13 +206,13 @@ At ingestion, on the concatenated result:
 - **Lindegren+2021 parallax zero-point**: use the official `zero_point.py` (https://www.cosmos.esa.int/web/gaia/edr3-code). Compute per-star `zpt`, store as `parallax_zpt`, apply as `parallax_corrected = parallax - zpt` stored as `parallax_corr`.
 - **Riello+2021 G-band flux/magnitude correction** (A&A 649, A3 Appendix A): apply the cubic-polynomial factor f(BP−RP) to sources with 2-parameter (`astrometric_params_solved == 3`) or 6-parameter (`== 95`) solutions at G ≥ 13, with separate bright (13 ≤ G ≤ 16) and faint (G > 16) coefficients and BP−RP clipped to [0.25, 3.0]. Reference code: agabrown/gaiaedr3-6p-gband-correction. Store as `phot_g_mean_mag_corr` (and `phot_g_mean_flux_corr` when a flux column is available).
 
-### 3.8 Output schema — `data/interim/stream1_apogee_gaia.parquet`
+### 3.8 Output schema. `data/interim/stream1_apogee_gaia.parquet`
 
 One row per APOGEE star with matched Gaia DR3. ~700 k rows × ~80 columns × ~8 bytes/cell ≈ **~450 MB uncompressed, ~150 MB Parquet with Snappy compression**.
 
 ---
 
-## 4. Stream 2 — TESS Hon+2021 + TASOC × Gaia DR3
+## 4. Stream 2. TESS Hon+2021 + TASOC × Gaia DR3
 
 Pre-staged for Task 4 (asteroseismic ages, led by others). **Not used by Pipelines 1 or 2 yet.** Kept minimal to preserve budget.
 
@@ -235,16 +235,16 @@ Expected rows: ~120 k post-cut. Size: ~15 MB Parquet.
 ### 4.2 TASOC / additional seismic parameters
 
 "TASOC" is the TESS Asteroseismic Science Operations Center. For TESS red giants, published supplementary parameters come from:
-- **Mackereth et al. 2021** (MNRAS 502, 1947) — 5 574 giants with Δν and mass estimates combining TESS + APOGEE.
-- **Stokholm et al. 2023** (MNRAS 524, 1080) — ~12 k stars with seismic masses.
-- **Hon et al. 2024** (in prep / arXiv recently) — extension of the 2021 catalogue with Δν for a subset.
-- **Silva Aguirre et al. 2020** (TASC-I) — for methodology reference.
+- **Mackereth et al. 2021** (MNRAS 502, 1947), 5 574 giants with Δν and mass estimates combining TESS + APOGEE.
+- **Stokholm et al. 2023** (MNRAS 524, 1080), ~12 k stars with seismic masses.
+- **Hon et al. 2024** (in prep / arXiv recently), extension of the 2021 catalogue with Δν for a subset.
+- **Silva Aguirre et al. 2020** (TASC-I), for methodology reference.
 
 **Not all of these are publicly released as tables yet.** Fetch what is available from VizieR or from the papers' Zenodo repositories. For the 2026 cut of the project, accept that Hon+2021 ν_max is the primary deliverable and the rest is opportunistic.
 
 ### 4.3 TIC → Gaia DR3 cross-match
 
-The TESS Input Catalog (TIC v8.2; Paegert+2021; Stassun+2019) publishes a `GAIA` column — **but this is Gaia DR2 source_id**, not DR3. Two-step cross-match required:
+The TESS Input Catalog (TIC v8.2; Paegert+2021; Stassun+2019) publishes a `GAIA` column. **but this is Gaia DR2 source_id**, not DR3. Two-step cross-match required:
 
 **Step 1**: fetch TIC v8.2 rows for our Hon+2021 TICs via MAST CasJobs or the CDS VizieR mirror `IV/39/tic82`. Columns: `TIC`, `GAIA` (DR2 ID), `RAJ2000`, `DEJ2000`, `Tmag`, `plx`.
 
@@ -264,15 +264,15 @@ Accept only matches with `angular_distance < 300 mas` AND `abs(magnitude_differe
 
 ### 4.4 Enrichment and output
 
-Join the cross-matched `source_id`s to Gaia DR3 using the same query template as §3.6. No XP coefficients needed yet — deferred to Task 4.
+Join the cross-matched `source_id`s to Gaia DR3 using the same query template as §3.6. No XP coefficients needed yet, deferred to Task 4.
 
 Output: `data/interim/stream2_tess_gaia.parquet`. ~120 k rows × ~40 columns ≈ **~80 MB uncompressed, ~30 MB Parquet**.
 
 ---
 
-## 5. Stream 3 — 1–2 M Gaia RGB+RC application sample
+## 5. Stream 3, 1–2 M Gaia RGB+RC application sample
 
-This is the inference set for Pipeline 1 (`xp_abundances`); the Pipeline 1 prediction parquets produced from it are the input Starfold (downstream; separate repo) consumes to build its own feature matrix. **Selection criterion matters most here** — an honest, defensible, reproducible cut is essential for the D-Cat-b/D-Cat-d releases.
+This is the inference set for Pipeline 1 (`xp_abundances`); the Pipeline 1 prediction parquets produced from it are the input Starfold (downstream; separate repo) consumes to build its own feature matrix. **Selection criterion matters most here**: an honest, defensible, reproducible cut is essential for the D-Cat-b/D-Cat-d releases.
 
 ### 5.1 Three candidate selection strategies
 
@@ -288,7 +288,7 @@ This is the inference set for Pipeline 1 (`xp_abundances`); the Pipeline 1 predi
 - **Extension at low latitudes / high extinction**: where Andrae+2023 has holes (they cut Av > 1.5 and |b| < 5°), supplement with GSP-Phot Kiel cuts (Teff 4000–5200 K, logg 1.0–3.5) to avoid a latitude-biased catalogue.
 - **Cross-check** (not selection): verify each kept star against StarHorse2 (Queiroz+2023) where available; flag disagreements (|logg_A23 − logg_SH2| > 0.5 dex) for downstream scrutiny.
 
-**Why not StarHorse2 as primary?** StarHorse2 is scientifically excellent but its coverage is defined by the inputs — and critically, its largest table (Gaia RVS StarHorse, ~4.2 M stars, Queiroz+2023) requires G<sub>RVS</sub> < 14, which excludes the faint-end XP population our Pipeline 1 targets. Use StarHorse2 where it overlaps (as a cross-check and to import precision distances/extinctions), not as the primary selector.
+**Why not StarHorse2 as primary?** StarHorse2 is scientifically excellent but its coverage is defined by the inputs, and critically, its largest table (Gaia RVS StarHorse, ~4.2 M stars, Queiroz+2023) requires G<sub>RVS</sub> < 14, which excludes the faint-end XP population our Pipeline 1 targets. Use StarHorse2 where it overlaps (as a cross-check and to import precision distances/extinctions), not as the primary selector.
 
 ### 5.2 Andrae+2023 vetted RGB download
 
@@ -301,7 +301,7 @@ This is the inference set for Pipeline 1 (`xp_abundances`); the Pipeline 1 predi
 Target: **1.5 M** stars evenly distributed in `(Teff, logg, [M/H], G)`.
 
 ```python
-# Illustrative — the real implementation lives in
+# Illustrative, the real implementation lives in
 # src/arqueogal/data/stream3_selection.py
 bins_teff  = np.linspace(4000, 5500, 7)
 bins_logg  = np.linspace(1.0, 3.5, 6)
@@ -311,13 +311,13 @@ bins_g     = np.linspace(7, 16, 10)
 # Cells with < 600 stars: take all; cells with more: random.
 ```
 
-This stratification is essential for downstream diagnostics (§9.2 test 6 here, and population-discovery work in Starfold) — an unstratified sample dominated by disc stars at solar metallicity would under-sample the halo and metal-poor tails where interesting population structure lives.
+This stratification is essential for downstream diagnostics (§9.2 test 6 here, and population-discovery work in Starfold), an unstratified sample dominated by disc stars at solar metallicity would under-sample the halo and metal-poor tails where interesting population structure lives.
 
 Log the exact stratification parameters and random seed to provenance.
 
 ### 5.4 Gaia DR3 enrichment
 
-Same query template as §3.6. **With XP coefficients this time** — the full purpose of Stream 3 is to feed XP into Pipeline 1 inference.
+Same query template as §3.6. **With XP coefficients this time**: the full purpose of Stream 3 is to feed XP into Pipeline 1 inference.
 
 ### 5.5 Output
 
@@ -329,11 +329,11 @@ Same query template as §3.6. **With XP coefficients this time** — the full pu
 Pipeline 1 inference consumes 2MASS J/H/K and AllWISE W1/W2 as auxiliary features alongside the XP coefficients. Zero-imputation diagnostics on Stream 3 show all five v1 labels degrade 28–130% RMSE without IR; NaN-imputation crashes the adapter. Per-star IR is non-negotiable.
 
 - Module: `src/arqueogal/data/ir_photometry.py`. Driver: `scripts/fetch_ir_photometry.py`.
-- Primary TAP: **AIP** (`https://gaia.aip.de/tap`, `GAIA_AIP_TOKEN` bearer auth). ESA Gaia Archive is a secondary fallback but its shared anonymous `TAP_UPLOAD` queue routinely runs up against a 20 GB filesystem quota under concurrent external load — a single 10 k-id chunk can land with `Filesystem quota exceeded for user anonymous`. Prefer AIP.
+- Primary TAP: **AIP** (`https://gaia.aip.de/tap`, `GAIA_AIP_TOKEN` bearer auth). ESA Gaia Archive is a secondary fallback but its shared anonymous `TAP_UPLOAD` queue routinely runs up against a 20 GB filesystem quota under concurrent external load, a single 10 k-id chunk can land with `Filesystem quota exceeded for user anonymous`. Prefer AIP.
 - Cross-match uses the Marrese+2019 Gaia×external best-neighbour tables:
   - 2MASS: `gaiadr3.tmass_psc_xsc_best_neighbour` ⨝ `catalogs.tmass` (AIP) / `gaiadr1.tmass_original_valid` (ESA).
   - AllWISE: `gaiadr3.allwise_best_neighbour` ⨝ `catalogs.allwise` (AIP) / `gaiadr1.allwise_original_valid` (ESA).
-- **Join key — important.** For both catalogues use `<original_valid|catalogs>.designation = best_neighbour.original_ext_source_id`. Do **not** join AllWISE on `allwise_oid` — on ESA that deterministically triggers `java.sql.SQLException: PooledConnection has already been closed` and on AIP it works but has no upside. The `designation` string join is correct for both PSC catalogues (AllWISE designations are `Jhhmmss.ss±ddmmss.s`; 2MASS are `hhmmssss±ddmmsss`).
+- **Join key, important.** For both catalogues use `<original_valid|catalogs>.designation = best_neighbour.original_ext_source_id`. Do **not** join AllWISE on `allwise_oid`, on ESA that deterministically triggers `java.sql.SQLException: PooledConnection has already been closed` and on AIP it works but has no upside. The `designation` string join is correct for both PSC catalogues (AllWISE designations are `Jhhmmss.ss±ddmmss.s`; 2MASS are `hhmmssss±ddmmsss`).
 - Column mapping to the module's canonical schema:
   - 2MASS PSC: `j_m → j_mag`, `j_msigcom → e_j_mag`, `h_m → h_mag`, `h_msigcom → e_h_mag`, `ks_m → k_mag` (ESA) **or** `k_m → k_mag` (AIP), `ks_msigcom → e_k_mag` (ESA) / `k_msigcom → e_k_mag` (AIP), `designation → tmass_source_id`, `bn.angular_distance → tmass_angular_distance`, `bn.xm_flag → tmass_xm_quality_flag`.
   - AllWISE: `w1mpro → w1_mag`, `w1mpro_error → e_w1_mag` (ESA) / `w1sigmpro → e_w1_mag` (AIP), analogous for W2, `designation → allwise_source_id`, `bn.angular_distance → allwise_angular_distance`, `bn.xm_flag → allwise_xm_quality_flag`.
@@ -396,8 +396,8 @@ Checkpoint each batch to `data/interim/xp_batches/batch_NNNN.parquet` so a crash
 
 Applied in `src/arqueogal/data/gaia_xp.py`, in order:
 
-1. **Ye+2024 NN flux-correction.** Reference: Ye et al. 2025, *A&A* 695 A75 (peer-reviewed version of arXiv:2411.19105). Public data and code release: **concept DOI 10.5281/zenodo.14028588** (resolves to all versions); **version DOI 10.5281/zenodo.14712749** (v2, published 2025-01-21, `GaiaXP-correction_V0.zip`, ~1.5 GB, MD5 `c7136ede1fcada9b1e0a0373c59741b1`). CDS mirror: `J/A+A/695/A75`. **Implemented** via path (a): trained weights (`nn_model_pattern.pth`) + per-feature StandardScaler (`scaler_mean.txt`, `scaler_scale.txt`) vendored under `data/external/ye2024/GaiaXP-correction_V0/model/` (42 MB). Path (b) — cross-matching the Zenodo catalog — is not viable: `catalog_all.vot` only contains atmospheric parameters for the 68 M cross-sample, not corrected coefficients/spectra for arbitrary source_ids. The NN operates in *sampled* flux space on `np.geomspace(360, 990, 330)` nm; its output is stored as `xp_sampled_corrected.parquet` (intermediate).
-   **GaiaXPy-required columns we didn't fetch** (covariance drop in §6.1): `bp_n_parameters` / `rp_n_parameters` are injected as `55` (matching the fixed-length Hermite arrays); `bp_coefficient_correlations` / `rp_coefficient_correlations` are injected as zero vectors of length `55·54/2 = 1485`. GaiaXPy only consumes correlations to propagate `flux_error` and `flux_error_*`, and the Ye NN reads only mean flux + mean magnitudes, so the zero substitution leaves the NN inputs exact. Propagated `flux_error` is consequently uncalibrated and **must not be used** — use `YE2024_FLAG_OK` / `YE2024_FLAG_NO_SYNTH_PHOT` / `YE2024_FLAG_CALIBRATE_FAIL` as the only per-star reliability signal out of this step. Recorded in the `xp_sampled_corrected.provenance.json` sidecar.
+1. **Ye+2024 NN flux-correction.** Reference: Ye et al. 2025, *A&A* 695 A75 (peer-reviewed version of arXiv:2411.19105). Public data and code release: **concept DOI 10.5281/zenodo.14028588** (resolves to all versions); **version DOI 10.5281/zenodo.14712749** (v2, published 2025-01-21, `GaiaXP-correction_V0.zip`, ~1.5 GB, MD5 `c7136ede1fcada9b1e0a0373c59741b1`). CDS mirror: `J/A+A/695/A75`. **Implemented** via path (a): trained weights (`nn_model_pattern.pth`) + per-feature StandardScaler (`scaler_mean.txt`, `scaler_scale.txt`) vendored under `data/external/ye2024/GaiaXP-correction_V0/model/` (42 MB). Path (b), cross-matching the Zenodo catalog, is not viable: `catalog_all.vot` only contains atmospheric parameters for the 68 M cross-sample, not corrected coefficients/spectra for arbitrary source_ids. The NN operates in *sampled* flux space on `np.geomspace(360, 990, 330)` nm; its output is stored as `xp_sampled_corrected.parquet` (intermediate).
+   **GaiaXPy-required columns we didn't fetch** (covariance drop in §6.1): `bp_n_parameters` / `rp_n_parameters` are injected as `55` (matching the fixed-length Hermite arrays); `bp_coefficient_correlations` / `rp_coefficient_correlations` are injected as zero vectors of length `55·54/2 = 1485`. GaiaXPy only consumes correlations to propagate `flux_error` and `flux_error_*`, and the Ye NN reads only mean flux + mean magnitudes, so the zero substitution leaves the NN inputs exact. Propagated `flux_error` is consequently uncalibrated and **must not be used**: use `YE2024_FLAG_OK` / `YE2024_FLAG_NO_SYNTH_PHOT` / `YE2024_FLAG_CALIBRATE_FAIL` as the only per-star reliability signal out of this step. Recorded in the `xp_sampled_corrected.provenance.json` sidecar.
 2. **Hermite re-projection.** Linear least-squares projection of the 330-element Ye-corrected flux onto the 55+55 Hermite basis used by Gaia DR3 (BP and RP separately, wavelength→pseudo-wavelength per De Angeli+2023 §3). Outputs: `bp_coeffs_corrected[55]`, `rp_coeffs_corrected[55]`. **Per-star QC feature:** `reprojection_residual_rms` (RMS of Ye sampled flux − Hermite-basis reconstruction). Retained, not used for rejection. This step re-enters the coefficient representation used by Andrae+2023, AspGap, Buck & Schwarz 2024, and Guiglion+2024, and closes the §7.2 research_brief.md decision on flux representation.
 3. **Normalisation by first coefficient.** For each star:
    ```
@@ -405,26 +405,26 @@ Applied in `src/arqueogal/data/gaia_xp.py`, in order:
    rp_coeff[1:] /= rp_coeff[0]
    ```
    This is the Guiglion+2024 and Buck & Schwarz 2024 convention: the zeroth coefficient carries the overall flux scale; dividing the rest makes the representation magnitude-independent.
-4. **First-coefficient transformation.** `bp_coeff[0] → log10(bp_coeff[0])`; then z-score `bp_coeff[0]` and `rp_coeff[0]` across the Stream-1 training set. **Freeze (μ, σ) in the pipeline-1 training provenance** and re-apply identically at Stream-3 inference — never re-z-score against the inference sample. Buck & Schwarz 2024's recipe.
+4. **First-coefficient transformation.** `bp_coeff[0] → log10(bp_coeff[0])`; then z-score `bp_coeff[0]` and `rp_coeff[0]` across the Stream-1 training set. **Freeze (μ, σ) in the pipeline-1 training provenance** and re-apply identically at Stream-3 inference, never re-z-score against the inference sample. Buck & Schwarz 2024's recipe.
 5. **Error propagation.** Under division by `bp_coeff[0]`, the normalised error is:
    ```
    σ_norm_i = sqrt( (σ_i / bp_coeff[0])^2 + (bp_coeff_i * σ_0 / bp_coeff[0]^2)^2 )
    ```
-   Implement this exactly, do not approximate. Ye's re-projected coefficients inherit their σ from the propagation of `flux_error`; since our `flux_error` is uncalibrated per step 1, the coefficient σ is a lower bound only — release notes must say so.
+   Implement this exactly, do not approximate. Ye's re-projected coefficients inherit their σ from the propagation of `flux_error`; since our `flux_error` is uncalibrated per step 1, the coefficient σ is a lower bound only, release notes must say so.
 6. **Output columns.** `bp_coeffs_norm[55]`, `rp_coeffs_norm[55]`, `bp_coeff_errs_norm[55]`, `rp_coeff_errs_norm[55]`, the z-scored zeroth-coefficient features `bp_c0_z`, `rp_c0_z`, the Hermite-reprojection QC feature `reprojection_residual_rms`, and `ye2024_flag`. Float32. Drop raw coefficients from the analysis-ready file (keep them in `data/interim/` for diagnostic reanalysis).
 
 ### 6.5 Sanity checks (run at ingestion)
 
 - `bp_coeffs` and `rp_coeffs` arrays have length exactly 55 each. Reject stars with NaN or missing arrays.
 - `bp_coeff[0] > 0` and `rp_coeff[0] > 0`. (Flux normalisation should be positive for real stars.)
-- No coefficient should be > 10× the typical magnitude-stratified median of its column — outliers flagged with `xp_outlier_flag`.
-- `has_xp_continuous` from the `gaia_source` join should be True for every star. If not, the XP query silently failed — halt and investigate.
+- No coefficient should be > 10× the typical magnitude-stratified median of its column, outliers flagged with `xp_outlier_flag`.
+- `has_xp_continuous` from the `gaia_source` join should be True for every star. If not, the XP query silently failed, halt and investigate.
 
 ### 6.6 Ye+2024 `NO_SYNTH_PHOT` selection function
 
-The Ye+2024 NN flux-correction refuses to correct a non-trivial minority of stars because `gaiaxpy.generate` cannot produce the synthetic photometry the NN expects (internally flagged `YE2024_FLAG_NO_SYNTH_PHOT`, emitted as `ye2024_flag == 1`). Thread-1 diagnostics on Stream 1 (N = 324,054; 2.60 % globally flagged) showed the failure rate is a *strong* function of Galactic latitude and G magnitude: **10.48 % in the plane (`|b| < 5°`) vs 0.08 % off-plane (`|b| > 15°`), i.e., a 134× ratio**, and it is essentially zero for G ≲ 14 at any latitude, rising to 40 % at `|b| < 5°` for G > 15.5. The rejection is *not* a uniformly-random sample — it tracks regions where crowding, extinction, and Gaia XP de-blending failures preferentially remove stars. The D-Cat-b release therefore exposes this as a per-star scalar:
+The Ye+2024 NN flux-correction refuses to correct a non-trivial minority of stars because `gaiaxpy.generate` cannot produce the synthetic photometry the NN expects (internally flagged `YE2024_FLAG_NO_SYNTH_PHOT`, emitted as `ye2024_flag == 1`). Thread-1 diagnostics on Stream 1 (N = 324,054; 2.60 % globally flagged) showed the failure rate is a *strong* function of Galactic latitude and G magnitude: **10.48 % in the plane (`|b| < 5°`) vs 0.08 % off-plane (`|b| > 15°`), i.e., a 134× ratio**, and it is essentially zero for G ≲ 14 at any latitude, rising to 40 % at `|b| < 5°` for G > 15.5. The rejection is *not* a uniformly-random sample, it tracks regions where crowding, extinction, and Gaia XP de-blending failures preferentially remove stars. The D-Cat-b release therefore exposes this as a per-star scalar:
 
-- **`selection_prob` column**: defined as `1 − P(NO_SYNTH_PHOT | |b|, G)`, i.e., the probability that a star at the given `(|b|, G)` would have been *retained* by the Ye+2024 correction (flag == 0). Clipped to `[0.01, 1.0]` — the floor keeps inverse weights finite in the plane-faint corner while remaining honest (users should treat `selection_prob < 0.1` as informative about catalogue completeness, not as a number to extrapolate).
+- **`selection_prob` column**: defined as `1 − P(NO_SYNTH_PHOT | |b|, G)`, i.e., the probability that a star at the given `(|b|, G)` would have been *retained* by the Ye+2024 correction (flag == 0). Clipped to `[0.01, 1.0]`, the floor keeps inverse weights finite in the plane-faint corner while remaining honest (users should treat `selection_prob < 0.1` as informative about catalogue completeness, not as a number to extrapolate).
 - **Stratification (v1):** 5×5 grid on `(|b|, G)` with edges `|b| ∈ {0, 5, 10, 20, 45, 90}°` and `G ∈ {2.0, 11.0, 12.5, 14.0, 15.5, 17.65}`. 1 of 25 cells is sparse (N < 200); its rate is consistent with the neighbouring cells so no regression fallback is triggered. If future ingestion tips cells below threshold, the planned fallback is `statsmodels.nonparametric.lowess` or `scipy.ndimage.gaussian_filter` on the rate grid; the scorer contract is unchanged.
 - **v2 stratification** (post-D-Cat-b): extend to `(|b|, G, Teff, log g)` and/or include line-of-sight Av.
 - **Scorer:** `arqueogal.data.selection_function.score_selection_prob(b_deg, g_mag) → np.ndarray` in `[0.01, 1.0]`. Loads the v1 Parquet artefact.
@@ -432,27 +432,27 @@ The Ye+2024 NN flux-correction refuses to correct a non-trivial minority of star
 - **Builder:** `scripts/build_selection_function_v1.py`. Deterministic. Read-only on the input; atomic write on the output.
 - **Downstream use:** Stream 3 ingestion calls `score_selection_prob` on each star's `(b_deg, g_mag)` and writes the scalar into the per-star D-Cat-b catalogue. Users needing inverse weights compute `1.0 / selection_prob`.
 
-### 6.7 Compound selection function (v1.1) — Ye retention × IR completeness
+### 6.7 Compound selection function (v1.1). Ye retention × IR completeness
 
 v1.1 extends the §6.6 selection function with a second, multiplicative component: **P(IR-complete | |b|, G, Teff, log g)**. The IR-dependency diagnostic confirmed the five 2MASS/AllWISE magnitudes (J, H, K, W1, W2) are load-bearing on all five Pipeline-1 labels. Stars without 2MASS/AllWISE counterparts (~0.37 % of Stream 1) fall into the "IR=0 rare-pattern" regime at inference (training used `nan_to_num(0.0)` on those rows); their per-star predictions are scientifically different from the IR-complete majority. Volume-complete downstream analyses therefore need *both* `P(Ye-retained)` and `P(IR-complete)` per star.
 
 - **Compound definition:** `p_compound = p_ye_retained · p_ir_complete · p_parallax · p_extinction`. In v1.1 the last two factors are 0/1 gates (True → 1.0, False → 0.0) that take a per-star data-availability flag; smooth parallax / extinction-availability probabilities are earmarked for v1.2.
 - **IR-completeness definition:** a row is IR-complete iff all five IR magnitudes are finite *and* non-zero. Both conditions are enforced for clean training→inference transfer (the zero-sentinel is the downstream `nan_to_num` stand-in for "no counterpart").
-- **IR grid:** 5×5×3×2 on `(|b|, G, Teff, log g)` — same |b|×G edges as v1 for compositional ease; `Teff ∈ {3000, 4400, 4900, 6500} K` (cool / mid / warm giants) and `log g ∈ {0, 2.5, 5.0}` (luminous giants / lower-RGB+RC). 150 possible cells; on Stream 1, 145 populate and 112 are dense (N ≥ 100). Per-cell Laplace smoothing `(N_c + 1) / (N_t + 2)` prevents 0 or 1 extremes; `[0.01, 1.0]` clamp matches v1.
+- **IR grid:** 5×5×3×2 on `(|b|, G, Teff, log g)`, same |b|×G edges as v1 for compositional ease; `Teff ∈ {3000, 4400, 4900, 6500} K` (cool / mid / warm giants) and `log g ∈ {0, 2.5, 5.0}` (luminous giants / lower-RGB+RC). 150 possible cells; on Stream 1, 145 populate and 112 are dense (N ≥ 100). Per-cell Laplace smoothing `(N_c + 1) / (N_t + 2)` prevents 0 or 1 extremes; `[0.01, 1.0]` clamp matches v1.
 - **Sparse-cell fallback:** when a 4-D cell has N < 100 *or* when Teff / log g are unavailable at scoring time, the scorer falls back to the always-dense |b|×G marginal. Out-of-range inputs are clamped to the nearest edge.
 - **Global Stream-1 rate:** P(IR-complete) = 99.63 % (vs the ~99.9 % training-domain heuristic referenced in the IR-dependency diagnostic). Most of the gap is concentrated in faint-in-plane cells (bright `|b|<5°` drops to ~94 %).
 - **Scorers** (all in `arqueogal.data.selection_function`):
-  - `score_selection_prob(b_deg, g_mag)` — v1, unchanged for backwards compatibility.
-  - `score_ir_completeness(b_deg, g_mag, teff, logg)` — new.
-  - `score_compound_selection_prob(b_deg, g_mag, teff, logg, parallax_over_error=None, av_missing=False)` — returns a dict with `p_ye_retained`, `p_ir_complete`, `p_compound`, and a `components` breakdown.
+  - `score_selection_prob(b_deg, g_mag)`, v1, unchanged for backwards compatibility.
+  - `score_ir_completeness(b_deg, g_mag, teff, logg)`, new.
+  - `score_compound_selection_prob(b_deg, g_mag, teff, logg, parallax_over_error=None, av_missing=False)`, returns a dict with `p_ye_retained`, `p_ir_complete`, `p_compound`, and a `components` breakdown.
 - **Artefacts:**
-  - `reports/selection_function/ir_completeness_v1.{parquet,md,provenance.json}` — the 4-D grid plus the |b|×G marginal fallback (both stored in the same Parquet, distinguished by a `grid` column).
-  - `reports/selection_function/selection_function_v1.1.{parquet,md,provenance.json}` — the |b|×G-marginal compound table (Ye retention joined with IR completeness) for consumers who do not carry Teff / log g at scoring time. v1 remains in place at `selection_function_v1.*` for historical reference.
+  - `reports/selection_function/ir_completeness_v1.{parquet,md,provenance.json}`, the 4-D grid plus the |b|×G marginal fallback (both stored in the same Parquet, distinguished by a `grid` column).
+  - `reports/selection_function/selection_function_v1.1.{parquet,md,provenance.json}`, the |b|×G-marginal compound table (Ye retention joined with IR completeness) for consumers who do not carry Teff / log g at scoring time. v1 remains in place at `selection_function_v1.*` for historical reference.
 - **Builder:** `scripts/build_selection_function_v11.py`. Deterministic. Read-only on the input; atomic writes on outputs.
 - **Known limitations (v1.1):**
-  1. `p_parallax` and `p_extinction` are 0/1 gates — upgrade path is v1.2.
+  1. `p_parallax` and `p_extinction` are 0/1 gates, upgrade path is v1.2.
   2. IR-completeness table is computed on the Stream 1 (APOGEE × Gaia XP) basis; cross-check on first Stream-3 Ye run is scheduled.
-  3. Piecewise-constant inside each 4-D cell — smoothing is v1.3 work if structure inside bins ever grows.
+  3. Piecewise-constant inside each 4-D cell, smoothing is v1.3 work if structure inside bins ever grows.
   4. Coarse Teff stratification (3 bins); refine if future data ingestion produces material 4-D structure inside any of them.
 
 ---
@@ -464,7 +464,7 @@ v1.1 extends the §6.6 selection function with a second, multiplicative componen
 - Reference: Bailer-Jones, Rybizki, Fouesneau, Demleitner, Andrae 2021, AJ 161, 147; arXiv:2012.05220.
 - VizieR catalogue: **I/352**.
 - GAVO mirror: `gedr3dist.main` at https://dc.g-vo.org/tableinfo/gedr3dist.main (primary, recommended).
-- Full catalogue: 1,467,744,818 geometric + 1,346,621,631 photogeometric distances. Full dump is ~60 GB — **do not download all**. Query only our source_ids.
+- Full catalogue: 1,467,744,818 geometric + 1,346,621,631 photogeometric distances. Full dump is ~60 GB. **do not download all**. Query only our source_ids.
 - Columns: `source_id`, `r_med_geo`, `r_lo_geo`, `r_hi_geo`, `r_med_photogeo`, `r_lo_photogeo`, `r_hi_photogeo`, `flag`.
 
 GAVO TAP query via pyvo:
@@ -478,17 +478,17 @@ FROM gedr3dist.main
 WHERE source_id IN (__batch__)
 ```
 
-**Use `r_med_photogeo` as the primary distance** — Bailer-Jones+2021 show photogeometric outperforms geometric for stars with parallax S/N < 10 by incorporating colour and magnitude as an absolute-magnitude prior. Asymmetric errors: use `(r_hi_photogeo - r_lo_photogeo) / 2` as the symmetric σ approximation only where required; otherwise carry the full asymmetric pair.
+**Use `r_med_photogeo` as the primary distance**: Bailer-Jones+2021 show photogeometric outperforms geometric for stars with parallax S/N < 10 by incorporating colour and magnitude as an absolute-magnitude prior. Asymmetric errors: use `(r_hi_photogeo - r_lo_photogeo) / 2` as the symmetric σ approximation only where required; otherwise carry the full asymmetric pair.
 
 Fallback: if GAVO is down or slow, AIP hosts the same data under `gaiaedr3.distances_bailerjones` (confirm exact table name via AIP schema browser at first ingestion).
 
 ### 7.2 StarHorse2 (Queiroz+2023)
 
-- Reference: Queiroz, Anders, Chiappini et al. 2023, A&A 673, A155; arXiv:2303.09926. Version 2 files **only** (v1 had a piecewise age prior that biased old stars — release notes at https://data.aip.de/projects/aqueiroz2023.html).
+- Reference: Queiroz, Anders, Chiappini et al. 2023, A&A 673, A155; arXiv:2303.09926. Version 2 files **only** (v1 had a piecewise age prior that biased old stars, release notes at https://data.aip.de/projects/aqueiroz2023.html).
 - Landing page: https://data.aip.de/projects/aqueiroz2023.html. S3 bucket: `https://s3.data.aip.de:9000/shaqueiroz2023/`.
 - Eight files, one per parent spectroscopic survey. For our training-set enrichment the relevant ones are:
-  - `aqueiroz2023_apogee_dr17_v2.fits` — APOGEE DR17 (562 k stars). **Our Stream 1 overlap.** Size ~250 MB.
-  - `aqueiroz2023_gaia_rvs_v2.fits` — Gaia RVS (4.2 M). Useful for Stream 3 cross-check. Size ~1.5 GB — **exceeds budget if downloaded in full**. Query via AIP TAP instead (see below).
+  - `aqueiroz2023_apogee_dr17_v2.fits`. APOGEE DR17 (562 k stars). **Our Stream 1 overlap.** Size ~250 MB.
+  - `aqueiroz2023_gaia_rvs_v2.fits`. Gaia RVS (4.2 M). Useful for Stream 3 cross-check. Size ~1.5 GB. **exceeds budget if downloaded in full**. Query via AIP TAP instead (see below).
 - Key columns: `source_id`, `dist16`, `dist50`, `dist84` (pc), `av16`, `av50`, `av84` (mag), `teff16/50/84`, `logg16/50/84`, `met16/50/84`, `mass16/50/84`, `age16/50/84` (Gyr), `starhorse_outputflag`, `starhorse_ageflag`.
 - **Age cautions**: SH2 ages are reliable only on the SGB (σ_age/age ~15%) and MSTO (σ_age/age ~30%). For RGB and RC stars, ages are uninformative (the SGB prior dominates). Respect `starhorse_ageflag`. Do not use SH2 ages for red giants; use them only where the flag says valid.
 
@@ -505,18 +505,18 @@ FROM gaiadr3_contrib.aqueiroz2023_apogee_dr17_v2
 WHERE source_id IN (__batch__)
 ```
 
-(Confirm exact table name at first use via `SELECT TOP 1 * FROM tap_schema.tables WHERE schema_name = 'gaiadr3_contrib'` — AIP occasionally reorganises its `_contrib` namespace.)
+(Confirm exact table name at first use via `SELECT TOP 1 * FROM tap_schema.tables WHERE schema_name = 'gaiadr3_contrib'`. AIP occasionally reorganises its `_contrib` namespace.)
 
 ### 7.3 Distance selection logic
 
 For Pipeline 1 (and, by extension, for the kinematics module that may be shared with Starfold):
 - Primary: `r_med_photogeo` from Bailer-Jones+2021.
 - Cross-check and uncertainty inflation: where StarHorse2 `dist50` is available, compare. If |log10(r_BJ/d_SH2)| > 0.3 (factor of 2 disagreement), flag the star as `dist_conflict` and inflate the distance uncertainty to encompass both.
-- Inside Pipeline 1 itself, distance is also a model output — the final feature vector carries a `distance_prior` (Bailer-Jones) and its σ, and the ML jointly re-fits.
+- Inside Pipeline 1 itself, distance is also a model output, the final feature vector carries a `distance_prior` (Bailer-Jones) and its σ, and the ML jointly re-fits.
 
 ---
 
-## 8. Extinction — strategy within the 5 GB budget
+## 8. Extinction, strategy within the 5 GB budget
 
 ### 8.1 The budget problem
 
@@ -550,11 +550,11 @@ For Pipeline 1 (and, by extension, for the kinematics module that may be shared 
    av = q(coord)  # SkyCoord with distance attached
    ```
 
-2. **GSP-Phot 3D neighborhood-median Av** computed from the per-star `ag_gspphot` values already carried in Stream 1 and Stream 3 Gaia queries. See §8.3 for the recipe — pure Gaia data, zero additional disk, all distances covered (no 1.25 kpc regime cut-off).
+2. **GSP-Phot 3D neighborhood-median Av** computed from the per-star `ag_gspphot` values already carried in Stream 1 and Stream 3 Gaia queries. See §8.3 for the recipe, pure Gaia data, zero additional disk, all distances covered (no 1.25 kpc regime cut-off).
 
-Both features are injected into Pipeline 1 independently; the ML learns when to trust each and when to deviate from the prior. Per research_brief §5.3 this is the published-XP-pipeline methodological differentiator — no prior XP-abundance work uses the neighborhood-median.
+Both features are injected into Pipeline 1 independently; the ML learns when to trust each and when to deviate from the prior. Per research_brief §5.3 this is the published-XP-pipeline methodological differentiator, no prior XP-abundance work uses the neighborhood-median.
 
-**SFD+SFD_to_Av** stays on disk as a 2D high-latitude prior for sanity checks and as the third tier for stars with NaN Edenhofer and insufficient GSP-Phot neighbours — not as a primary feature.
+**SFD+SFD_to_Av** stays on disk as a 2D high-latitude prior for sanity checks and as the third tier for stars with NaN Edenhofer and insufficient GSP-Phot neighbours, not as a primary feature.
 
 **Lallement+2022** is a *cross-check* feature, not the 1.25–3 kpc primary. See §8.5.
 
@@ -571,9 +571,9 @@ Implemented in `src/arqueogal/data/dust_maps.py::neighborhood_av_features`. Reci
 
 **Pros**: zero disk footprint; uses Gaia-internal consistency; scales to 1.5 M stars trivially; covers all distances.
 
-**Cons**: GSP-Phot per-star A_G has systematic biases at high extinction (Av > 3) and at low metallicity. The neighborhood median smooths these but does not eliminate them — hence the cross-check against Lallement+2022 (§8.5) at mid-distance.
+**Cons**: GSP-Phot per-star A_G has systematic biases at high extinction (Av > 3) and at low metallicity. The neighborhood median smooths these but does not eliminate them, hence the cross-check against Lallement+2022 (§8.5) at mid-distance.
 
-### 8.4 Final recommendation — primary Av features
+### 8.4 Final recommendation, primary Av features
 
 **Per star, two independent Av features go into Pipeline 1:**
 
@@ -589,20 +589,20 @@ Plus two auxiliaries:
 | `av_sfd` | SFD1998 2D | High-latitude prior, sanity check | ~100 MB |
 | `av_los_lallement` (§8.5) | Lallement+2022 cube | Cross-check for 1.25–3 kpc stars | ~117 MB |
 
-**Total dust-map disk**: ~820 MB — well inside the 5 GB budget.
+**Total dust-map disk**: ~820 MB, well inside the 5 GB budget.
 
 The ML network receives all four as features and learns to weight them. No prior-based distance-regime hand-off. If Lallement is unavailable in the local `dustmaps` build (see §8.5), the primary pipeline still runs end-to-end on `av_los_edenhofer` + `av_nbhd_*` + `av_sfd`.
 
 ### 8.5 Lallement+2022 as cross-check (not 1.25–3 kpc primary)
 
-Lallement+2022 (A&A 661 A147) is a 6×6×0.8 kpc³ Cartesian extinction-density cube at 25 pc voxels. It is fed as a **cross-check feature** alongside Edenhofer and the neighborhood-median — never as the sole 1.25–3 kpc primary.
+Lallement+2022 (A&A 661 A147) is a 6×6×0.8 kpc³ Cartesian extinction-density cube at 25 pc voxels. It is fed as a **cross-check feature** alongside Edenhofer and the neighborhood-median, never as the sole 1.25–3 kpc primary.
 
 **The `dustmaps.lallement2022` submodule is not in every `dustmaps` wheel.** Upgrading `dustmaps` to pull the submodule risks pinned RAPIDS / numpy / pandas dependency churn and is **forbidden**. Use a direct CDS fetch instead:
 
 - **Source:** CDS J/A+A/661/A147, anonymous FTP at `ftp://cdsarc.u-strasbg.fr/cats/J/A+A/661/A147/`.
 - **File:** `cube_ext.fits.gz` (~100 MB gzipped, ~117 MB uncompressed; single 3D image cube of extinction density in nanomag/pc, Sun-centred Cartesian axes: X → Galactic centre, Y → rotation direction, Z → NGP).
 - **Checksum-pinned download:** fetched once into `data/external/lallement2022/cube_ext.fits.gz`, SHA-256 recorded in provenance.
-- **Reader:** `astropy.io.fits` for the cube, `scipy.ndimage.map_coordinates` for trilinear interpolation. Minimal helper `lallement2022_query(ra_deg, dec_deg, distance_pc)` lives in `src/arqueogal/data/dust_maps.py` — no package dependency, no env risk.
+- **Reader:** `astropy.io.fits` for the cube, `scipy.ndimage.map_coordinates` for trilinear interpolation. Minimal helper `lallement2022_query(ra_deg, dec_deg, distance_pc)` lives in `src/arqueogal/data/dust_maps.py`, no package dependency, no env risk.
 
 The voxel-integrated Av along the LOS is computed by interpolating extinction density along the (X(s), Y(s), Z(s)) sightline in voxel space and multiplying by voxel step in parsecs.
 
@@ -633,7 +633,7 @@ From Streams 1 and 3:
 ### 9.3 Potential
 
 **Primary**: `McMillan17` via galpy (McMillan 2017, MNRAS 465, 76). Well-constrained rotation curve, disc+bulge+halo components.
-**Sensitivity check**: run a subset with `MWPotential2014` (Bovy 2015) and record the per-star action differences — if systematic actions shift by > 20% between potentials, any downstream population-classification conclusions (Starfold / D5.1) must carry a "potential-dependent" caveat.
+**Sensitivity check**: run a subset with `MWPotential2014` (Bovy 2015) and record the per-star action differences, if systematic actions shift by > 20% between potentials, any downstream population-classification conclusions (Starfold / D5.1) must carry a "potential-dependent" caveat.
 
 ### 9.4 Outputs
 
@@ -752,7 +752,7 @@ Final budget audit at the end of ingestion. If the total exceeds 4.5 GB, re-eval
 | `data/interim/xp_coeffs.parquet` | XP float32, 1.5 M stars | 1.4 GB |
 | `data/interim/stream1_apogee_gaia.parquet` | | 150 MB |
 | `data/interim/stream2_tess_gaia.parquet` | | 30 MB |
-| `data/interim/stream3_gaia_rgbrc.parquet` (without XP — joined at use time) | | 320 MB |
+| `data/interim/stream3_gaia_rgbrc.parquet` (without XP, joined at use time) | | 320 MB |
 | `data/processed/pipeline1_training.parquet` | | 400 MB |
 | `data/processed/pipeline1_inference.parquet` | | 700 MB |
 | `data/provenance/` | JSON sidecars | <10 MB |
@@ -762,7 +762,7 @@ Final budget audit at the end of ingestion. If the total exceeds 4.5 GB, re-eval
 1. Drop Lallement+2022; rely on Edenhofer+2024 + GSP-Phot neighborhood-median beyond 1.25 kpc (saves 300 MB).
 2. Drop the `pipeline1_inference.parquet` materialisation; compute inference in-memory streaming from `stream3 + xp_coeffs` (saves 700 MB).
 3. Reduce Stream 3 to 1 M stars (saves ~500 MB).
-4. Drop `bp_coefficient_errors`/`rp_coefficient_errors` from XP, keep only means (saves ~700 MB but costs uncertainty propagation — **don't do this if calibration is a first-class requirement per research_brief §7.1**).
+4. Drop `bp_coefficient_errors`/`rp_coefficient_errors` from XP, keep only means (saves ~700 MB but costs uncertainty propagation. **don't do this if calibration is a first-class requirement per research_brief §7.1**).
 
 Apply cuts in priority order until budget is met.
 
@@ -788,7 +788,7 @@ Apply cuts in priority order until budget is met.
 
 ## 14. Tooling: pyvo, requests, astroquery alternatives
 
-### 14.1 pyvo — primary TAP client
+### 14.1 pyvo, primary TAP client
 
 ```python
 import pyvo
@@ -812,7 +812,7 @@ result = job.fetch_result().to_table()
 
 Documentation: https://pyvo.readthedocs.io/
 
-### 14.2 requests — direct HTTPS downloads
+### 14.2 requests, direct HTTPS downloads
 
 ```python
 import requests
@@ -832,9 +832,9 @@ def download(url, dest: Path, chunk_size=1024*1024):
 
 Always stream (not `r.content`) for large files; write to temp path, rename on success, for atomicity.
 
-### 14.3 astroquery — last-resort fallback only
+### 14.3 astroquery, last-resort fallback only
 
-Use `astroquery.vizier` for VizieR catalogue fetches when TAP is not available. Never use `astroquery.gaia` unless pyvo explicitly fails — it has been unstable in recent months.
+Use `astroquery.vizier` for VizieR catalogue fetches when TAP is not available. Never use `astroquery.gaia` unless pyvo explicitly fails, it has been unstable in recent months.
 
 ### 14.4 Provenance logging
 

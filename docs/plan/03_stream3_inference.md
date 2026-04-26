@@ -1,4 +1,4 @@
-# Phase 03 — Stream 3 expansion + Pipeline 1 inference
+# Phase 03. Stream 3 expansion + Pipeline 1 inference
 
 **Status: Phase 2 (prerequisites) complete 2026-04-19. Phase 3 (fetch + inference)
 about to launch.**
@@ -9,20 +9,20 @@ Run Pipeline 1 v1 ensemble inference on ~650 k Gaia XP stars (non-APOGEE) to pro
 the D-Cat-b catalogue contribution and the downstream prediction parquets that
 Starfold (separate repo; see `04_pipeline2_main.md`) consumes.
 
-## Sampling strategy — Option C (dual samples)
+## Sampling strategy. Option C (dual samples)
 
-- **~400 k uniform-stratified** (revised down from 800 k under 10 GB budget) — for
+- **~400 k uniform-stratified** (revised down from 800 k under 10 GB budget), for
   Pipeline 1 audit and §9.2 test 6 cross-catalogue consistency. Ensures equal
   statistical power across (Teff, log g, [M/H], G) cells.
-- **~250 k volume-limited** (revised down from 500 k) at d ≤ 2.5 kpc — retained as
+- **~250 k volume-limited** (revised down from 500 k) at d ≤ 2.5 kpc, retained as
   a natural-density sample consumable by Starfold-side density-based clustering.
   Preserves natural density (Option A random sampling from the 4M-candidate pool,
-  no oversampling — ADR-0013).
+  no oversampling. ADR-0013).
 
 Union of source_ids after dedup: ~1.2–1.3 M unique; delta to existing 168k on disk
 is ~1 M.
 
-## Phase 2 prerequisites — DONE
+## Phase 2 prerequisites. DONE
 
 | Deliverable | Status |
 |---|---|
@@ -42,7 +42,7 @@ Launch order:
 3. Feature-matrix emit: uniform-stratified ~400k → `pipeline1_inference_uniform.parquet`;
    volume-limited ~250k → `pipeline1_inference_volume.parquet`. Both carry
    `selection_prob` and `aux_missingness_*` flags. Apply frozen v1 per-coefficient
-   z-score stats (basis fingerprint `0d34b565...`) — do NOT refit.
+   z-score stats (basis fingerprint `0d34b565...`), do NOT refit.
 4. Pipeline 1 v1 ensemble inference on both matrices. Outputs: 5-label μ, full Σ,
    OOD flags, Regime B flag, `selection_prob`, `aux_missingness_*`, tier marker
    (T1 or T1-caveat).

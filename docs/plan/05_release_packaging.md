@@ -1,4 +1,4 @@
-# Phase 05 — Release packaging
+# Phase 05. Release packaging
 
 **Status: Underspecified. Deliverable deadlines are firm; release-format decisions are
 not.**
@@ -8,7 +8,7 @@ not.**
 | Code | Title | Due | Format expectations |
 |---|---|---|---|
 | D-Cat-b | XP abundance catalogue | Aug 2026 | Parquet + accompanying README + methodology |
-| D5.1 | Population-classifier ML tool | Dec 2026 | Starfold (separate repo) — release logistics handled there |
+| D5.1 | Population-classifier ML tool | Dec 2026 | Starfold (separate repo), release logistics handled there |
 | D-Cat-d | Population membership probabilities | Feb 2027 | Parquet appended to the team all-sky catalogue; produced by Starfold from this repo's Pipeline 1 predictions |
 
 ## What's decided
@@ -26,17 +26,17 @@ not.**
 
 ## What's NOT decided
 
-- **D5.1 release logistics** (license, scope, install story) — now Starfold's concern,
+- **D5.1 release logistics** (license, scope, install story), now Starfold's concern,
   not this repo's.
 - **D-Cat-d integration with team catalogue.** Format and interface with the
   ArqueoGal all-sky catalogue unspecified in this workspace (team-side decision;
   Starfold produces the content, team integrates).
-- **Methods paper(s)** — scope ambiguous now that Pipeline 2 methodology has moved
+- **Methods paper(s)**: scope ambiguous now that Pipeline 2 methodology has moved
   out of tree. See `docs/plan/06_methods_paper.md`.
 
 ## Needs clarification
 
-- D-Cat-d format and integration — may need coordination with PI Campante and
+- D-Cat-d format and integration, may need coordination with PI Campante and
   Starfold.
 - Whether `data/` provenance sidecars (currently mostly unpopulated for Pipeline 1
   ensemble outputs) need to be backfilled before release, or whether the release

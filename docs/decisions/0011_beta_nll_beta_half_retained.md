@@ -28,20 +28,20 @@ The β=0 retrain showed:
 
 Interpretation: β=0.5's variance-inflation was a symptom, not the cause. The cause
 was input-side (ADR-0002 per-coefficient z-scoring) and head-capacity (ADR-0001
-5-label simplification). Once those were fixed, β=0.5 is fine — and β=0 offers no
+5-label simplification). Once those were fixed, β=0.5 is fine, and β=0 offers no
 additional advantage.
 
 ## Alternatives rejected
 
-- **Switch to β=0 production** — no calibration benefit; slightly less robust to
+- **Switch to β=0 production**: no calibration benefit; slightly less robust to
   outliers during training.
-- **Switch to β=1 (full variance weighting)** — more extreme than β=0.5, not
+- **Switch to β=1 (full variance weighting)**: more extreme than β=0.5, not
   empirically tested, no reason to favour.
 
 ## Consequences
 
 - β=0.5 is the production loss-weighting in `beta_nll_block_cholesky`.
-- The β=0 canary result is itself a methods-paper contribution — β-NLL's
+- The β=0 canary result is itself a methods-paper contribution, β-NLL's
   variance-inflation is not the mechanism behind observed miscalibration in XP
   pipelines (at least not for this architecture).
 

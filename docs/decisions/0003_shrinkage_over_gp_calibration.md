@@ -38,7 +38,7 @@ shrinkage toward well-populated neighbours. Evidence rejected it:
 - Global reliability error: shrinkage 0.080 vs GP 0.136. Halt cells: shrinkage 5 vs
   GP 6. cov95: shrinkage 0.970 vs GP 0.885.
 - Physical interpretation: the (Teff, log g, [M/H]) parameter space is not smooth at
-  cool-giant corners — TiO/MgH molecular bands introduce opacity discontinuities,
+  cool-giant corners. TiO/MgH molecular bands introduce opacity discontinuities,
   Ye+2024 training density drops at the low-Teff edge. A smoothness prior is
   physically wrong there.
 
@@ -50,9 +50,9 @@ assumption across physical regime boundaries.
 ## Alternatives rejected
 
 - **GP smoothing** (as above).
-- **Single global α per label** — too aggressive; loses per-cell structure entirely.
-- **Smoother GP with longer length-scale** — still wrong at physical boundaries.
-- **Training-data expansion at cool edge (SNR 70 → 50)** — would help but doesn't
+- **Single global α per label**: too aggressive; loses per-cell structure entirely.
+- **Smoother GP with longer length-scale**: still wrong at physical boundaries.
+- **Training-data expansion at cool edge (SNR 70 → 50)**: would help but doesn't
   remove the structural regime difference. Deferred to a hypothetical v2.
 
 ## Consequences
@@ -64,7 +64,7 @@ assumption across physical regime boundaries.
   primary path. It is not. Do not propose GP as default.
 - Cool giants stay in per-star D-Cat-b Tier 1 release (with shrinkage-inflated σ
   documented). Regime B (low-|b| warm RGB) does not, by explicit envelope.
-- Methods paper should feature the GP rejection as a negative methodology result —
+- Methods paper should feature the GP rejection as a negative methodology result 
   "smoothness prior fails at physically-structured parameter boundaries".
 
 ## Methodology note

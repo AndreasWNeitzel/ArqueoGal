@@ -1,4 +1,4 @@
-# Shared Utilities — Design Document
+# Shared Utilities. Design Document
 
 ## Files
 
@@ -46,19 +46,19 @@ Publication-quality infrastructure inherited from TESS_ML plot_config.py:
 - Consistent rcParams applied on import
 - Color scheme: colorblind-safe palettes available as option
 - Helper functions:
-  - `hexbin_with_colorbar(ax, x, y, ...)` — for large N (never raw scatter)
-  - `density_2d(ax, x, y, bins, ...)` — 2D histogram with proper normalization
-  - `residual_panel(ax, y_true, y_pred, label, ...)` — standardized residual plot
-  - `coverage_curve(ax, sigma, error, ...)` — P(|ε| < nσ) vs nσ
-  - `save_figure(fig, path, formats=['png', 'pdf'])` — save in multiple formats
+  - `hexbin_with_colorbar(ax, x, y, ...)`, for large N (never raw scatter)
+  - `density_2d(ax, x, y, bins, ...)`, 2D histogram with proper normalization
+  - `residual_panel(ax, y_true, y_pred, label, ...)`, standardized residual plot
+  - `coverage_curve(ax, sigma, error, ...)`. P(|ε| < nσ) vs nσ
+  - `save_figure(fig, path, formats=['png', 'pdf'])`, save in multiple formats
 
 ## io.py
 
 - `load_parquet(path, columns=None)` → DataFrame (pandas or cudf depending on size)
 - `save_parquet(df, path, compression='snappy')`
 - `streaming_parquet_reader(path, batch_size)` → generator of DataFrames
-- `save_checkpoint(path, **kwargs)` — with version tag, weights_only=True support
-- `load_checkpoint(path, device)` — with _orig_mod. prefix stripping, version check
+- `save_checkpoint(path, **kwargs)`, with version tag, weights_only=True support
+- `load_checkpoint(path, device)`, with _orig_mod. prefix stripping, version check
 
 ## reproducibility.py
 

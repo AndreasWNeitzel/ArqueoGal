@@ -20,8 +20,8 @@ Cross-label CMI comparison at 2026-04-19 showed the 2-D summary was unreliable:
 | Teff | 0.1352 | 0.0296 | 4.6× over |
 | log g | 0.0401 | 0.0311 | 1.3× over |
 | [M/H] | 0.0088 | 0.0357 | 4.1× under |
-| [α/M] | 0.0000 | 0.0000 | — |
-| [Mg/H] | 0.0000 | 0.0357 | — |
+| [α/M] | 0.0000 | 0.0000 |  |
+| [Mg/H] | 0.0000 | 0.0357 |  |
 
 Three of five labels' 2-D CMI is badly biased relative to the PCA summary. The
 apparent "Teff has high CMI" was a 4.6× overestimate.
@@ -37,18 +37,18 @@ cross-check only. Update `research_brief.md §9.2` to specify PCA methodology.
 - Evidence is unambiguous: 2-D → PCA changes the CMI estimate by factors of 4–5×
   in both directions for three of five labels. A method with that much variance is
   not reliable.
-- PCA summary captures 95%+ of XP variance — the KSG estimator operates on a
+- PCA summary captures 95%+ of XP variance, the KSG estimator operates on a
   near-complete representation.
 - Cost is trivial (PCA is cheap; adding 7 components to the conditional estimator
   is unchanged in structure).
 
 ## Alternatives rejected
 
-- **Full-dim KSG on 110-D XP** — KSG scales poorly in dimensionality; variance
+- **Full-dim KSG on 110-D XP**: KSG scales poorly in dimensionality; variance
   dominates by ~20 D.
-- **Deep-MI estimators (MINE, InfoNCE)** — more flexible but introduce estimator
+- **Deep-MI estimators (MINE, InfoNCE)**: more flexible but introduce estimator
   complexity and hyperparameter tuning not needed for the audit scale.
-- **Keep 2-D as primary, flag as approximate** — user-facing methodology should
+- **Keep 2-D as primary, flag as approximate**: user-facing methodology should
   use the best available estimate, not a known-biased one.
 
 ## Consequences
@@ -62,7 +62,7 @@ cross-check only. Update `research_brief.md §9.2` to specify PCA methodology.
 ## Methodology note
 
 This was surfaced during the cross-label CMI consistency pass. The methodology paper
-should explicitly document the bias rather than silently use the corrected method —
+should explicitly document the bias rather than silently use the corrected method 
 it is publishable content.
 
 ## Needs clarification

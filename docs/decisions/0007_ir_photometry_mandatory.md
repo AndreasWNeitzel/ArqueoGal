@@ -1,4 +1,4 @@
-# ADR-0007: IR photometry is load-bearing — 2MASS + AllWISE fetch mandatory
+# ADR-0007: IR photometry is load-bearing, 2MASS + AllWISE fetch mandatory
 
 **Date**: 2026-04-19 · **Status**: Accepted, Phase 2 complete
 
@@ -29,7 +29,7 @@ zero-impute + `ir_missing_flag = True` (matches training behaviour on the 0.1% o
 Stream 1 without 2MASS counterpart). Downstream users treat flagged stars with
 additional caution or exclude from volume-complete analyses.
 
-**Broader scope**: aux-missingness flag system covering IR, parallax, extinction —
+**Broader scope**: aux-missingness flag system covering IR, parallax, extinction 
 not just IR. Each gets its own boolean column in Pipeline 1 inference output.
 
 ## Rationale
@@ -47,10 +47,10 @@ not just IR. Each gets its own boolean column in Pipeline 1 inference output.
 
 ## Alternatives rejected
 
-- **Retrain without IR as separate ensemble** — weeks of work, out of D-Cat-b scope.
-- **Impute IR from Gaia color-magnitude relations** — would be systematic, needs
+- **Retrain without IR as separate ensemble**: weeks of work, out of D-Cat-b scope.
+- **Impute IR from Gaia color-magnitude relations**: would be systematic, needs
   its own validation step. Not feasible within v1.
-- **Zero-impute without flag** — silent data-quality degradation downstream. Violates
+- **Zero-impute without flag**: silent data-quality degradation downstream. Violates
   honesty-under-uncertainty.
 
 ## Consequences
@@ -67,7 +67,7 @@ not just IR. Each gets its own boolean column in Pipeline 1 inference output.
 
 The IR question was initially open: IR could have been decorative. The diagnostic
 resolved it decisively. Three of five labels (Teff +154%, log g +211%, [M/H] +131%)
-are worse off without IR than the §9.2 permutation analysis alone suggested — IR
+are worse off without IR than the §9.2 permutation analysis alone suggested. IR
 carries more absolute value for atmospheric parameter recovery than that analysis
 indicated. Worth remembering: permutation importance within a set of correlated
 features can underestimate the group's load-bearing contribution.

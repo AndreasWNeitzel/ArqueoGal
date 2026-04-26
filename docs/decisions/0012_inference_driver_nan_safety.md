@@ -33,9 +33,9 @@ raised (Mahalanobis covers the 108-D XP block only).
 
 ## Alternatives rejected
 
-- **NaN sanitisation without flags** — silent degradation. Violates honesty-under-
+- **NaN sanitisation without flags**: silent degradation. Violates honesty-under-
   uncertainty.
-- **Extend Mahalanobis OOD to cover aux block** — more architecturally invasive than
+- **Extend Mahalanobis OOD to cover aux block**: more architecturally invasive than
   boolean flags; adds opportunity for error without clear marginal value.
 
 ## Consequences
@@ -45,7 +45,7 @@ raised (Mahalanobis covers the 108-D XP block only).
 - Release-documentation task expanded: D-Cat-b release explicitly describes each
   aux-missingness flag and its downstream implication.
 - The bug's pre-flight discovery (via halt-and-ratify process on Stream 3 launch)
-  is itself a process vindication — halting before fetch caught a production bug
+  is itself a process vindication, halting before fetch caught a production bug
   that would have cost a full fetch + re-run otherwise.
 
 ## Methodology note

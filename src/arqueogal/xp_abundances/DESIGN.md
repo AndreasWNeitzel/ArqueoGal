@@ -1,4 +1,4 @@
-# `arqueogal.xp_abundances` — Design (pipeline-level)
+# `arqueogal.xp_abundances`. Design (pipeline-level)
 
 ## Purpose
 
@@ -15,13 +15,13 @@ there.
 ## Scope
 
 - **Magnitude regime**: G ≤ 17.65 (XP-native). We do NOT push to G > 17. Focus is depth of
-  treatment — calibration, extension to additional elements via the §3.3 statistical
+  treatment, calibration, extension to additional elements via the §3.3 statistical
   promotion protocol, honest separation of spectrum-driven from prior-driven predictions.
 - **Stars**: red giants, Teff ∈ [4000, 5500] K, log g ∈ [1.0, 3.5].
-- **Labels — Tier 1** (per-star reliable): Teff, log g, [Fe/H], Av, d.
-- **Labels — Tier 2** (per-star with inflated σ, population-level recommended): [α/M],
+- **Labels. Tier 1** (per-star reliable): Teff, log g, [Fe/H], Av, d.
+- **Labels. Tier 2** (per-star with inflated σ, population-level recommended): [α/M],
   [C/Fe], [N/Fe], [C/N] for RGB in validity domain, [Mg/Fe] if separable.
-- **Labels — Tier 3**: not released per-star.
+- **Labels. Tier 3**: not released per-star.
 
 ## Main vs experimental
 
@@ -36,7 +36,7 @@ See `main/DESIGN.md` and `experimental/DESIGN.md` for each arm.
   coefficient 0, (4) propagate errors under division. Do not reorder. Do not silently
   skip Ye+2024.
 - **Mészáros+2025 [X/M]/Teff corrections** applied to DR19 labels *before* `flag_bad` cut.
-- **Retrain from scratch on DR19** — no DR17-trained weights reused.
+- **Retrain from scratch on DR19**: no DR17-trained weights reused.
 - **Uncertainty calibration is a release gate**. Reliability diagrams (per Teff×log g×[Fe/H]
   cell), 68/95/99% coverage tests on hold-out, post-hoc temperature scaling or isotonic
   regression if miscalibrated. Conformal intervals released as alternative product.
@@ -50,7 +50,7 @@ See `main/DESIGN.md` and `experimental/DESIGN.md` for each arm.
 
 Versioned in :data:`arqueogal.xp_abundances.main.audit.AUDIT_PROTOCOL_VERSION`.
 
-- **v1.1 — 2026-04-19.** Test 5 primary estimator changed from the 2-D XP
+- **v1.1, 2026-04-19.** Test 5 primary estimator changed from the 2-D XP
   summary ``(|BP|-sum, |RP|-sum)`` to a PCA summary retaining ≥ 95% of the
   BP + RP normalised-shape variance (default `n_pca_components = 7` for Gaia
   XP). The Pipeline 1 v1 release exposed substantial 2-D bias for three of
@@ -61,10 +61,10 @@ Versioned in :data:`arqueogal.xp_abundances.main.audit.AUDIT_PROTOCOL_VERSION`.
   and emits a `DeprecationWarning` on use. The [α/M] PCA-CMI anomaly
   (0.0000 nats at 7 components) was adjudicated by a three-test sequential
   triage (`scripts/triage_alpha_m_cmi.py`; `reports/pipeline1/audit/alpha_m_triage.md`)
-  and diagnosed as H2 aux absorption — parallax-only 15-PC CMI = 0.1125 nats.
+  and diagnosed as H2 aux absorption, parallax-only 15-PC CMI = 0.1125 nats.
   Cross-references: `docs/research_brief.md §9.2.1`; the module docstring of
   `src/arqueogal/xp_abundances/main/audit.py`.
-- **v1 — 2026-04 (Pipeline 1 v1 release).** Initial six-test §9.2 protocol.
+- **v1, 2026-04 (Pipeline 1 v1 release).** Initial six-test §9.2 protocol.
   Test 5 used the 2-D ``(|BP|-sum, |RP|-sum)`` XP summary. Superseded.
 
 ## References

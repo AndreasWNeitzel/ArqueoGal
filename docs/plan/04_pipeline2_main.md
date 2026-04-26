@@ -1,4 +1,4 @@
-# Phase 04 — Population classification moved to Starfold
+# Phase 04. Population classification moved to Starfold
 
 **Status (2026-04-22):** the stellar-population classification pipeline
 originally scoped as "Pipeline 2" in this repository has been spun out into
