@@ -637,8 +637,10 @@ def test_atomic_write_on_failure_leaves_no_partial_output(
     def _explode(self, *args, **kwargs):
         raise RuntimeError("simulated interrupt mid-write")
 
-    # Make pandas.DataFrame.to_parquet explode under _atomic_write_parquet.
-    monkeypatch.setattr(pd.DataFrame, "to_parquet", _explode)
+    # Inject the failure into the streaming writer's per-chunk write path.
+    # The driver streams chunks through _StreamingParquetWriter.write — that
+    # is the equivalent of the old pd.DataFrame.to_parquet failure point.
+    monkeypatch.setattr(driver._StreamingParquetWriter, "write", _explode)
     with pytest.raises(RuntimeError, match="simulated interrupt"):
         driver.run_inference(
             ensemble_dir=env["ensemble_dir"],
@@ -1256,6 +1258,88 @@ def test_provenance_records_aux_missingness_definitions(
     assert aux["flag_rates"]["extinction_missing_flag"] == 0.0
     # Layout resolution echoes back which configured cols were in aux_cols.
     assert aux["layout_resolution"]["parallax_in_layout"] is True
+
+
+def test_unscale_permutes_block_to_human_label_order() -> None:
+    """Block-vs-human reorder is correctly inverted when block != human.
+
+    Regression test for the 21-label inference bug discovered 2026-04-29:
+    the production 4-block-Cholesky head emits ``pred.mu`` /
+    ``pred.Sigma_*`` in :attr:`block_layout.label_order_block`, which
+    permutes the human label order. The earlier driver indexed the output
+    by human-order ``LABEL_SHORT_NAMES`` without permuting first, so e.g.
+    ``alpha_m_pred`` carried the prediction for whichever label sat at
+    block-index 4 (``si_h`` for the production layout) — yielding a
+    correlation of ``-0.42`` against APOGEE truth on Stream 1.
+    """
+    # Three-label layout where block != human: human is (a, b, c), block
+    # places them as (b, c, a). The unscaler must produce mu in human
+    # order so out["a_pred"] = mu_block[:, perm[0]] = mu_block[:, 2].
+    human_labels = ("a_apogee", "b_apogee", "c_apogee")
+    block_labels = ("b_apogee", "c_apogee", "a_apogee")
+    block_layout = CovarianceBlockLayout(
+        block_sizes=(3,),
+        n_diagonal_only=0,
+        label_order_block=block_labels,
+        label_order_human=human_labels,
+    )
+    # Scaler in HUMAN order. Distinct mean / scale per label so the
+    # permutation can be verified by the magnitude of the unscaled values.
+    scaler = LabelScaler(
+        mean=np.array([100.0, 200.0, 300.0], dtype=np.float32),
+        scale=np.array([10.0, 20.0, 30.0], dtype=np.float32),
+        label_names=human_labels,
+    )
+    # Predictions in BLOCK order. Three rows, three labels. Each label
+    # gets a distinct constant pre-scaling value so we can read off which
+    # column went where.
+    B = 3
+    n = 3
+    pred_mu_block = np.array(
+        [
+            [1.0, 2.0, 3.0],  # row 0
+            [1.0, 2.0, 3.0],  # row 1
+            [1.0, 2.0, 3.0],  # row 2
+        ],
+        dtype=np.float32,
+    )
+    # Σ_total: block-order outer product so we can check axis-1 and axis-2
+    # permute correctly.
+    Sigma_block = np.zeros((B, n, n), dtype=np.float32)
+    for r in range(B):
+        Sigma_block[r] = np.outer(
+            np.array([0.5, 1.5, 2.5], dtype=np.float32),
+            np.array([0.5, 1.5, 2.5], dtype=np.float32),
+        )
+    pred = driver.EnsemblePrediction(
+        mu=pred_mu_block,
+        sigma_aleatoric=np.zeros((B, n), dtype=np.float32),
+        sigma_epistemic=np.zeros((B, n), dtype=np.float32),
+        sigma_total=np.zeros((B, n), dtype=np.float32),
+        Sigma_aleatoric=np.zeros((B, n, n), dtype=np.float32),
+        Sigma_epistemic=Sigma_block.copy(),
+        Sigma_total=Sigma_block.copy(),
+        per_member_mu=np.zeros((1, B, n), dtype=np.float32),
+        y=None,
+    )
+    out = driver._unscale_ensemble_output(pred, scaler, block_layout)
+    # Expected: human-order μ
+    # human label "a" → block index 2 → pred 3.0 → 3.0 * 10 + 100 = 130
+    # human label "b" → block index 0 → pred 1.0 → 1.0 * 20 + 200 = 220
+    # human label "c" → block index 1 → pred 2.0 → 2.0 * 30 + 300 = 360
+    np.testing.assert_allclose(out["mu"][0], np.array([130.0, 220.0, 360.0]))
+    # Expected cov diagonals in physical units:
+    # cov_0_0 = Σ_block[2, 2] * s[0]² = 6.25 * 100 = 625
+    # cov_1_1 = Σ_block[0, 0] * s[1]² = 0.25 * 400 = 100
+    # cov_2_2 = Σ_block[1, 1] * s[2]² = 2.25 * 900 = 2025
+    np.testing.assert_allclose(out["cov_cols"]["cov_0_0"][0], 625.0)
+    np.testing.assert_allclose(out["cov_cols"]["cov_1_1"][0], 100.0)
+    np.testing.assert_allclose(out["cov_cols"]["cov_2_2"][0], 2025.0)
+    # Off-diag: cov_0_1 (human a vs human b) = Σ_block[2, 0] * s[0]*s[1]
+    # = 0.5*2.5 = 1.25; * 10 * 20 = 250
+    np.testing.assert_allclose(out["cov_cols"]["cov_0_1"][0], 250.0)
+    # σ_total diag matches sqrt(diag var)
+    np.testing.assert_allclose(out["sigma_total"][0], np.array([25.0, 10.0, 45.0]))
 
 
 # Silence unused-import complaints about `os`, `shutil`, `signal` — they exist

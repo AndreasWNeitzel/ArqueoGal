@@ -48,6 +48,8 @@ from arqueogal.xp_abundances.main.training import save_checkpoint, train_model
 def _tiers_for_label_set(label_set: str) -> LabelTiers:
     if label_set == "5":
         return LabelTiers.five_label()
+    if label_set == "2":
+        return LabelTiers.two_label()
     return LabelTiers()
 
 
@@ -55,7 +57,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("run_ensemble")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
+DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1_kiel.parquet"
 DEFAULT_MODEL_DIR = REPO_ROOT / "models/main/xp_abundances"
 DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/run_a"
 
@@ -95,7 +97,12 @@ def build_ensemble_config(
     beta_val: float = 0.0,
     barlow_w: float = 0.8,
     barlow_lam: float = 0.005,
+    ari_w: float = 0.0,
+    ari_alpha_threshold: float = 0.15,
+    ari_kernel_sigma: float = 0.03,
     early_stop_patience: int = 3,
+    queue_size: int = 0,
+    queue_warm_start: bool = True,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -125,14 +132,26 @@ def build_ensemble_config(
             supcon_label_n_first=None,
             barlow=barlow_w,
             barlow_lam=barlow_lam,
+            ari=ari_w,
+            ari_alpha_threshold=ari_alpha_threshold,
+            ari_kernel_sigma=ari_kernel_sigma,
         ),
-        grad_norm_abort_threshold=500.0,
+        # β=0 canary: pure Gaussian NLL can explode on high-σ samples. The
+        # threshold scales with batch size because SupCon's in-batch
+        # similarity matrix is B² and the pre-clip grad norm grows with B.
+        # 500 was tuned for batch=512; at batch=2048 (4× wider) the natural
+        # SupCon contribution alone reaches 800–900. 4000 keeps the canary
+        # active for true NLL explosions while accommodating the larger
+        # contrastive geometry.
+        grad_norm_abort_threshold=4000.0,
         temperature_init=0.15,  # was 0.10; larger τ softens contrastive
         # gradient and reduces train-side overfit on SupCon while keeping
         # the supervised label-clustering signal.
         ensemble_seeds=seeds,
         inverse_freq_weighting=inverse_freq_weighting,
         inverse_freq_clip=inverse_freq_clip,
+        queue_size=queue_size,
+        queue_warm_start=queue_warm_start,
     )
 
 
@@ -143,8 +162,24 @@ def main() -> None:
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=2048,
+        help="Supervised fine-tune batch. Default 2048 (matches the contrastive "
+        "pretrain batch) — keeps the encoder's contrastive geometry continuous "
+        "between phases.",
+    )
+    parser.add_argument(
+        "--seeds",
+        type=int,
+        nargs="+",
+        default=[0],
+        help="Ensemble seeds. Default is a single seed (0). The historical "
+        "5-seed ensemble did not show evidence of usefulness for the production "
+        "5-label head, and its predictive σ inflation already absorbs the small "
+        "epistemic-spread signal that motivated multi-seed averaging.",
+    )
     parser.add_argument(
         "--early-stop-patience",
         type=int,
@@ -154,11 +189,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--label-set",
-        choices=("21", "5"),
+        choices=("21", "5", "2"),
         default="21",
         help="21 = default LabelTiers (production, 4-block Cholesky). "
         "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} "
-        "with a single 5×5 full Cholesky block (production as of #143).",
+        "with a single 5×5 full Cholesky block (production as of #143). "
+        "2 = LabelTiers.two_label() {[M/H], [α/M]} with a single 2×2 dense "
+        "block — TESS_ML-matched diagnostic configuration.",
     )
     parser.add_argument(
         "--inverse-freq",
@@ -194,6 +231,35 @@ def main() -> None:
     parser.add_argument("--barlow-lam", type=float, default=0.005, help="Barlow off-diag scale")
     parser.add_argument("--beta-nll", type=float, default=1.0)
     parser.add_argument("--beta", type=float, default=0.0, help="β-NLL temperature (0=plain NLL)")
+    parser.add_argument(
+        "--ari", type=float, default=0.0,
+        help="Soft-ARI chemistry-cluster contamination loss weight. >0 penalises "
+        "disc-bimodality misclassification of [α/M] across the threshold. "
+        "Default 0 = disabled. Recommended 0.1 alongside SupCon.",
+    )
+    parser.add_argument(
+        "--ari-alpha-threshold", type=float, default=0.15,
+        help="[α/M] dex threshold for soft K=2 disc/thick split (default 0.15).",
+    )
+    parser.add_argument(
+        "--ari-kernel-sigma", type=float, default=0.03,
+        help="Sigmoid steepness around the [α/M] threshold (default 0.03 dex).",
+    )
+    parser.add_argument(
+        "--queue-size",
+        type=int,
+        default=0,
+        help="SupCon momentum queue size. 0 disables. 8192 matches the "
+        "TESS_ML recipe and is the documented configuration that achieves "
+        "low/high-α disc separation.",
+    )
+    parser.add_argument(
+        "--queue-warm-start",
+        action="store_true",
+        default=True,
+        help="Initialise the queue with random unit-norm vectors so K is "
+        "static from step 1. Default True per TESS_ML.",
+    )
     args = parser.parse_args()
 
     seeds = tuple(args.seeds)
@@ -222,7 +288,12 @@ def main() -> None:
         beta_val=args.beta,
         barlow_w=args.barlow,
         barlow_lam=args.barlow_lam,
+        ari_w=args.ari,
+        ari_alpha_threshold=args.ari_alpha_threshold,
+        ari_kernel_sigma=args.ari_kernel_sigma,
         early_stop_patience=args.early_stop_patience,
+        queue_size=args.queue_size,
+        queue_warm_start=args.queue_warm_start,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
     ensemble_dir = args.model_dir / f"{date_tag}_{sha7}_{cfg_hash}{ensemble_suffix}"
@@ -243,7 +314,12 @@ def main() -> None:
         beta_val=args.beta,
         barlow_w=args.barlow,
         barlow_lam=args.barlow_lam,
+        ari_w=args.ari,
+        ari_alpha_threshold=args.ari_alpha_threshold,
+        ari_kernel_sigma=args.ari_kernel_sigma,
         early_stop_patience=args.early_stop_patience,
+        queue_size=args.queue_size,
+        queue_warm_start=args.queue_warm_start,
     )
     layout = FeatureLayout()
 
@@ -278,6 +354,7 @@ def main() -> None:
             layout=layout,
             tiers=tiers,
             label_scaler=result["label_scaler"],
+            feature_scaler=result.get("feature_scaler"),
             seed=seed,
             training_metrics={
                 "best_val_loss": float(result["best_val_loss"]),

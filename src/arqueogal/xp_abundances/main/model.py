@@ -30,6 +30,24 @@ reliability diagrams.
 
 Beta-NLL (Seitzer+2022 β=0.5) lives in :mod:`.losses`. This file is pure
 architecture — loss-agnostic.
+
+Statistical interpretation
+--------------------------
+The head outputs ``(μ, L)`` and the codebase carries them as a per-star
+"posterior" for shorthand convenience. Mathematically they are an MLE point
+estimate of the conditional mean plus a learned heteroscedastic Gaussian
+likelihood factor, *not* a Bayesian posterior in the generative sense. The
+empirical-Bayes shrinkage in :mod:`.uncertainty` calibrates the marginal
+``σ_pred`` against APOGEE residuals so the pair ``(μ, L)`` covers truth at
+the nominal frequencies (68 / 95 / 99 %), but no actual prior over labels
+is imposed — the "prior" referred to in the σ-inflation gate (see
+``release._PER_ELEMENT_SIGMA_INFLATED_THRESHOLD``) is the marginal label
+distribution under training conditional on auxiliary features, i.e. the
+regression head's empirical inductive bias when conditional mutual
+information CMI(spectrum; label | aux) → 0. Methods-paper text must reflect
+this distinction explicitly: we deliver calibrated frequentist confidence
+ellipsoids dressed as posteriors-of-convenience, not generative-Bayesian
+posteriors. See B1/B7 of the bayesian-rigor review (2026-04-28).
 """
 
 from __future__ import annotations
@@ -315,12 +333,13 @@ _FIVE_LABEL: tuple[str, ...] = (
 
 
 def five_label_block_layout() -> CovarianceBlockLayout:
-    """Single full 5×5 Cholesky block for the {Teff, logg, [M/H], [α/M], [Mg/H]} variant.
+    """Single full 5x5 Cholesky block for the {Teff, logg, [M/H], [α/M], [Mg/H]} variant.
 
     Block and human orders match :class:`LabelTiers.five_label`. With only 5
     labels, a single dense block (15 Cholesky parameters) is trivially trainable
-    and captures every cross-label correlation — no physics-motivated
-    sub-blocking is needed.
+    and captures every cross-label correlation. This is the "v5 working"
+    layout that produced visible disc α-bimodality with the SupCon raw-units
+    kernel + ARI=0.1 + identity-projection encoder.
     """
     return CovarianceBlockLayout(
         block_sizes=(5,),
@@ -406,6 +425,17 @@ class Encoder(nn.Module):
                 if dropout > 0 and i == 0:
                     layers.append(nn.Dropout(dropout))
         self.trunk = nn.Sequential(*layers)
+        # 2-layer SimCLR/SupCon-style projection. The L2-normalised trunk
+        # output (z = F.normalize(h)) collapses magnitude information onto
+        # the unit sphere; high-variance label directions (Teff, log g)
+        # dominate the angular geometry and squeeze low-variance label
+        # directions (e.g. [α/M]) onto a small angular subspace where the
+        # contrastive gradient is too weak to discriminate. The projection
+        # MLP gives SupCon a learnable transform from h into a separate
+        # contrastive space z, while the supervised regression head keeps
+        # reading the magnitude-preserving h. The 2-layer (Linear → GELU →
+        # Linear) form is the canonical SupCon projection used by Khosla
+        # et al. 2020 and the TESS_ML reference.
         self.proj = nn.Sequential(
             nn.Linear(latent_dim, latent_dim),
             nn.GELU(),
@@ -543,18 +573,67 @@ class BlockCholeskyHead(nn.Module):
         return mu, L
 
 
+class EvolutionaryStageHead(nn.Module):
+    """4-way soft classifier for evolutionary stage: RGB, HeCB, OOD_evolved, OOD_unevolved.
+
+    This is a **diagnostic head**, not a gating mechanism. It emits soft probabilities
+    that are included in the release parquet for downstream analysis. The head shares the
+    encoder latent space ``h`` and is trained jointly with the main abundance regression
+    head via a cross-entropy loss with weight 0.05.
+
+    Architecture: ``latent_dim → 64 → 32 → 4`` with LayerNorm + GELU, matching the
+    lightweight diagnostic pattern.
+    """
+
+    def __init__(
+        self,
+        latent_dim: int,
+        hidden: int = 64,
+        dropout: float = 0.05,
+    ) -> None:
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(latent_dim, hidden),
+            nn.LayerNorm(hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, 32),
+            nn.LayerNorm(32),
+            nn.GELU(),
+            nn.Linear(32, 4),  # 4 classes: RGB, HeCB, OOD_evolved, OOD_unevolved
+        )
+
+    def forward(self, h: torch.Tensor) -> torch.Tensor:
+        """Return logits for 4-way classification.
+
+        Parameters
+        ----------
+        h
+            Trunk hidden state, shape ``(B, latent_dim)``.
+
+        Returns
+        -------
+        Logits of shape ``(B, 4)``. Apply softmax to get soft probabilities.
+        """
+        return self.mlp(h)
+
+
 class XpAbundanceModel(nn.Module):
-    """Convenience wrapper: encoder + block-Cholesky head.
+    """Convenience wrapper: encoder + block-Cholesky head + optional evol-stage head.
 
     Not an AutoEncoder — just a composition returning everything the training
     loop needs from one forward pass. ``z`` (the L2-normalised projection) is
     computed unconditionally; callers that only need supervised outputs can
     ignore it at negligible cost.
+
+    When ``include_evol_stage_head=True`` (v1.1+), the model also includes a
+    4-way evolutionary-stage diagnostic head that emits soft probabilities.
     """
 
-    def __init__(self, config: ModelConfig) -> None:
+    def __init__(self, config: ModelConfig, include_evol_stage_head: bool = False) -> None:
         super().__init__()
         self.config = config
+        self.include_evol_stage_head = include_evol_stage_head
         self.encoder = Encoder(
             input_dim=config.input_dim,
             latent_dim=config.latent_dim,
@@ -568,6 +647,14 @@ class XpAbundanceModel(nn.Module):
             hidden=config.head_hidden,
             dropout=config.head_dropout,
         )
+        if include_evol_stage_head:
+            self.evol_stage_head = EvolutionaryStageHead(
+                latent_dim=config.latent_dim,
+                hidden=64,
+                dropout=config.head_dropout,
+            )
+        else:
+            self.evol_stage_head = None
 
     @property
     def block_layout(self) -> CovarianceBlockLayout:
@@ -576,9 +663,21 @@ class XpAbundanceModel(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> (
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        | tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+    ):
+        """Forward pass returning (mu, L, h, z) or (mu, L, h, z, evol_logits).
+
+        Returns tuple of 4 elements when evol_stage_head is disabled (v1.0 compat),
+        or tuple of 5 elements when enabled (v1.1+). Callers should check the
+        include_evol_stage_head flag or use conditional unpacking.
+        """
         h, z = self.encoder(x)
         mu, L = self.head(h)
+        if self.include_evol_stage_head:
+            evol_logits = self.evol_stage_head(h)
+            return mu, L, h, z, evol_logits
         return mu, L, h, z
 
 
@@ -586,6 +685,7 @@ __all__ = [
     "BlockCholeskyHead",
     "CovarianceBlockLayout",
     "Encoder",
+    "EvolutionaryStageHead",
     "ModelConfig",
     "XpAbundanceModel",
     "default_pipeline1_layout",

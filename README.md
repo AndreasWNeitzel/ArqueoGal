@@ -26,9 +26,7 @@ Population classification (formerly Pipeline 2 inside this repo) was spun out to
 
 ## Start here
 
-![Data flow](reports/figures/data_overview/panel_01_data_flow.png)
-
-**For a visual tour of the data we ingest and produce:** [`docs/data_overview.md`](docs/data_overview.md), eight panels covering data-flow, sky footprint, Kiel diagram, `[α/M]` vs `[Fe/H]` chemistry, magnitude reach, label availability tiers, extinction priors, and row-count waterfall.
+**For a visual tour of the data we ingest and produce:** [`docs/data_overview.md`](docs/data_overview.md), eight panels covering data-flow, sky footprint, Kiel diagram, `[α/M]` vs `[Fe/H]` chemistry, magnitude reach, label availability tiers, extinction priors, and row-count waterfall. The PNG panels themselves live under `reports/figures/data_overview/` (gitignored, 10 MB rule); regenerate them locally via `python scripts/gallery/plot_*.py`.
 
 **For scientific rationale and methodology:** [`docs/research_brief.md`](docs/research_brief.md), literature review, tier-promotion protocol, information-content audit, six-diagnostic validation stack for real-data clustering, and the scope of what each pipeline claims.
 
@@ -62,9 +60,32 @@ Main-pipeline code is frozen during deliverable sprints; feature work goes to `e
 
 ## Environment
 
-- WSL2 Ubuntu, Python 3.12, RAPIDS 25.10 (cudf / cuml / cugraph), PyTorch 2.10 + CUDA 13.
-- Activate with `rapidsenv` (shell alias). Do not create new venvs.
-- Before any `pip install`, verify it will not bump RAPIDS-pinned versions (cudf, cuml, numpy, pandas, pyarrow).
+This repository targets Python 3.12. There are two supported environments depending on what you intend to run:
+
+**External contributor (CPU-only, runs the test gate, lint, and release-tier annotation):**
+
+```bash
+git clone https://github.com/AndreasWNeitzel/ArqueoGal
+cd ArqueoGal
+uv venv .venv --python 3.12
+source .venv/bin/activate
+uv pip install \
+  "numpy>=1.26" "pandas>=2.0" "pyarrow>=15" "scipy>=1.11" \
+  "matplotlib>=3.8" "astropy>=6" "scikit-learn>=1.4" \
+  "torch>=2.0" "pytest>=9.0" "ruff>=0.5" "pyvo>=1.8.1" \
+  "pydantic>=2.0" "pydantic-settings>=2.0" "PyYAML>=6.0"
+ruff check src/ tests/ scripts/
+pytest tests/xp_abundances/main/ tests/data/test_release_pipeline.py \
+       -m "not gpu and not slow and not stress"
+```
+
+This is the same dependency set the GitHub Actions CI workflow installs, so passing locally implies passing on push.
+
+**Full developer environment (GPU training, data ingestion, RAPIDS-accelerated pipelines):**
+
+WSL2 Ubuntu, Python 3.12, RAPIDS 25.10 (cudf / cuml / cugraph), PyTorch 2.10 + CUDA 13. On the maintainer's machine this is activated via the `rapidsenv` shell alias; the venv lives at `~/.venvs/rapids25.10_python3.12_cuda13`. RAPIDS, CUDA 13, and a real GPU are required for training, the kNN-rescue stage, and the cuML-backed UMAP/HDBSCAN paths; everything else (release-tier annotation, sanity gates, plotting, the full `xp_abundances/main/` test suite) runs CPU-only.
+
+Before any `pip install` into the full environment, verify it will not bump RAPIDS-pinned versions (cudf, cuml, numpy, pandas, pyarrow). The CI environment intentionally skips RAPIDS so it stays portable.
 
 ---
 
@@ -126,6 +147,19 @@ print(trustworthy[
 ```
 
 The companion `*.release_tier.json` sidecar records the catalogue schema version, tier counts, and which OOD/caveat flags were active at annotation time. See [`docs/CATALOG_SCHEMA.md`](docs/CATALOG_SCHEMA.md) for the full column reference and [`docs/decisions/0015_v5_release_tier_simplification.md`](docs/decisions/0015_v5_release_tier_simplification.md) for the v5 rationale.
+
+---
+
+## Quickstart: run inference on real data
+
+To produce predictions on a fresh Gaia sample (Streams 2 or 3):
+
+```bash
+# Requires a trained checkpoint at models/pipeline1_v1/checkpoint_final.pt
+python scripts/run_pipeline1_inference_v1_layout.py STREAM
+```
+
+where `STREAM` is `2` or `3`. The inference driver reads the corresponding processed parquet at `data/processed/pipeline1_features_stream{2,3}.parquet` and emits predictions at `data/processed/pipeline1_predictions_stream{2,3}_v1.parquet`.
 
 ---
 

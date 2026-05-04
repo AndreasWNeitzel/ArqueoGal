@@ -83,8 +83,28 @@ def patched_pipeline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
     monkeypatch.setattr(mod, "load_andrae2023", fake_load_andrae)
     monkeypatch.setattr(mod, "enrich_source_ids", fake_enrich)
-    monkeypatch.setattr(mod, "apply_parallax_zpt", fake_zpt)
-    monkeypatch.setattr(mod, "apply_g_mag_correction", fake_g_mag)
+
+    # Post-2026-04-29: parallax/G-mag corrections moved into the unified
+    # preprocessing pipeline. Patch the symbols where preprocessing.py
+    # imports them.
+    from arqueogal.data import preprocessing as preproc_mod
+
+    monkeypatch.setattr(preproc_mod, "apply_parallax_zpt", fake_zpt)
+    monkeypatch.setattr(preproc_mod, "apply_g_mag_correction", fake_g_mag)
+    # Stream 3 calls apply_pipeline1_preprocessing(mode="inference"); short-
+    # circuit it so the test stays focused on the orchestration logic.
+    real_preprocessing = preproc_mod.apply_pipeline1_preprocessing
+
+    def fake_preprocessing(df, **kwargs):
+        captured["preproc_kwargs"] = kwargs
+        captured["preproc_input_len"] = len(df)
+        out = fake_zpt(df)
+        out = fake_g_mag(out)
+        return out
+
+    monkeypatch.setattr(preproc_mod, "apply_pipeline1_preprocessing", fake_preprocessing)
+    monkeypatch.setattr(mod, "apply_pipeline1_preprocessing", fake_preprocessing)
+    captured["_real_preprocessing"] = real_preprocessing
     return captured
 
 

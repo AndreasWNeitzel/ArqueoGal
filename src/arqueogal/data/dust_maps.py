@@ -187,30 +187,39 @@ def neighborhood_av_features(  # noqa: PLR0913 — keyword-only tuning knobs wit
     global_to_pos = np.full(n, -1, dtype=np.int64)
     global_to_pos[pos_to_global] = np.arange(n_pos)
 
-    # cKDTree.query_ball_point rejects NaN — query only the finite rows.
-    finite_neighbor_lists = tree.query_ball_point(tree_points, r=radius_pc)
-
     median = np.full(n, np.nan, dtype=np.float64)
     std = np.full(n, np.nan, dtype=np.float64)
     n_neigh = np.zeros(n, dtype=np.int32)
 
-    for pos_idx, global_idx in enumerate(pos_to_global):
-        neigh = finite_neighbor_lists[pos_idx]
-        if not neigh:
-            continue
-        neigh_arr = np.asarray(neigh, dtype=np.int64)
-        if not include_self:
-            neigh_arr = neigh_arr[neigh_arr != pos_idx]
-            if neigh_arr.size == 0:
+    # Memory-bounded chunked queries. cKDTree.query_ball_point on the full
+    # tree allocates a Python list-of-lists with ~500-2000 ints per star × N
+    # stars; at N=300k+ this is 10+ GB of Python object overhead and OOMs
+    # on small-RAM machines. Process CHUNK_SIZE stars at a time, reduce
+    # each ball to the (median, std, n) triple, drop the list, repeat.
+    CHUNK_SIZE = 4000
+    for chunk_start in range(0, n_pos, CHUNK_SIZE):
+        chunk_end = min(chunk_start + CHUNK_SIZE, n_pos)
+        chunk_points = tree_points[chunk_start:chunk_end]
+        chunk_lists = tree.query_ball_point(chunk_points, r=radius_pc)
+        for local_idx, neigh in enumerate(chunk_lists):
+            pos_idx = chunk_start + local_idx
+            global_idx = pos_to_global[pos_idx]
+            if not neigh:
                 continue
-        av_slice = tree_av[neigh_arr]
-        finite = np.isfinite(av_slice)
-        finite_vals = av_slice[finite]
-        k = finite_vals.size
-        n_neigh[global_idx] = k
-        if k >= min_neighbors:
-            median[global_idx] = np.median(finite_vals)
-            std[global_idx] = np.std(finite_vals, ddof=0)
+            neigh_arr = np.asarray(neigh, dtype=np.int64)
+            if not include_self:
+                neigh_arr = neigh_arr[neigh_arr != pos_idx]
+                if neigh_arr.size == 0:
+                    continue
+            av_slice = tree_av[neigh_arr]
+            finite = np.isfinite(av_slice)
+            finite_vals = av_slice[finite]
+            k = finite_vals.size
+            n_neigh[global_idx] = k
+            if k >= min_neighbors:
+                median[global_idx] = np.median(finite_vals)
+                std[global_idx] = np.std(finite_vals, ddof=0)
+        del chunk_lists
 
     return NeighborhoodAvFeatures(
         av_nbhd_median=median.astype(np.float32),

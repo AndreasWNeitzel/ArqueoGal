@@ -87,13 +87,21 @@ DEFAULT_AUX_COLS: Final[tuple[str, ...]] = (
     "r_med_photogeo",
     "r_lo_photogeo",
     "r_hi_photogeo",
-    # IR photometry
-    "j_mag",
-    "h_mag",
-    "k_mag",
-    "w1_mag",
-    "w2_mag",
+    # IR photometry — DEREDDENED (Yuan+2013 ratios + fused A_V from
+    # arqueogal.data.extinction.apply_extinction_corrections). The raw
+    # j_mag / h_mag / k_mag / w1_mag / w2_mag columns are *retained* on
+    # the parquet for selection-function diagnostics and external
+    # consumers; the model consumes only the *_dered surface so train and
+    # inference apply the same Yuan+2013 + R_V=3.1 transform.
+    "j_mag_dered",
+    "h_mag_dered",
+    "k_mag_dered",
+    "w1_mag_dered",
+    "w2_mag_dered",
     # Extinction priors (multi-column — model picks which prior to trust per star)
+    # plus the fused A_V used by the dereddening step (av_los) and its trust
+    # flags so the encoder still sees the residual XP extinction signal.
+    "av_los",
     "av_edenhofer",
     "av_sfd",
     "av_lallement",
@@ -494,6 +502,135 @@ class LabelScaler:
     def is_default(self) -> bool:
         """True iff mean==0 and scale==1 everywhere — the placeholder shape."""
         return bool(np.all(self.mean == 0.0) and np.all(self.scale == 1.0))
+
+
+# --- Feature scaler ----------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class FeatureScaler:
+    """Per-feature standardiser for the encoder input vector.
+
+    The XP shape coefficients (``bp_coef_norm_*``, ``rp_coef_norm_*``) and
+    the c0 z-scalars are already standardised by the parquet build (frozen
+    Hermite z-score basis). Aux features and the reprojection-residual RMS
+    are NOT — they enter the encoder at their raw magnitudes (parallax in
+    mas, distance in pc, residual RMS spanning 50+ orders of magnitude).
+    The first Linear layer of the encoder receives a vector whose dimensions
+    differ by ~10⁶ in scale; gradient and weight-magnitude pathologies
+    follow.
+
+    This scaler is fit on the train partition only (NaN-aware), applied
+    to every partition before the encoder sees the input. Per-feature:
+
+    - residual RMS columns are first ``log10`` transformed (they span
+      [1e-20, 1e+36]; linear z-score would be dominated by the heavy
+      tail), then z-scored.
+    - aux columns are z-scored directly.
+
+    The XP block is left untouched — those coefficients carry the frozen
+    Hermite z-score from the parquet builder and downstream consumers
+    (Stream-3 inference reproducibility, kNN rescue) depend on that
+    contract.
+
+    The scaler is persisted in the checkpoint blob so inference uses the
+    same statistics as training.
+    """
+
+    mean: np.ndarray  # (input_dim,) float32, in encoder input order
+    scale: np.ndarray  # (input_dim,) float32, strictly positive
+    feature_names: tuple[str, ...]
+    log10_mask: np.ndarray  # (input_dim,) bool — True where log10 is applied
+    apply_mask: np.ndarray  # (input_dim,) bool — True where scaling is applied
+
+    @classmethod
+    def fit(
+        cls,
+        x: np.ndarray,
+        feature_names: tuple[str, ...] | list[str],
+        *,
+        residual_cols: tuple[str, ...],
+        xp_already_scaled_cols: tuple[str, ...],
+        eps: float = 1e-8,
+    ) -> "FeatureScaler":
+        """Fit per-feature mean / std on finite entries.
+
+        ``residual_cols`` get ``log10`` applied before z-scoring (they
+        span 50+ orders of magnitude). ``xp_already_scaled_cols`` are
+        skipped — the parquet builder already z-scored them via the
+        frozen Hermite basis and they must round-trip unchanged.
+        """
+        if x.ndim != 2:
+            raise ValueError(f"expected 2-D feature matrix, got shape {x.shape}")
+        if x.shape[1] != len(feature_names):
+            raise ValueError(
+                f"x has {x.shape[1]} columns but feature_names has {len(feature_names)}",
+            )
+        names = tuple(feature_names)
+        residual_set = set(residual_cols)
+        skip_set = set(xp_already_scaled_cols)
+        n_feat = len(names)
+        log10_mask = np.zeros(n_feat, dtype=bool)
+        apply_mask = np.zeros(n_feat, dtype=bool)
+        mean = np.zeros(n_feat, dtype=np.float32)
+        scale = np.ones(n_feat, dtype=np.float32)
+
+        for j, name in enumerate(names):
+            if name in skip_set:
+                # Frozen-Hermite-z-scored column — leave passthrough.
+                continue
+            col = x[:, j].astype(np.float64, copy=False)
+            if name in residual_set:
+                # Residual RMS spans many orders of magnitude; log10 first
+                # (NaN-safe; non-positive residuals get filtered out).
+                col_l = np.where(np.isfinite(col) & (col > 0), np.log10(col), np.nan)
+                log10_mask[j] = True
+                values = col_l[np.isfinite(col_l)]
+            else:
+                values = col[np.isfinite(col)]
+            if values.size == 0:
+                continue
+            # Robust outlier guard: trim values outside [p0.1, p99.9] before
+            # computing mean/std. Sentinel values (-1e6 etc.) that escaped
+            # upstream NaN-handling otherwise pollute the per-feature
+            # statistics — k_mag_dered's mean was driven to -5.35 (instead
+            # of ~10) by 4 sentinel rows with value -1e6.
+            if values.size >= 100:
+                lo = np.quantile(values, 0.001)
+                hi = np.quantile(values, 0.999)
+                trim = (values >= lo) & (values <= hi)
+                if int(trim.sum()) >= max(50, int(0.5 * values.size)):
+                    values = values[trim]
+            mean[j] = np.float32(values.mean())
+            s = float(values.std(ddof=0))
+            scale[j] = np.float32(max(s, eps))
+            apply_mask[j] = True
+        return cls(
+            mean=mean, scale=scale, feature_names=names,
+            log10_mask=log10_mask, apply_mask=apply_mask,
+        )
+
+    def transform(self, x: np.ndarray) -> np.ndarray:
+        """Standardise ``x``; preserves NaN.
+
+        The XP block columns are passed through unchanged (their entries
+        in ``apply_mask`` are False). For residual columns, log10 is
+        applied first; for other apply-masked columns, plain z-score.
+        """
+        out = x.astype(np.float32, copy=True)
+        for j in range(out.shape[1]):
+            if not self.apply_mask[j]:
+                continue
+            col = out[:, j]
+            if self.log10_mask[j]:
+                # Replace non-positive / NaN with NaN before log10 so the
+                # downstream nan_to_num path handles them consistently.
+                col = np.where(np.isfinite(col) & (col > 0),
+                               np.log10(col).astype(np.float32),
+                               np.float32(np.nan))
+            col = (col - self.mean[j]) / self.scale[j]
+            out[:, j] = col
+        return out
 
 
 # --- Map-style Dataset -------------------------------------------------------

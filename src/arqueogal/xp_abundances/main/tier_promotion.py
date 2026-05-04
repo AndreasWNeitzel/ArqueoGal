@@ -7,8 +7,12 @@ coordinator :func:`tier_promotion_report` applies the §3.3 decision tree
 to the collected results and assigns a final tier.
 
 The research_brief §3.3 decision tree operates on six tests, of which test 3
-(SHAP feature importance) and test 6 (cross-catalogue consistency) are
-deferred to future versions. Tier promotion runs at 5/6 coverage:
+(SHAP feature importance) is deferred to future versions and test 6
+(cross-catalogue consistency) has its framework shipped 2026-04-28 in
+:mod:`arqueogal.xp_abundances.main.cross_catalogue` but still depends on
+per-catalogue cross-matches before it can return ``passed=True`` for any
+element; until those land, test 6 remains in :data:`STUBBED_TESTS`. Tier
+promotion runs at 5/6 coverage:
 
 - Passes 1–3 only → ``"tier_3_rejected"``.
 - Passes 1–4 but fails 5 or 6 → ``"tier_3_internal"``.

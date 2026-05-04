@@ -11,12 +11,9 @@ and Kiel diagrams. A2 emphasizes raw Gaia data alone, for documentation of
 the three input catalogues' geometric and photometric reach.
 
 What it reads:
-- data/processed/pipeline1_features_stream1.parquet
+- data/processed/pipeline1_features_stream1_kiel.parquet
 - data/processed/pipeline1_features_stream2.parquet (if available)
 - data/processed/pipeline1_features_stream3.parquet
-
-Synthetic fixture support: --synthetic flag generates realistic Gaia sky
-distributions and magnitude distributions per stream.
 """
 
 from __future__ import annotations
@@ -41,64 +38,26 @@ from _common import (
     style_galactic_mollweide,
 )
 
-OUT = REPO / "reports/gallery/A2_raw_gaia_distribution"
+OUT = REPO / "reports/gallery/A_raw_data"
 
 
-def _make_synthetic_streams() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Generate synthetic Gaia data for three streams."""
-    rng = np.random.default_rng(42)
-
-    def make_stream(n, ra_center, dec_center, g_mean):
-        # Isotropic RA/Dec with some clustering
-        ra = rng.normal(ra_center, 60, n) % 360
-        dec = rng.normal(dec_center, 30, n)
-        dec = np.clip(dec, -90, 90)
-        g_mag = rng.normal(g_mean, 1.5, n)
-        g_mag = np.clip(g_mag, 6, 17)
-
-        return pd.DataFrame({
-            "source_id": np.arange(n),
-            "ra_deg": ra,
-            "dec_deg": dec,
-            "g_mag": g_mag,
-        })
-
-    # Streams have different sky distributions:
-    # S1: bulge-centric (APOGEE footprint)
-    s1 = make_stream(2000, ra_center=0, dec_center=0, g_mean=11)
-
-    # S2: scattered (TESS asteroseismic giants)
-    s2 = make_stream(800, ra_center=90, dec_center=-30, g_mean=10.5)
-
-    # S3: all-sky (Gaia DR3 volume)
-    s3_list = []
-    for _ in range(5):
-        s3_list.append(make_stream(1200, rng.uniform(0, 360), rng.uniform(-90, 90), rng.uniform(10, 12)))
-    s3 = pd.concat(s3_list, ignore_index=True)
-
-    return s1, s2, s3
-
-
-def main(use_synthetic: bool = False) -> None:
+def main() -> None:
     apply_style()
 
-    if use_synthetic:
-        s1, s2, s3 = _make_synthetic_streams()
-    else:
-        s1 = pd.read_parquet(
-            REPO / "data/processed/pipeline1_features_stream1.parquet",
-            columns=["source_id", "ra_deg", "dec_deg", "g_mag"],
-        )
-        s3 = pd.read_parquet(
-            REPO / "data/processed/pipeline1_features_stream3.parquet",
-            columns=["source_id", "ra_deg", "dec_deg", "g_mag"],
-        )
+    s1 = pd.read_parquet(
+        REPO / "data/processed/pipeline1_features_stream1_kiel.parquet",
+        columns=["source_id", "ra_deg", "dec_deg", "g_mag"],
+    )
+    s3 = pd.read_parquet(
+        REPO / "data/processed/pipeline1_features_stream3.parquet",
+        columns=["source_id", "ra_deg", "dec_deg", "g_mag"],
+    )
 
-        s2_path = REPO / "data/processed/pipeline1_features_stream2.parquet"
-        if s2_path.exists():
-            s2 = pd.read_parquet(s2_path, columns=["source_id", "ra_deg", "dec_deg", "g_mag"])
-        else:
-            s2 = None
+    s2_path = REPO / "data/processed/pipeline1_features_stream2.parquet"
+    if s2_path.exists():
+        s2 = pd.read_parquet(s2_path, columns=["source_id", "ra_deg", "dec_deg", "g_mag"])
+    else:
+        s2 = None
 
     rng = np.random.default_rng(0)
 
@@ -161,11 +120,10 @@ def main(use_synthetic: bool = False) -> None:
         "A2 — Raw Gaia DR3 distribution per stream: sky coverage and magnitude reach",
         fontsize=11,
     )
-    save_fig(fig, OUT / "raw_gaia_distribution")
+    save_fig(fig, OUT / "A2_raw_gaia_distribution")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot A2: Raw Gaia distribution per stream.")
-    parser.add_argument("--synthetic", action="store_true", help="Use synthetic fixture.")
     args = parser.parse_args()
-    main(use_synthetic=args.synthetic)
+    main()

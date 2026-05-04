@@ -409,10 +409,14 @@ def test_training_config_serialises_paths(tmp_path: Path) -> None:
 
 
 def test_feature_layout_default_input_dim_matches_design() -> None:
-    """DESIGN: full layout = 54 BP + 54 RP + 2 c0 + 3 residuals + 26 aux = 139-D."""
-    assert FeatureLayout().input_dim == 139
-    # Truncated layout: 19 + 22 + 2 + 3 + 26 = 72-D.
-    assert FeatureLayout.truncated_43d().input_dim == 72
+    """DESIGN: full layout = 54 BP + 54 RP + 2 c0 + 3 residuals + 27 aux = 140-D.
+
+    Aux count moved from 26 → 27 on 2026-04-29 (extinction-correction
+    protocol). See ``docs/protocols/extinction_correction.md``.
+    """
+    assert FeatureLayout().input_dim == 140
+    # Truncated layout: 19 + 22 + 2 + 3 + 27 = 73-D.
+    assert FeatureLayout.truncated_43d().input_dim == 73
 
 
 # --- Run A / #119.3 / #119.5 phase-toggle knobs ------------------------------

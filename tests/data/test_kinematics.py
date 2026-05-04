@@ -133,6 +133,7 @@ def test_compute_actions_all_nan_returns_empty() -> None:
 
 
 def test_compute_actions_drops_nan_rows(caplog: pytest.LogCaptureFixture) -> None:
+    pytest.importorskip("galpy")  # compute_actions imports galpy lazily
     rows = [_sunlike_row(1), _sunlike_row(2, pmra=np.nan), _sunlike_row(3)]
     df = pd.DataFrame(rows)
     with caplog.at_level(logging.INFO, logger="arqueogal.data.kinematics"):
@@ -158,6 +159,7 @@ def test_compute_actions_mc_rejects_nonpositive_samples() -> None:
 
 
 def test_unknown_potential_raises() -> None:
+    pytest.importorskip("galpy")  # compute_actions imports galpy lazily
     df = pd.DataFrame([_sunlike_row(1)])
     with pytest.raises(ValueError, match="unknown potential"):
         compute_actions(df, config=KinematicsConfig(potential="not-a-pot"))  # type: ignore[arg-type]

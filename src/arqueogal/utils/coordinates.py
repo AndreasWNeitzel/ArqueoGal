@@ -9,13 +9,86 @@ transforms.
 All inputs are plain ``float`` ndarrays in the units named below; we
 attach ``astropy.units`` internally, propagate through the frame
 transforms, and strip units only at the output boundary.
+
+Galactocentric frame conventions
+--------------------------------
+ArqueoGal pins the following frame so that every downstream consumer
+(Pipeline 1 release, Starfold population classification, Task 6
+chemodynamics) reads the same numbers. The values match
+:mod:`arqueogal.data.kinematics` (which owns the McMillan+2017 action-
+angle computation and is the canonical declaration site); we re-export
+them here as :data:`GALACTOCENTRIC_FRAME` so the frame convention is
+visible from the coordinate-transform layer rather than buried in a
+data-pipeline module.
+
+- ``R_0 = 8.21 kpc``: McMillan+2017 native value. GRAVITY+2018 measure
+  ``R_0 = 8.122 ± 0.031 kpc``; we keep the McMillan native value to
+  avoid a 1% rescaling of the fitted potential. Note this divergence
+  in any methods-paper section that compares against catalogues built
+  on ``R_0 = 8.122 kpc`` (e.g. Bovy+2024, McMillan refit).
+- ``V_circ = 233.1 km/s``: McMillan+2017 ``v_0`` (matches Reid &
+  Brunthaler 2020 dispersion-corrected proper-motion of Sgr A*).
+- ``z_sun = 20.8 pc``: Bennett & Bovy 2019 (consistent with
+  Schönrich+Binney+Dehnen 2010 and Anderson+2019).
+- ``solar_motion = (-11.1, 12.24, 7.25) km/s`` in ``(U, V, W)`` with
+  galpy's sign convention (``U`` positive toward the Galactic centre,
+  negated in the tuple — Schönrich+Binney+Dehnen 2010 ``U_sun = +11.1``
+  is rendered as ``-11.1`` here).
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 
+# Re-exported from arqueogal.data.kinematics so utils/coordinates.py is
+# the canonical "where do the frame constants live" entry point.
+from arqueogal.data.kinematics import (
+    R_0_KPC as _R_0_KPC,
+)
+from arqueogal.data.kinematics import (
+    SOLAR_MOTION_KMS as _SOLAR_MOTION_KMS,
+)
+from arqueogal.data.kinematics import (
+    V_0_KMS as _V_0_KMS,
+)
+from arqueogal.data.kinematics import (
+    Z_0_PC as _Z_0_PC,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class GalactocentricFrameConstants:
+    """Pinned Galactocentric frame for ArqueoGal.
+
+    See module docstring for citations. Used as a single source of truth
+    for any code that needs to know "what R_0, V_circ, z_sun, and solar
+    motion does ArqueoGal use?"; kinematics.py owns the underlying
+    floats so that galpy's McMillan17 potential reads the McMillan-
+    native values without an extra dependency.
+    """
+
+    R_0_kpc: float
+    V_circ_kms: float
+    z_sun_pc: float
+    # ``UVW`` in the field name follows the (U, V, W) convention rather than
+    # PEP 8 lower-case; that is the universal Galactic-archaeology naming and
+    # ruff's N815 mixedCase check is silenced for this one field.
+    solar_motion_UVW_kms: tuple[float, float, float]  # noqa: N815
+
+
+GALACTOCENTRIC_FRAME = GalactocentricFrameConstants(
+    R_0_kpc=_R_0_KPC,
+    V_circ_kms=_V_0_KMS,
+    z_sun_pc=_Z_0_PC,
+    solar_motion_UVW_kms=_SOLAR_MOTION_KMS,
+)
+
+
 __all__ = [
+    "GALACTOCENTRIC_FRAME",
+    "GalactocentricFrameConstants",
     "equatorial_to_galactic",
     "galactic_velocities_to_cylindrical",
 ]

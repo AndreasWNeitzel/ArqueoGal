@@ -15,9 +15,11 @@ authors:
   - family-names: Miglio
     given-names: Andrea
 title: "ArqueoGal Pipeline 1: per-element abundances from Gaia BP/RP with calibrated information-content audit"
-version: "1.0.0"
+version: "1.0.0-pre"
 date-released: "2026-04-19"
-doi: "PLACEHOLDER-AWAITING-ZENODO"
+# DOI is intentionally omitted until the Zenodo mint accompanying the v1
+# methods-paper submission. Cite by repository URL + commit SHA in the
+# meantime; see CONTRIBUTING.md "Citation".
 repository-code: "https://github.com/AndreasWNeitzel/ArqueoGal"
 license: MIT
 keywords:

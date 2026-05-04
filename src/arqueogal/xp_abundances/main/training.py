@@ -47,6 +47,7 @@ from arqueogal.xp_abundances.main.adapter import XpFeatureAdapter
 from arqueogal.xp_abundances.main.config import TrainingConfig
 from arqueogal.xp_abundances.main.data import (
     FeatureLayout,
+    FeatureScaler,
     LabelScaler,
     LabelTiers,
     XpAbundanceDataset,
@@ -57,6 +58,7 @@ from arqueogal.xp_abundances.main.losses import (
     ContrastiveQueue,
     barlow_twins_loss,
     beta_nll_block_cholesky,
+    soft_ari_loss,
     supcon_soft_positive,
 )
 from arqueogal.xp_abundances.main.model import (
@@ -150,11 +152,39 @@ def build_dataloaders(
         for k in ("X", "Y", "sigma_Y", "source_id"):
             if k in arrs:
                 arrs[k] = arrs[k][xp_finite]
-    # Impute remaining feature NaN (in residuals / aux priors) to 0.
-    np.nan_to_num(arrs["X"], copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
     train_mask = np.isin(arrs["source_id"], split_ids["train"])
     val_mask = np.isin(arrs["source_id"], split_ids["val"])
+
+    # Fit the feature scaler on the train partition only (NaN-aware,
+    # log10-aware on residual columns). Apply to every partition before
+    # the encoder sees the input. The XP block (Hermite z-scored coefs +
+    # c0 scalars) is left passthrough — it's already standardised by the
+    # frozen Hermite z-score basis at parquet-build time, and downstream
+    # consumers depend on that.
+    xp_passthrough_cols = (
+        *layout.bp_coef_cols, *layout.rp_coef_cols, *layout.xp_scalar_cols,
+    )
+    feature_scaler = FeatureScaler.fit(
+        arrs["X"][train_mask],
+        feature_names=layout.all_required_columns,
+        residual_cols=layout.residual_cols,
+        xp_already_scaled_cols=xp_passthrough_cols,
+    )
+    n_aux_scaled = int(feature_scaler.apply_mask.sum())
+    _LOG.info(
+        "fit feature scaler on %d train stars: %d aux/residual columns "
+        "scaled, %d XP columns passthrough",
+        int(train_mask.sum()),
+        n_aux_scaled,
+        len(layout.all_required_columns) - n_aux_scaled,
+    )
+    arrs["X"] = feature_scaler.transform(arrs["X"])
+
+    # Impute remaining feature NaN (in residuals / aux priors) to 0.
+    # After standardisation, x=0 corresponds to the per-feature mean —
+    # the least-disruptive imputation in standardised space.
+    np.nan_to_num(arrs["X"], copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
     # Fit label scaler on the train partition only (NaN-aware per label),
     # then apply to every partition's Y so the network trains in a
@@ -162,16 +192,16 @@ def build_dataloaders(
     # learn the raw-physical-unit offsets for Teff / log g / [M/H] — see
     # task #140 and the Run A calibration findings.
     label_scaler = LabelScaler.fit(arrs["Y"][train_mask], tiers.all_labels)
+    # Per-label mean/scale logging is generic over arbitrary label sets
+    # (5-label, 2-label, or 21-label configurations all reach this point).
+    _scaler_summary = ", ".join(
+        f"{name} mean={label_scaler.mean[i]:+.3f} scale={label_scaler.scale[i]:.3f}"
+        for i, name in enumerate(tiers.all_labels)
+    )
     _LOG.info(
-        "fit label scaler on %d train stars — Teff mean=%.1f scale=%.1f, "
-        "logg mean=%.2f scale=%.2f, [M/H] mean=%.2f scale=%.2f",
+        "fit label scaler on %d train stars — %s",
         int(train_mask.sum()),
-        float(label_scaler.mean[0]),
-        float(label_scaler.scale[0]),
-        float(label_scaler.mean[1]),
-        float(label_scaler.scale[1]),
-        float(label_scaler.mean[2]),
-        float(label_scaler.scale[2]),
+        _scaler_summary,
     )
     # ``transform`` is NaN-preserving; rescaled uncertainties scale by 1/s too
     # (only σ_Y is also divided, so its meaning relative to the standardised
@@ -232,7 +262,7 @@ def build_dataloaders(
         num_workers=loader_workers,
         pin_memory=loader_pin,
     )
-    return train_loader, val_loader, split_ids, label_scaler
+    return train_loader, val_loader, split_ids, label_scaler, feature_scaler
 
 
 def _strat_columns_available(parquet_path: Path | str) -> list[str]:
@@ -483,13 +513,44 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
             yk = torch.cat([y_for_supcon, qy], dim=0)
         else:
             zk, yk = z, y_for_supcon
+
+        # Per-label kernel bandwidth in raw label units (production path),
+        # falling back to the legacy isotropic scalar when no per-label
+        # vector is configured or no scaler buffers exist on the model.
+        sigma_arg: torch.Tensor | float
+        label_scale_arg: torch.Tensor | None = None
+        n_first = lw.supcon_label_n_first
+        if (
+            lw.supcon_sigma_raw is not None
+            and hasattr(model, "label_scale_human")
+        ):
+            sigma_vec = torch.as_tensor(
+                lw.supcon_sigma_raw,
+                dtype=torch.float32,
+                device=x.device,
+            )
+            scale_vec = model.label_scale_human.to(torch.float32)
+            if n_first is not None:
+                sigma_vec = sigma_vec[:n_first]
+                scale_vec = scale_vec[:n_first]
+            if sigma_vec.shape[0] != y_for_supcon.shape[1]:
+                raise ValueError(
+                    f"supcon_sigma_raw length {sigma_vec.shape[0]} does not match"
+                    f" label dim {y_for_supcon.shape[1]}",
+                )
+            sigma_arg = sigma_vec
+            label_scale_arg = scale_vec
+        else:
+            sigma_arg = lw.supcon_sigma
+
         supcon = supcon_soft_positive(
             z,
             y_for_supcon,
             zk,
             yk,
             temperature=tau,
-            sigma=lw.supcon_sigma,
+            sigma=sigma_arg,
+            label_scale=label_scale_arg,
         )
     else:
         supcon = torch.zeros((), device=x.device)
@@ -497,6 +558,41 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
     if nll_active:
         y_block = model.block_layout.reorder_human_to_block(y)
         finite = torch.isfinite(y_block)
+
+        # Mask out the [alpha/M] channel of the NLL for training stars whose
+        # TRUTH alpha falls in the ambiguous mid-band [0.10, 0.20] dex (the
+        # disc-bimodality dip). These stars pull the regression head toward
+        # the conditional mean and produce a fake mid-alpha overdensity at
+        # metal-poor [M/H] (the "M/H=-1, alpha/M=+0.1" hallucinated cluster).
+        # By withholding their alpha-NLL gradient, the head only learns from
+        # clean disc-component members. Other label channels (Teff, log g,
+        # [M/H], [Mg/H]) still contribute for these stars.
+        try:
+            alpha_idx_human = model.block_layout.label_order_human.index(
+                "alpha_m_apogee"
+            )
+        except ValueError:
+            alpha_idx_human = None
+        if alpha_idx_human is not None and hasattr(model, "label_scale_human"):
+            alpha_idx_block = (
+                model.block_layout
+                .label_order_block.index("alpha_m_apogee")
+            )
+            s_alpha = model.label_scale_human[alpha_idx_human]
+            m_alpha = model.label_mean_human[alpha_idx_human]
+            # Truth alpha in standardised label space (block-ordered y).
+            alpha_true_block = y_block[:, alpha_idx_block]
+            # Convert thresholds [0.10, 0.20] dex into standardised space.
+            lo = (0.10 - m_alpha) / s_alpha
+            hi = (0.20 - m_alpha) / s_alpha
+            ambig = (alpha_true_block >= lo) & (alpha_true_block <= hi)
+            ambig &= torch.isfinite(alpha_true_block)
+            # Drop the alpha channel for ambiguous stars only.
+            new_mask = finite.clone()
+            new_mask[:, alpha_idx_block] = (
+                new_mask[:, alpha_idx_block] & ~ambig
+            )
+            finite = new_mask
         y_clean = torch.where(finite, y_block, mu.detach())
         nll = beta_nll_block_cholesky(
             mu,
@@ -514,12 +610,60 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
     else:
         bt = torch.zeros((), device=x.device)
 
-    total = lw.supcon * supcon + lw.beta_nll * nll + lw.barlow * bt
+    # Soft-ARI chemistry-cluster contamination penalty. y and mu are both in
+    # LabelScaler-normalised space during training, so the physical [α/M]
+    # threshold (lw.ari_alpha_threshold dex, ~0.15) and kernel sigma must be
+    # converted into the same space. We do that via the per-label buffers
+    # registered on the model (``label_mean_human`` / ``label_scale_human``,
+    # set in ``train_model`` after fitting the scaler). When the buffers are
+    # absent (e.g. unit tests / smoke checks running on a freshly constructed
+    # model with no scaler attached) we fall back to interpreting the
+    # threshold directly in scaled space.
+    ari_active = lw.ari != 0.0
+    if ari_active:
+        try:
+            alpha_idx_human = model.block_layout.label_order_human.index("alpha_m_apogee")
+        except ValueError:
+            ari_active = False
+            ari = torch.zeros((), device=x.device)
+        else:
+            mu_human = model.block_layout.reorder_block_to_human(mu)
+            alpha_pred = mu_human[:, alpha_idx_human]
+            alpha_true = y[:, alpha_idx_human]
+            finite_alpha = torch.isfinite(alpha_true)
+            if int(finite_alpha.sum()) >= 8:
+                a_pred = alpha_pred[finite_alpha]
+                a_true = alpha_true[finite_alpha]
+                if hasattr(model, "label_scale_human") and hasattr(model, "label_mean_human"):
+                    s_alpha = model.label_scale_human[alpha_idx_human]
+                    m_alpha = model.label_mean_human[alpha_idx_human]
+                    threshold = (lw.ari_alpha_threshold - m_alpha) / s_alpha
+                    kernel = lw.ari_kernel_sigma / s_alpha
+                else:
+                    threshold = lw.ari_alpha_threshold
+                    kernel = lw.ari_kernel_sigma
+                p_high_pred = torch.sigmoid((a_pred - threshold) / kernel)
+                p_high_true = torch.sigmoid((a_true - threshold) / kernel)
+                pred_K2 = torch.stack([1.0 - p_high_pred, p_high_pred], dim=1)
+                true_K2 = torch.stack([1.0 - p_high_true, p_high_true], dim=1)
+                ari = soft_ari_loss(pred_K2, true_K2)
+            else:
+                ari = torch.zeros((), device=x.device)
+    else:
+        ari = torch.zeros((), device=x.device)
+
+    total = (
+        lw.supcon * supcon
+        + lw.beta_nll * nll
+        + lw.barlow * bt
+        + lw.ari * ari
+    )
     parts = {
         "loss": float(total.detach()),
         "supcon": float(supcon.detach()),
         "nll": float(nll.detach()),
         "barlow": float(bt.detach()),
+        "ari": float(ari.detach()),
         "tau": float(tau.detach()),
     }
     return total, parts, z.detach(), y.detach()
@@ -549,6 +693,7 @@ def train_one_epoch(  # noqa: PLR0913 — one-epoch dispatch has many collaborat
         "supcon": 0.0,
         "nll": 0.0,
         "barlow": 0.0,
+        "ari": 0.0,
         "tau": 0.0,
     }
     n = 0
@@ -643,6 +788,7 @@ def validate(
         "supcon": 0.0,
         "nll": 0.0,
         "barlow": 0.0,
+        "ari": 0.0,
         "tau": 0.0,
     }
     n = 0
@@ -679,13 +825,12 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
     seed_everything(seed, deterministic=cfg.deterministic)
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    feature_scaler: FeatureScaler | None = None
     if train_loader is None or val_loader is None:
-        train_loader, val_loader, _split_ids, label_scaler = build_dataloaders(
-            cfg,
-            layout,
-            tiers,
-            seed=seed,
-        )
+        (
+            train_loader, val_loader, _split_ids,
+            label_scaler, feature_scaler,
+        ) = build_dataloaders(cfg, layout, tiers, seed=seed)
     elif label_scaler is None:
         raise ValueError(
             "label_scaler is required when train_loader/val_loader are supplied"
@@ -694,6 +839,20 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
         )
 
     model, log_temp, adapter = _build_model_and_temperature(cfg, layout, tiers, device)
+    # Expose the per-label LabelScaler stats to losses that need physical-unit
+    # thresholds (e.g. soft-ARI on the [α/M] disc-thick boundary). Buffers
+    # follow ``tiers.all_labels`` order, which equals
+    # ``model.block_layout.label_order_human``.
+    model.register_buffer(
+        "label_mean_human",
+        torch.tensor(label_scaler.mean, dtype=torch.float32, device=device),
+        persistent=False,
+    )
+    model.register_buffer(
+        "label_scale_human",
+        torch.tensor(label_scaler.scale, dtype=torch.float32, device=device),
+        persistent=False,
+    )
     optimizer = _build_optimizer(model, log_temp, cfg)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
@@ -815,6 +974,7 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
         "log_temp": log_temp,
         "adapter": adapter,
         "label_scaler": label_scaler,
+        "feature_scaler": feature_scaler,
         "history": history,
         "best_val_loss": best_vl,
         "best_epoch": best_epoch,
@@ -976,6 +1136,7 @@ def save_checkpoint(  # noqa: PLR0913 — each field is an independent reload de
     seed: int,
     training_metrics: dict[str, Any] | None = None,
     git_sha: str = "",
+    feature_scaler: FeatureScaler | None = None,
 ) -> Path:
     """Persist a v2 checkpoint matching DESIGN §Checkpoint schema.
 
@@ -1027,6 +1188,17 @@ def save_checkpoint(  # noqa: PLR0913 — each field is an independent reload de
         "log_temperature": log_temp.detach().cpu(),
         "block_layout": model.block_layout.to_dict(),
     }
+    if feature_scaler is not None:
+        # Persist the feature scaler so inference can apply the SAME
+        # standardisation the encoder was trained on (NaN-aware z-score on
+        # aux + log10 + z-score on residual RMS).
+        blob["feature_scaler"] = {
+            "mean": feature_scaler.mean.astype(np.float32, copy=True),
+            "scale": feature_scaler.scale.astype(np.float32, copy=True),
+            "feature_names": list(feature_scaler.feature_names),
+            "log10_mask": feature_scaler.log10_mask.astype(bool, copy=True),
+            "apply_mask": feature_scaler.apply_mask.astype(bool, copy=True),
+        }
     torch.save(blob, path)
     return path
 

@@ -152,6 +152,7 @@ def test_xp_query_targets_the_xp_table() -> None:
 
 
 def test_ye2024_rejects_missing_source_id() -> None:
+    pytest.importorskip("gaiaxpy")  # apply_ye2024_correction imports gaiaxpy lazily
     xp = pd.DataFrame({"bp_coefficients": [[0.0] * XP_COEFF_LEN]})
     coords = pd.DataFrame({"source_id": [1], "ra": [0.0], "dec": [0.0]})
     with pytest.raises(KeyError, match="source_id"):
@@ -159,6 +160,7 @@ def test_ye2024_rejects_missing_source_id() -> None:
 
 
 def test_ye2024_rejects_missing_coord_columns() -> None:
+    pytest.importorskip("gaiaxpy")  # apply_ye2024_correction imports gaiaxpy lazily
     xp = pd.DataFrame({"source_id": [1]})
     coords = pd.DataFrame({"source_id": [1], "ra": [0.0]})  # no dec
     with pytest.raises(KeyError, match="dec"):
@@ -166,6 +168,7 @@ def test_ye2024_rejects_missing_coord_columns() -> None:
 
 
 def test_ye2024_rejects_wrong_sampling_length() -> None:
+    pytest.importorskip("gaiaxpy")  # apply_ye2024_correction imports gaiaxpy lazily
     xp = pd.DataFrame({"source_id": [1]})
     coords = pd.DataFrame({"source_id": [1], "ra": [0.0], "dec": [0.0]})
     with pytest.raises(ValueError, match="sampling_nm"):

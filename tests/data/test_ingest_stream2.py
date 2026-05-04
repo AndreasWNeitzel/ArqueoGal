@@ -125,12 +125,87 @@ def patched_pipeline(monkeypatch: pytest.MonkeyPatch):
         out["phot_g_mean_mag_corr"] = out["phot_g_mean_mag"] - 0.002
         return out
 
+    def fake_fetch_xp(service, source_ids, **kwargs):  # noqa: ANN001
+        captured["xp_service"] = service
+        captured["xp_source_ids"] = list(source_ids)
+        captured["xp_kwargs"] = kwargs
+        ids_list = list(source_ids)
+        n = len(ids_list)
+        return pd.DataFrame(
+            {
+                "source_id": np.array(ids_list, dtype=np.int64),
+                "corrected_flux": [[1.0] * 330 for _ in range(n)],
+            }
+        )
+
+    def fake_apply_ye2024(xp_df, coords_df, **kwargs):  # noqa: ANN001
+        captured["ye2024_input_len"] = len(xp_df)
+        out = xp_df.copy()
+        out["corrected_flux"] = [[1.0] * 330 for _ in range(len(xp_df))]
+        out["ye2024_flag"] = np.zeros(len(xp_df), dtype=np.int8)
+        return out
+
+    def fake_reproject_ye_to_hermite(flux_array):  # noqa: ANN001
+        n = len(flux_array)
+        fingerprint = "0d34b5659e97e5891b57005215a59b0b70fc56f23d8ffb22f442c4ad5101eab7"
+        return {
+            "bp_coeffs": np.ones((n, 55), dtype=np.float32),
+            "rp_coeffs": np.ones((n, 55), dtype=np.float32),
+            "reprojection_residual_rms": np.ones(n, dtype=np.float32),
+            "basis_fingerprint_sha256": fingerprint,
+            "basis_version": "v1.0",
+        }
+
+    def fake_load_frozen_stats(path):  # noqa: ANN001
+        from arqueogal.data.frozen_stats import FrozenZScoreStats
+
+        fingerprint = "0d34b5659e97e5891b57005215a59b0b70fc56f23d8ffb22f442c4ad5101eab7"
+        return FrozenZScoreStats(
+            basis_fingerprint=fingerprint,
+            c0_bp_mean_log10=-13.0,
+            c0_bp_sigma_log10=0.5,
+            c0_rp_mean_log10=-13.2,
+            c0_rp_sigma_log10=0.5,
+            coef_norm_bp_mean=np.zeros(54),
+            coef_norm_bp_sigma=np.ones(54),
+            coef_norm_rp_mean=np.zeros(54),
+            coef_norm_rp_sigma=np.ones(54),
+            sigma_floor=1e-8,
+            n_reference_population=0,
+            reference_population_description="mock",
+        )
+
+    def fake_verify_basis(fp, stats):  # noqa: ANN001
+        pass
+
     monkeypatch.setattr(mod, "fetch_hon2021", fake_fetch_hon2021)
     monkeypatch.setattr(mod, "fetch_tic_v82", fake_fetch_tic)
     monkeypatch.setattr(mod, "crossmatch_dr2_to_dr3", fake_xmatch)
     monkeypatch.setattr(mod, "enrich_source_ids", fake_enrich)
-    monkeypatch.setattr(mod, "apply_parallax_zpt", fake_zpt)
-    monkeypatch.setattr(mod, "apply_g_mag_correction", fake_g_mag)
+
+    # Post-2026-04-29: XP fetch / Ye+2024 / re-projection / z-score / parallax-zpt
+    # / G-mag correction all moved into the unified preprocessing pipeline.
+    # Patch the symbols at their new home (and short-circuit
+    # apply_pipeline1_preprocessing so the test stays focused on Stream-2
+    # orchestration, not preprocessing-internals).
+    from arqueogal.data import preprocessing as preproc_mod
+
+    monkeypatch.setattr(preproc_mod, "fetch_xp_coefficients", fake_fetch_xp)
+    monkeypatch.setattr(preproc_mod, "apply_ye2024_correction", fake_apply_ye2024)
+    monkeypatch.setattr(preproc_mod, "reproject_ye_to_hermite", fake_reproject_ye_to_hermite)
+    monkeypatch.setattr(preproc_mod, "load_frozen_zscore_stats", fake_load_frozen_stats)
+    monkeypatch.setattr(preproc_mod, "verify_basis_fingerprint", fake_verify_basis)
+    monkeypatch.setattr(preproc_mod, "apply_parallax_zpt", fake_zpt)
+    monkeypatch.setattr(preproc_mod, "apply_g_mag_correction", fake_g_mag)
+
+    def fake_preprocessing(df, **kwargs):
+        captured["preproc_kwargs"] = kwargs
+        out = fake_zpt(df)
+        out = fake_g_mag(out)
+        return out
+
+    monkeypatch.setattr(preproc_mod, "apply_pipeline1_preprocessing", fake_preprocessing)
+    monkeypatch.setattr(mod, "apply_pipeline1_preprocessing", fake_preprocessing)
     return captured
 
 
@@ -182,6 +257,34 @@ def test_corrections_ran_after_join(tmp_path: Path, patched_pipeline: dict[str, 
     assert patched_pipeline["g_mag_input_len"] == 2
 
 
+def test_xp_columns_present_in_output(tmp_path: Path, patched_pipeline: dict[str, object]) -> None:
+    """Verify XP coefficients (Hermite-reprojected and z-scored) are present."""
+    vz = MagicMock(spec=TAPService)
+    ap = MagicMock(spec=TAPService)
+    out = mod.ingest_stream2(tmp_path, vizier=vz, aip=ap)
+    df = pd.read_parquet(out)
+    # Check that the 4 z-scored coefficient columns exist
+    assert "bp_coeffs_norm_zscore" in df.columns
+    assert "rp_coeffs_norm_zscore" in df.columns
+    assert "bp_c0_log_zscore" in df.columns
+    assert "rp_c0_log_zscore" in df.columns
+    # Check that reprojection quality metric is present
+    assert "reprojection_residual_rms" in df.columns
+    # Verify row count matches the post-join count
+    assert len(df) == 2
+
+
+def test_xp_fetch_receives_correct_source_ids(
+    tmp_path: Path, patched_pipeline: dict[str, object]
+) -> None:
+    """XP fetch must receive the resolved DR3 source_ids, not TIC or DR2 ids."""
+    vz = MagicMock(spec=TAPService)
+    ap = MagicMock(spec=TAPService)
+    mod.ingest_stream2(tmp_path, vizier=vz, aip=ap)
+    # DR3 source ids are DR2 + 1 per _xmatch_df, only 2 successfully resolve
+    assert set(patched_pipeline["xp_source_ids"]) == {1001, 2001}
+
+
 def test_custom_prob_threshold_propagates(
     tmp_path: Path, patched_pipeline: dict[str, object]
 ) -> None:
@@ -211,7 +314,7 @@ def test_xmatch_cuts_recorded_in_provenance(
     assert "|magnitude_difference| < 0.05" in meta["cuts_applied"]
 
 
-def test_provenance_has_all_four_tap_sources(
+def test_provenance_has_all_five_tap_sources(
     tmp_path: Path, patched_pipeline: dict[str, object]
 ) -> None:
     vz = MagicMock(spec=TAPService)
@@ -219,9 +322,9 @@ def test_provenance_has_all_four_tap_sources(
     mod.ingest_stream2(tmp_path, vizier=vz, aip=ap)
     meta = json.loads((tmp_path / "interim" / "stream2_tess_gaia.provenance.json").read_text())
     tap_names = [s["name"] for s in meta["sources"] if s["kind"] == "tap"]
-    assert len(tap_names) == 4
+    assert len(tap_names) == 5
     joined = " | ".join(tap_names).lower()
-    for kw in ("hon+2021", "tic v8.2", "dr2_neighbourhood", "enrichment"):
+    for kw in ("hon+2021", "tic v8.2", "dr2_neighbourhood", "enrichment", "xp"):
         assert kw in joined
 
 

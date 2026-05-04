@@ -24,7 +24,6 @@ data_acquisition.md §7, §8, §11 (Level 4), §14 (provenance).
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import numpy as np
@@ -52,6 +51,7 @@ from arqueogal.data.dust_maps import (
 )
 from arqueogal.data.provenance import Provenance, TapSource, write_sidecar
 from arqueogal.data.tap import AIP_TAP_URL, GAVO_TAP_URL
+from arqueogal.utils.io import save_parquet
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
         )
 
     logger.info("Level-4: writing %s", output_path)
-    _write_parquet_atomic(enriched, output_path)
+    save_parquet(enriched, output_path)
 
     n_bj_batches = (n_in + bj_batch_size - 1) // bj_batch_size
     sources = [
@@ -253,13 +253,6 @@ def enrich_geometry(  # noqa: PLR0913, PLR0915 — keyword-only tuning knobs wit
     write_sidecar(prov)
     logger.info("Level-4: done (%d rows → %s)", len(enriched), output_path)
     return output_path
-
-
-def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".part")
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, path)
 
 
 __all__ = ["enrich_geometry"]

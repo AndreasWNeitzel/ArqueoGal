@@ -23,7 +23,6 @@ data_acquisition.md §9 (kinematics), §11 (Level 5), §14 (provenance).
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import asdict
 from pathlib import Path
 
@@ -36,6 +35,7 @@ from arqueogal.data.kinematics import (
     compute_actions,
 )
 from arqueogal.data.provenance import Provenance, write_sidecar
+from arqueogal.utils.io import save_parquet
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def enrich_kinematics_stream(
     enriched = df.merge(actions, on="source_id", how="left", suffixes=("", "_kin"))
 
     logger.info("Level-5: writing %s", output_path)
-    _write_parquet_atomic(enriched, output_path)
+    save_parquet(enriched, output_path)
 
     cfg_dict = asdict(cfg)
     prov = Provenance(
@@ -122,13 +122,6 @@ def enrich_kinematics_stream(
     write_sidecar(prov)
     logger.info("Level-5: done (%d rows → %s)", len(enriched), output_path)
     return output_path
-
-
-def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".part")
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, path)
 
 
 __all__ = ["enrich_kinematics_stream"]

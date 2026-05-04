@@ -495,7 +495,7 @@ def main() -> None:
         batch_size=args.batch_size,
         seed=split_seed,
     )
-    _, val_loader, _, _scaler_from_loader = build_dataloaders(
+    _, val_loader, _, _scaler_from_loader, _ = build_dataloaders(
         cfg,
         layout,
         tiers,

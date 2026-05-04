@@ -221,15 +221,20 @@ def save_figure(
     fig: Any,
     path: str | Path,
     *,
-    formats: tuple[str, ...] = ("png", "pdf"),
+    formats: tuple[str, ...] = ("png",),
     dpi: int | None = None,
 ) -> list[Path]:
-    """Save ``fig`` to ``path.<ext>`` for each ``ext`` in ``formats``.
+    """Save ``fig`` to ``path.<ext>`` as PNG only.
+
+    PDF generation was frozen 2026-05-03 — gallery is review-only at this
+    stage. Non-PNG entries in ``formats`` are silently dropped so callers
+    that still pass ``("png", "pdf")`` keep working.
 
     Writes atomically (temp → rename). Returns the list of paths written.
     """
     path = Path(path).with_suffix("")
     path.parent.mkdir(parents=True, exist_ok=True)
+    formats = tuple(f for f in formats if f.lower() == "png") or ("png",)
     out: list[Path] = []
     for fmt in formats:
         target = path.with_suffix(f".{fmt}")

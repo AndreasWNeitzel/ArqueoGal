@@ -42,10 +42,22 @@ def supcon_soft_positive(  # noqa: PLR0913 — mirrors SupCon API in TESS_ML pro
     yk: torch.Tensor,
     *,
     temperature: torch.Tensor | float,
-    sigma: float = 0.10,
+    sigma: float | torch.Tensor = 0.10,
+    label_scale: torch.Tensor | None = None,
     eps: float = 1e-8,
 ) -> torch.Tensor:
     """Supervised Contrastive loss with Gaussian-kernel soft positives.
+
+    The label-space kernel runs in **raw label units** when ``sigma`` is a
+    1-D tensor of per-label bandwidths and ``label_scale`` is supplied — the
+    standardised labels arriving in ``ya`` / ``yk`` are first un-scaled by
+    multiplying by ``label_scale``, then squared distances are normalised by
+    the per-label ``sigma`` vector, so the kernel is anisotropic and
+    physically interpretable: ``sigma[i]`` has the same units as label ``i``.
+
+    Falls back to the scalar isotropic kernel in standardised space when
+    ``label_scale`` is omitted (legacy behaviour, used by unit tests with no
+    scaler attached).
 
     Parameters
     ----------
@@ -62,7 +74,14 @@ def supcon_soft_positive(  # noqa: PLR0913 — mirrors SupCon API in TESS_ML pro
         Scalar temperature τ. Typically a learnable ``nn.Parameter`` in the
         surrounding training module, clamped to ``[1e-3, 0.5]``.
     sigma
-        Gaussian-kernel bandwidth in label space (prototype default 0.10).
+        Either a scalar bandwidth applied isotropically across all label
+        dimensions (legacy standardised-space behaviour), or a 1-D tensor of
+        per-label bandwidths in raw label units (production path). When a
+        per-label tensor is supplied, ``label_scale`` is also required.
+    label_scale
+        Per-label std vector ``s``, shape ``(n_labels,)``, that the
+        ``LabelScaler`` divided by during standardisation. Multiplied into
+        ``ya`` and ``yk`` to recover raw-unit labels before the kernel.
 
     Returns
     -------
@@ -91,8 +110,28 @@ def supcon_soft_positive(  # noqa: PLR0913 — mirrors SupCon API in TESS_ML pro
         bad = nan_a.unsqueeze(1) | nan_k.unsqueeze(0)
         ya_f = torch.nan_to_num(ya, nan=0.0)
         yk_f = torch.nan_to_num(yk, nan=0.0)
-        d2 = (ya_f.unsqueeze(1) - yk_f.unsqueeze(0)).pow(2).sum(-1)
-        w = torch.exp(-d2 / (2.0 * sigma * sigma))
+
+        sigma_is_tensor = isinstance(sigma, torch.Tensor) and sigma.ndim >= 1
+        if sigma_is_tensor:
+            if label_scale is None:
+                raise ValueError(
+                    "supcon_soft_positive: per-label sigma supplied but "
+                    "label_scale is None; both are required to evaluate "
+                    "the kernel in raw label units.",
+                )
+            scale = label_scale.to(ya_f.dtype).to(ya_f.device)
+            ya_raw = ya_f * scale
+            yk_raw = yk_f * scale
+            sig = sigma.to(ya_raw.dtype).to(ya_raw.device)
+            diff = ya_raw.unsqueeze(1) - yk_raw.unsqueeze(0)  # (B, K, n)
+            d2_per_dim = diff.pow(2) / sig.pow(2).clamp_min(eps)
+            d2 = d2_per_dim.sum(-1)
+            w = torch.exp(-0.5 * d2)
+        else:
+            sig_scalar = float(sigma)
+            diff = ya_f.unsqueeze(1) - yk_f.unsqueeze(0)
+            d2 = diff.pow(2).sum(-1)
+            w = torch.exp(-d2 / (2.0 * sig_scalar * sig_scalar))
         w = w.masked_fill(eye | bad, 0.0)
 
     sm = sim.detach().max(dim=1, keepdim=True).values
@@ -178,7 +217,19 @@ def beta_nll_block_cholesky(  # noqa: PLR0913 — all kwargs are distinct numeri
     if mask is not None:
         if mask.shape != y.shape:
             raise ValueError(f"mask shape {mask.shape} != y shape {y.shape}")
-        obs_per_star = mask.float().sum(dim=-1).clamp_min(eps)
+        # ``obs_per_star`` is the number of observed labels for each star and may
+        # be exactly zero for stars whose entire label vector was masked out by
+        # upstream NaN handling. Earlier code clamped this to ``eps`` so the
+        # per-star scale became ~1e-9 — that is *not* zero, so a fully-masked
+        # star still contributed underflowed noise (and a tiny but non-zero
+        # gradient) computed from whatever placeholder ``y`` value the NaN
+        # sanitiser had written. The principled behaviour is for fully-masked
+        # stars to contribute exactly zero to both the numerator and the
+        # denominator of the batch-mean NLL. We achieve that by *not* clamping
+        # ``obs_per_star`` here (so per_star_scale is exactly 0 for masked-out
+        # stars) and only clamping the batch-level ``denom`` to avoid 0/0 in
+        # the degenerate case where every label in the batch is masked.
+        obs_per_star = mask.float().sum(dim=-1)
         per_star_scale = obs_per_star / float(n_dims)
         nll_per_star = nll_per_star * per_star_scale
         if sample_weights is not None:
@@ -219,6 +270,68 @@ def mahalanobis_residual(
     diff = (y - mu).unsqueeze(-1)
     z = torch.linalg.solve_triangular(L, diff, upper=False)
     return z.squeeze(-1)
+
+
+def soft_ari_loss(
+    y_pred: torch.Tensor,
+    y_true: torch.Tensor,
+    *,
+    eps: float = 1e-8,
+) -> torch.Tensor:
+    """Soft Adjusted Rand Index loss for 2-D chemistry plane ([α/M], [M/H]).
+
+    Computes a differentiable ARI via soft confusion matrix between predicted and
+    true GMM-component assignments. The loss is ``(1 - soft_ARI)`` so minimising it
+    pulls the predictions toward correct cluster membership.
+
+    Parameters
+    ----------
+    y_pred
+        Predicted soft-assignment probabilities, shape ``(B, K)`` where K=2
+        (low-α, high-α components). Rows should sum to 1 (output of softmax).
+    y_true
+        Ground-truth soft-assignment probabilities, shape ``(B, K)``, also summing
+        to 1 along axis 1.
+    eps
+        Numerical stability constant.
+
+    Returns
+    -------
+    Scalar loss in [0, 1]. Value 0 means perfect agreement; value 1 means
+    worst agreement. This is the negative of the ARI metric itself.
+    """
+    if y_pred.shape != y_true.shape:
+        raise ValueError(f"y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+    if y_pred.shape[1] != 2:
+        raise ValueError(f"soft_ari_loss expects K=2 components, got shape {y_pred.shape}")
+
+    B = y_pred.shape[0]
+    n_total = torch.tensor(float(B), dtype=y_pred.dtype, device=y_pred.device)
+
+    # Hubert-Arabie ARI extended to soft (continuous) assignments. Confusion
+    # matrix is left in raw soft-COUNT space (n_ij = sum_k pred[k,i] * true[k,j]),
+    # NOT normalised by B — normalisation collapses both the numerator and
+    # denominator of the ARI ratio because rows of soft pred / true already
+    # sum to 1, so the marginals saturate and the formula returns ±∞ → 0.
+    n_ij = y_pred.T @ y_true            # (2, 2) soft counts; sums to B
+    a = n_ij.sum(dim=1)                 # row sums (per pred component)
+    b = n_ij.sum(dim=0)                 # col sums (per truth component)
+
+    def comb2(x: torch.Tensor) -> torch.Tensor:
+        # Continuous extension of n*(n-1)/2 valid for soft (real-valued) counts.
+        return 0.5 * x * (x - 1.0)
+
+    sum_comb_nij = comb2(n_ij).sum()
+    sum_comb_a = comb2(a).sum()
+    sum_comb_b = comb2(b).sum()
+    comb_n = comb2(n_total)
+
+    expected = (sum_comb_a * sum_comb_b) / (comb_n + eps)
+    max_idx = 0.5 * (sum_comb_a + sum_comb_b)
+    soft_ari = (sum_comb_nij - expected) / (max_idx - expected + eps)
+    soft_ari = torch.clamp(soft_ari, -1.0, 1.0)
+
+    return 1.0 - soft_ari
 
 
 def barlow_twins_loss(h: torch.Tensor, lam: float = 0.005, eps: float = 1e-8) -> torch.Tensor:
@@ -338,10 +451,130 @@ class ContrastiveQueue:
         return self.z[: self.ptr], self.y[: self.ptr]
 
 
+def add_feature_noise(
+    x: torch.Tensor,
+    sigma_features: torch.Tensor,
+    feature_cols: list[int] | None = None,
+    *,
+    training: bool = True,
+) -> torch.Tensor:
+    """Add Gaussian noise to input features at training time for robustness.
+
+    Parameters
+    ----------
+    x
+        Input feature tensor, shape ``(B, D)``.
+    sigma_features
+        Per-feature uncertainty (standard deviation), shape ``(D,)`` or broadcastable.
+        Features with sigma_features[i] = 0 are not perturbed.
+    feature_cols
+        Optional list of feature indices to perturb. If None, all features are
+        eligible (subject to sigma_features > 0). Useful to exclude auxiliary
+        features that should not be noised.
+    training
+        If False, return x unchanged. This allows toggling noise injection in
+        eval mode.
+
+    Returns
+    -------
+    Noised features of the same shape as x. When training=False, returns x unchanged.
+    """
+    if not training:
+        return x
+
+    sigma_features = sigma_features.to(x.device)
+    if sigma_features.shape != x.shape[1:]:
+        msg = (
+            f"sigma_features shape {sigma_features.shape} incompatible with "
+            f"x shape[1:] {x.shape[1:]}"
+        )
+        raise ValueError(msg)
+
+    if feature_cols is not None:
+        sigma_apply = torch.zeros_like(sigma_features)
+        sigma_apply[feature_cols] = sigma_features[feature_cols]
+    else:
+        sigma_apply = sigma_features
+
+    noise = torch.randn_like(x) * sigma_apply.unsqueeze(0)
+    return x + noise
+
+
+def propagate_feature_noise_uncertainty(
+    mu: torch.Tensor,
+    L: torch.Tensor,
+    x: torch.Tensor,
+    sigma_features: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Analytically marginalise feature-measurement noise into predicted uncertainty.
+
+    After training, this method inflates the predicted covariance ``Σ = L Lᵀ`` to
+    account for feature-space measurement uncertainties via:
+
+    ``σ_total² = σ_pred² + Σ_i (∂μ/∂x_i)² · σ_i²``
+
+    where the gradients are computed via autograd on the trained model.
+
+    Parameters
+    ----------
+    mu
+        Predicted label means, shape ``(B, n_labels)``. Should have
+        ``requires_grad=True`` for gradient computation.
+    L
+        Predicted Cholesky factors, shape ``(B, n_labels, n_labels)``.
+    x
+        Input features, shape ``(B, D)``. Should have ``requires_grad=True``.
+    sigma_features
+        Per-feature uncertainty, shape ``(D,)``.
+
+    Returns
+    -------
+    ``(mu, L_total)`` where ``L_total`` is a new lower-triangular Cholesky factor
+    that accounts for propagated feature noise. The diagonal of ``L_total`` is
+    inflated; off-diagonals remain unchanged.
+    """
+    B, n_labels = mu.shape
+    device = mu.device
+
+    sigma_features = sigma_features.to(device)
+    if sigma_features.shape[0] != x.shape[1]:
+        raise ValueError(
+            f"sigma_features length {sigma_features.shape[0]} != x.shape[1] {x.shape[1]}"
+        )
+
+    sigma_pred_sq = (L @ L.transpose(-2, -1)).diagonal(dim1=-2, dim2=-1)
+
+    grad_norms_sq = torch.zeros(B, n_labels, device=device)
+    for i_label in range(n_labels):
+        grad_mu_i = torch.autograd.grad(
+            outputs=mu[:, i_label].sum(),
+            inputs=x,
+            create_graph=True,
+            allow_unused=True,
+            retain_graph=(i_label < n_labels - 1),
+        )[0]
+        if grad_mu_i is not None:
+            grad_norms_sq[:, i_label] = grad_mu_i.pow(2) @ sigma_features.pow(2)
+        else:
+            grad_norms_sq[:, i_label] = 0.0
+
+    sigma_total_sq = sigma_pred_sq + grad_norms_sq
+
+    L_total = L.clone()
+    L_diag = torch.sqrt(sigma_total_sq.clamp_min(1e-8))
+    L_indices = torch.arange(n_labels, device=device)
+    L_total[:, L_indices, L_indices] = L_diag
+
+    return mu, L_total
+
+
 __all__ = [
     "ContrastiveQueue",
+    "add_feature_noise",
     "barlow_twins_loss",
     "beta_nll_block_cholesky",
     "mahalanobis_residual",
+    "propagate_feature_noise_uncertainty",
+    "soft_ari_loss",
     "supcon_soft_positive",
 ]

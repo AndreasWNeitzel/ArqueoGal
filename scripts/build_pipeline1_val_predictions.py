@@ -72,7 +72,7 @@ def _ensemble_predict(ensemble_dir: Path, parquet: Path, device: torch.device):
         batch_size=1024,
         seed=split_seed,
     )
-    _, val_loader, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
+    _, val_loader, _, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
 
     per_mu: list[np.ndarray] = []
     per_L: list[np.ndarray] = []

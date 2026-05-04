@@ -1,0 +1,83 @@
+# Cross-catalogue Test-6 bindings.
+#
+# Each top-level key is a short tag for the comparison catalogue (matching
+# the --catalogue NAME=PATH argument of scripts/run_cross_catalogue_validation.py).
+# Per catalogue:
+#   citation:    short paper-style citation (used in plot legends, JSON).
+#   column_for:  ArqueoGal label key → external column name.
+#                Allowed keys: teff, logg, mh, alpha_m, mg_h.
+#                Omit a key to skip that label for that catalogue.
+#   sigma_for:   ArqueoGal label key → external per-star σ column.
+#                Optional; when omitted σ_external is taken to be zero
+#                and all residual scatter is attributed to ArqueoGal.
+#
+# The five reference catalogues below cover the 2024-2026 XP→labels
+# landscape; uncomment/extend as cross-match parquets become available.
+# Sources are listed in docs/protocols/cross_catalogue_test6.md.
+
+aspgap:
+  citation: "Li+2024 (AspGap)"
+  column_for:
+    teff: "Teff"
+    logg: "logg"
+    mh: "mh"
+    alpha_m: "alpha_m"
+  sigma_for:
+    teff: "e_Teff"
+    logg: "e_logg"
+    mh: "e_mh"
+    alpha_m: "e_alpha_m"
+
+shboost:
+  citation: "Khalatyan+2024 (SHBoost)"
+  column_for:
+    teff: "teff"
+    logg: "logg"
+    mh: "feh"
+  sigma_for:
+    teff: "teff_err"
+    logg: "logg_err"
+    mh: "feh_err"
+
+guiglion2024:
+  citation: "Guiglion+2024 (GSP-Spec hybrid)"
+  column_for:
+    teff: "teff"
+    logg: "logg"
+    mh: "feh"
+    alpha_m: "alpha_m"
+  sigma_for:
+    teff: "teff_err"
+    logg: "logg_err"
+    mh: "feh_err"
+    alpha_m: "alpha_m_err"
+
+andrae2023:
+  citation: "Andrae+2023 (XGBoost)"
+  column_for:
+    teff: "teff_xgboost"
+    logg: "logg_xgboost"
+    mh: "mh_xgboost"
+  # No published per-star uncertainties; σ-ratio diagnostic uses σ_ref=0.
+
+zhang2023:
+  citation: "Zhang+2023 (220M)"
+  column_for:
+    teff: "teff"
+    logg: "logg"
+    mh: "feh"
+
+galah_dr4:
+  citation: "Buder+2024 (GALAH DR4)"
+  column_for:
+    teff: "teff"
+    logg: "logg"
+    mh: "fe_h"
+    alpha_m: "alpha_fe"
+    mg_h: "mg_fe"
+  sigma_for:
+    teff: "e_teff"
+    logg: "e_logg"
+    mh: "e_fe_h"
+    alpha_m: "e_alpha_fe"
+    mg_h: "e_mg_fe"

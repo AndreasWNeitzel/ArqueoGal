@@ -27,7 +27,6 @@ on top of this repo's Pipeline 1 prediction parquets.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -44,6 +43,7 @@ from arqueogal.data.provenance import (
     sidecar_path,
     write_sidecar,
 )
+from arqueogal.utils.io import save_parquet
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ def _build_master_catalog(  # noqa: PLR0913 — keyword-only args are all distin
     schema.validate(merged, check_array_lengths=check_array_lengths)
 
     logger.info("Level-6 [%s]: writing %s", schema.name, output_path)
-    _write_parquet_atomic(merged, output_path)
+    save_parquet(merged, output_path)
 
     prov = Provenance(
         output_file=str(output_path),
@@ -211,13 +211,6 @@ def _build_master_catalog(  # noqa: PLR0913 — keyword-only args are all distin
     write_sidecar(prov, path=sidecar_path(output_path))
     logger.info("Level-6 [%s]: done (%d rows → %s)", schema.name, n_merged, output_path)
     return output_path
-
-
-def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".part")
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, path)
 
 
 __all__ = [

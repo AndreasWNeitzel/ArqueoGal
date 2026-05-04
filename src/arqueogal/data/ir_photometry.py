@@ -69,14 +69,39 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import numpy as np
 import pandas as pd
-import polars as pl
 from pyvo.dal.tap import TAPService
 
 from arqueogal.data.tap import DEFAULT_ASYNC_TIMEOUT_SEC, batched_upload_fetch_df
+
+# polars is part of the maintainer's full developer environment but not part of
+# the CPU-only public CI dep set (see README "Environment"). We import it lazily
+# so this module can be safely *imported* without polars; only the IR-photometry
+# fetch/assemble functions actually need it, and they raise a clear ImportError
+# at call time. Type checkers see the real symbol via the TYPE_CHECKING branch.
+if TYPE_CHECKING:
+    import polars as pl
+else:
+    try:
+        import polars as pl
+    except ImportError as exc:  # pragma: no cover — env-specific
+        _POLARS_IMPORT_ERROR = exc
+
+        class _PolarsUnavailable:
+            """Placeholder that fails loud the moment ``pl.<anything>`` is touched."""
+
+            def __getattr__(self, name: str) -> object:
+                raise ImportError(
+                    "arqueogal.data.ir_photometry requires the optional "
+                    "'polars' package. Install it (uv pip install polars) "
+                    "to use the IR-photometry crossmatch helpers; the rest "
+                    "of arqueogal.data does not need it."
+                ) from _POLARS_IMPORT_ERROR
+
+        pl = _PolarsUnavailable()  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 

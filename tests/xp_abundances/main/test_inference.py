@@ -236,12 +236,33 @@ def test_sigma_streaming_aggregation_numerically_equivalent(tmp_path: Path) -> N
         atol=1e-8,
         err_msg="Streaming Sigma aggregation not deterministic across calls.",
     )
-    # Verify dimensionality and positivity.
+    # Verify dimensionality and positivity. np.diagonal pulls the diagonal of
+    # each (n_labels, n_labels) covariance block, returning shape (n_stars,
+    # n_labels); every diagonal entry must be non-negative.
     assert pred.Sigma_total.shape == (100, tiers.n_labels, tiers.n_labels)
-    assert np.all(
-        np.diag(pred.Sigma_total.reshape(-1, tiers.n_labels, tiers.n_labels).transpose(0, 2, 1))
-        >= -1e-6
-    )  # diag should be >= 0
+    diag_per_star = np.diagonal(pred.Sigma_total, axis1=1, axis2=2)
+    assert diag_per_star.shape == (100, tiers.n_labels)
+    assert np.all(diag_per_star >= -1e-6)
+
+    # PSD guard for the aggregated covariance. Σ_total = Σ_alea + Σ_epi is
+    # symmetric by construction (Σ_alea = E[L Lᵀ], Σ_epi from outer products
+    # of centred per-member means), but floating-point round-off in the
+    # streaming aggregation can in principle drive a tail eigenvalue
+    # marginally negative. Assert symmetry first, then non-negative
+    # eigenvalues with a tolerance matched to float32 round-off scale.
+    Sigma_total = pred.Sigma_total.astype(np.float64)
+    np.testing.assert_allclose(
+        Sigma_total,
+        np.swapaxes(Sigma_total, 1, 2),
+        rtol=0,
+        atol=1e-6,
+        err_msg="Sigma_total not symmetric after ensemble aggregation",
+    )
+    eig_min = np.min(np.linalg.eigvalsh(Sigma_total), axis=1)
+    assert np.all(eig_min >= -1e-5), (
+        f"Sigma_total has negative eigenvalues (worst: {eig_min.min():.3e}); "
+        "aggregation produced a non-PSD covariance"
+    )
 
 
 def test_predict_ensemble_nan_sanitization_on_predictions(tmp_path: Path) -> None:

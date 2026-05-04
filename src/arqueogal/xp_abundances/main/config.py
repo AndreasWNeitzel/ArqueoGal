@@ -33,7 +33,29 @@ class LossWeights:
     supcon: float = 1.0
     beta_nll: float = 1.0
     beta: float = 0.5  # Seitzer β in β-NLL — 0.5 per DESIGN.
-    supcon_sigma: float = 0.10  # label-space Gaussian-kernel bandwidth.
+    supcon_sigma: float = 0.10
+    """Legacy scalar kernel bandwidth in **standardised** label space.
+
+    Retained as a fall-back when ``supcon_sigma_raw`` is ``None`` (e.g. unit
+    tests with no scaler attached, or smoke runs that bypass the loader).
+    The production path uses :attr:`supcon_sigma_raw` so the kernel runs in
+    raw label units — see the ``supcon_soft_positive`` kernel rewrite for
+    why a single standardised σ is dimensionally inconsistent across
+    labels with vastly different APOGEE noise scales.
+    """
+
+    supcon_sigma_raw: tuple[float, ...] | None = (100.0, 0.10, 0.10, 0.05, 0.10)
+    """Per-label Gaussian-kernel bandwidth in **raw label units** (same order
+    as ``tiers.all_labels``). Defaults match the 5-label production tier set
+    (Teff [K], log g [dex], [M/H] [dex], [α/M] [dex], [Mg/H] [dex]) and are
+    chosen to match APOGEE per-star noise for each element so two stars
+    within the same disc α-component register as soft positives, while two
+    stars across the disc α-bimodality (Δ[α/M] ≈ 0.2 dex) register as ~0.
+
+    Set to ``None`` to fall back to the legacy scalar :attr:`supcon_sigma`
+    in standardised space. Length must match ``tiers.all_labels`` when set;
+    see :func:`losses.supcon_soft_positive` for kernel computation."""
+
     supcon_label_n_first: int | None = None
 
     # --- Barlow Twins auxiliary (TESS_ML joint-loss recipe) ---
@@ -45,6 +67,21 @@ class LossWeights:
 
     barlow_lam: float = 0.005
     """Off-diagonal coupling in the Barlow loss. TESS_ML default 0.005."""
+
+    # --- Soft-ARI chemistry-cluster contamination penalty ---
+    ari: float = 0.0
+    """Weight on the soft-ARI loss penalising disc-bimodality contamination
+    in the ([α/M], [M/H]) plane. ``>0`` enables the term: per-batch we form
+    soft K=2 component assignments by applying a sigmoid to the [α/M] column
+    (centred at ``ari_alpha_threshold`` with steepness ``ari_kernel_sigma``)
+    on both truth and prediction, then optimise ``1 - softARI(pred, truth)``.
+    Default 0 preserves prior runs."""
+
+    ari_alpha_threshold: float = 0.15
+    """[α/M] dex threshold separating low-α (disc) from high-α (thick/halo)."""
+
+    ari_kernel_sigma: float = 0.03
+    """Sigmoid steepness for the soft K=2 assignment around the threshold."""
 
 
 @dataclass(frozen=True, slots=True)

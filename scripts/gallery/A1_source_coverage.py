@@ -9,16 +9,10 @@ What this shows:
   with the stream-specific selection box overlaid in red.
 
 What it reads:
-- Stream 1: data/processed/pipeline1_features_stream1.parquet (post-cut)
-           data/raw/apogee_dr19/astraAllStarASPCAP-0.6.0.fits.gz (pre-cut reference)
-- Stream 2: data/processed/pipeline1_features_stream2.parquet or
-           data/interim/stream2_tess_gaia.parquet
+- Stream 1: data/processed/pipeline1_features_stream1_kiel.parquet
+  (Kiel-bounded RGB pool, logg ∈ [1.0, 3.5], Teff ∈ [4000, 5500])
+- Stream 2: data/processed/pipeline1_features_stream2.parquet (post-cut)
 - Stream 3: data/processed/pipeline1_features_stream3.parquet (post-cut)
-           data/raw/andrae2023/andrae2023_rgb.parquet (pre-cut reference)
-
-Synthetic fixture support: --synthetic flag generates realistic random
-catalogue of 1000 stars per stream. This is the primary validation mode
-since production data is not on disk in most environments.
 """
 
 from __future__ import annotations
@@ -27,7 +21,6 @@ import argparse
 import sys
 from pathlib import Path
 
-import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -44,177 +37,89 @@ from _common import (
     style_galactic_mollweide,
 )
 
-OUT = REPO / "reports/gallery/A1_source_coverage"
+OUT = REPO / "reports/gallery/A_raw_data"
 
-# Per-stream cuts
-S1_CUT_TEFF = (4000.0, 5500.0)
-S1_CUT_LOGG = (1.0, 3.5)
-S2_CUT_TEFF = (3500.0, 6500.0)
-S2_CUT_LOGG = (0.0, 3.8)
-S3_CUT_TEFF = (3500.0, 6500.0)
-S3_CUT_LOGG = (0.0, 3.8)
+# Kiel-diagram view bounds (display only — cohort cuts removed 2026-04-29).
 KIEL_PLOT_X = (7800, 2800)
 KIEL_PLOT_Y = (5.5, -0.2)
 
 
 def _kiel_panel(
     ax,
-    teff_full,
-    logg_full,
-    teff_in,
-    logg_in,
+    teff,
+    logg,
     *,
     title,
     color,
-    cut_teff: tuple[float, float],
-    cut_logg: tuple[float, float],
-    n_full_actual: int | None = None,
-    n_in_actual: int | None = None,
+    n_actual: int | None = None,
 ):
-    """Plot full pre-cut Kiel in greyscale + in-cut subset in color + red dashed selection box."""
-    m_full = np.isfinite(teff_full) & np.isfinite(logg_full)
-    if m_full.sum() > 100:
-        ax.hexbin(
-            teff_full[m_full],
-            logg_full[m_full],
-            gridsize=80,
-            mincnt=5,
-            cmap="Greys",
-            bins="log",
-            extent=[2800, 7800, -0.2, 5.5],
-            alpha=0.6,
-            zorder=1,
-        )
-    m_in = np.isfinite(teff_in) & np.isfinite(logg_in)
-    if m_in.sum() > 100:
+    """Hexbin Kiel diagram of the actual stream cohort, no Kiel bounding box.
+
+    Bounding boxes were dropped on 2026-04-29: the OOD flags
+    (ood_mahalanobis_score, ood_disagreement_flag, regime_b_flag,
+    mode_ambiguous_flag) handle evolutionary-stage outliers downstream.
+    """
+    m = np.isfinite(teff) & np.isfinite(logg)
+    if m.sum() > 100:
         h = ax.hexbin(
-            teff_in[m_in],
-            logg_in[m_in],
+            teff[m],
+            logg[m],
             gridsize=80,
             mincnt=5,
             cmap="viridis",
             bins="log",
             extent=[2800, 7800, -0.2, 5.5],
             alpha=0.95,
-            zorder=2,
         )
-        plt.colorbar(h, ax=ax, label="log10 N (in-cut)")
-    box = patches.Rectangle(
-        (cut_teff[0], cut_logg[0]),
-        cut_teff[1] - cut_teff[0],
-        cut_logg[1] - cut_logg[0],
-        linewidth=2.0,
-        edgecolor="red",
-        linestyle="--",
-        facecolor="none",
-        zorder=10,
-    )
-    ax.add_patch(box)
+        plt.colorbar(h, ax=ax, label="log10 N")
     ax.set_xlim(*KIEL_PLOT_X)
     ax.set_ylim(*KIEL_PLOT_Y)
     ax.set_xlabel(r"$T_\mathrm{eff}$ [K]", fontsize=8)
     ax.set_ylabel(r"$\log g$ [dex]", fontsize=8)
-    n_full = int(n_full_actual if n_full_actual is not None else m_full.sum())
-    n_in = int(n_in_actual if n_in_actual is not None else m_in.sum())
-    ax.set_title(
-        f"{title}\nfull cohort: {n_full:,}  ·  in-cut: {n_in:,} "
-        f"({100 * n_in / max(n_full, 1):.2f}%)",
-        fontsize=9,
-        color=color,
-    )
+    n = int(n_actual if n_actual is not None else m.sum())
+    ax.set_title(f"{title}\nn = {n:,}", fontsize=9, color=color)
 
 
-def _add_box_label(ax, cut_teff: tuple[float, float], cut_logg: tuple[float, float]):
-    """Annotate the cut box."""
-    teff_pad = 0.04 * (cut_teff[1] - cut_teff[0])
-    logg_pad = 0.04 * (cut_logg[1] - cut_logg[0])
-    label_x = cut_teff[1] - teff_pad
-    label_y = cut_logg[0] + logg_pad
-    ax.text(
-        label_x,
-        label_y,
-        f"selection\nlog g ∈ [{cut_logg[0]:.1f}, {cut_logg[1]:.1f}]\n"
-        f"Teff ∈ [{cut_teff[0] / 1000:.1f}, {cut_teff[1] / 1000:.1f}] kK",
-        color="red",
-        fontsize=7.5,
-        ha="left",
-        va="top",
-        fontweight="bold",
-        bbox=dict(facecolor="white", edgecolor="red", lw=0.6, alpha=0.92, pad=2),
-        zorder=11,
-    )
 
 
-def _make_synthetic_fixture(n_per_stream: int = 1000, seed: int = 42) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Generate realistic synthetic streams for testing."""
-    rng = np.random.default_rng(seed)
-
-    def make_stream(n, teff_mean, logg_mean):
-        return pd.DataFrame({
-            "source_id": np.arange(n),
-            "ra_deg": rng.uniform(0, 360, n),
-            "dec_deg": rng.uniform(-90, 90, n),
-            "g_mag": rng.uniform(6, 17, n),
-            "teff_apogee": rng.normal(teff_mean, 300, n),
-            "logg_apogee": rng.normal(logg_mean, 0.3, n),
-        })
-
-    s1 = make_stream(n_per_stream, 4500, 2.0)
-    s1["teff_apogee"] = s1["teff_andrae"] = s1["teff_apogee"]  # alias for uniformity
-    s1["logg_apogee"] = s1["logg_andrae"] = s1["logg_apogee"]
-
-    s2 = make_stream(n_per_stream, 4800, 2.5)
-    s2 = s2.rename(columns={"teff_apogee": "teff_gspphot", "logg_apogee": "logg_gspphot"})
-
-    s3 = make_stream(n_per_stream, 4600, 2.2)
-    s3 = s3.rename(columns={"teff_apogee": "teff_andrae", "logg_apogee": "logg_andrae"})
-
-    return s1, s2, s3
-
-
-def main(use_synthetic: bool = False) -> None:
+def main() -> None:
     apply_style()
 
-    if use_synthetic:
-        s1, s2, s3 = _make_synthetic_fixture()
-        raw_apogee_teff = np.array([])
-        raw_apogee_logg = np.array([])
-        n_apogee_raw = 0
-        raw_andrae_teff = np.array([])
-        raw_andrae_logg = np.array([])
-        n_andrae_raw = 0
-    else:
-        s1 = pd.read_parquet(
-            REPO / "data/processed/pipeline1_features_stream1.parquet",
-            columns=["source_id", "ra_deg", "dec_deg", "g_mag", "teff_apogee", "logg_apogee"],
-        )
-        s3 = pd.read_parquet(
-            REPO / "data/processed/pipeline1_features_stream3.parquet",
+    # Stream 1 = Kiel-bounded training pool (logg ∈ [1.0, 3.5],
+    # Teff ∈ [4000, 5500] K). The full APOGEE × Gaia cohort lives at
+    # pipeline1_features_stream1.parquet; the production training pool is the
+    # Kiel-masked sibling.
+    s1 = pd.read_parquet(
+        REPO / "data/processed/pipeline1_features_stream1_kiel.parquet",
+        columns=["source_id", "ra_deg", "dec_deg", "g_mag", "teff_apogee", "logg_apogee"],
+    )
+    s3 = pd.read_parquet(
+        REPO / "data/processed/pipeline1_features_stream3.parquet",
+        columns=["source_id", "ra_deg", "dec_deg", "g_mag", "teff_andrae", "logg_andrae"],
+    )
+    # Stream 2
+    s2_path = REPO / "data/processed/pipeline1_features_stream2.parquet"
+    if s2_path.exists():
+        s2 = pd.read_parquet(
+            s2_path,
             columns=["source_id", "ra_deg", "dec_deg", "g_mag", "teff_andrae", "logg_andrae"],
         )
-        # Stream 2
-        s2_path = REPO / "data/processed/pipeline1_features_stream2.parquet"
-        if s2_path.exists():
-            s2 = pd.read_parquet(
-                s2_path,
-                columns=["source_id", "ra_deg", "dec_deg", "g_mag", "teff_andrae", "logg_andrae"],
-            )
-            s2 = s2.rename(columns={"teff_andrae": "teff_gspphot", "logg_andrae": "logg_gspphot"})
-        else:
-            s2 = None
+        s2 = s2.rename(columns={"teff_andrae": "teff_gspphot", "logg_andrae": "logg_gspphot"})
+    else:
+        s2 = None
 
-        # Load raw pre-cut (stub for now; full FITS load omitted for speed)
-        raw_apogee_teff = np.array([])
-        raw_apogee_logg = np.array([])
-        n_apogee_raw = len(s1)
-        raw_andrae_teff = np.array([])
-        raw_andrae_logg = np.array([])
-        n_andrae_raw = len(s3)
+    # Pre-cut reference teff/logg arrays (stub for now; full FITS load omitted for speed)
+    raw_apogee_teff = np.array([])
+    raw_apogee_logg = np.array([])
+    n_apogee_raw = len(s1)
+    raw_andrae_teff = np.array([])
+    raw_andrae_logg = np.array([])
+    n_andrae_raw = len(s3)
 
     rng = np.random.default_rng(0)
 
     fig = plt.figure(figsize=(17, 11))
-    gs = fig.add_gridspec(2, 4, hspace=0.38, wspace=0.32, width_ratios=[1, 1, 1, 1.05])
+    gs = fig.add_gridspec(2, 4, hspace=0.42, wspace=0.32, width_ratios=[1, 1, 1, 1.05])
 
     # Row 1: Sky Mollweides
     streams_sky = [
@@ -267,22 +172,27 @@ def main(use_synthetic: bool = False) -> None:
     ax_g.set_title("Magnitude distribution per stream")
     ax_g.legend(fontsize=7, loc="upper left", frameon=True, framealpha=0.95)
 
-    # Row 2: Kiel diagrams
+    # Row 2: Kiel diagrams (no bounding box — OOD flags handle evolutionary outliers)
     ax_k1 = fig.add_subplot(gs[1, 0])
     _kiel_panel(
         ax_k1,
-        raw_apogee_teff if raw_apogee_teff.size > 0 else s1["teff_apogee"].to_numpy(),
-        raw_apogee_logg if raw_apogee_logg.size > 0 else s1["logg_apogee"].to_numpy(),
         s1["teff_apogee"].to_numpy(),
         s1["logg_apogee"].to_numpy(),
-        title="Stream 1 — APOGEE DR19",
+        title="Stream 1 — APOGEE DR19 (Kiel-masked RGB)",
         color=PALETTE["apogee"],
-        cut_teff=S1_CUT_TEFF,
-        cut_logg=S1_CUT_LOGG,
-        n_full_actual=n_apogee_raw if n_apogee_raw else len(s1),
-        n_in_actual=len(s1),
+        n_actual=len(s1),
     )
-    _add_box_label(ax_k1, S1_CUT_TEFF, S1_CUT_LOGG)
+    ax_k1.add_patch(
+        plt.Rectangle(
+            (4000, 1.0),
+            5500 - 4000,
+            3.5 - 1.0,
+            fill=False,
+            edgecolor="red",
+            linewidth=1.2,
+            linestyle="--",
+        )
+    )
 
     ax_k2 = fig.add_subplot(gs[1, 1])
     if s2 is not None:
@@ -290,55 +200,48 @@ def main(use_synthetic: bool = False) -> None:
             ax_k2,
             s2["teff_gspphot"].to_numpy(),
             s2["logg_gspphot"].to_numpy(),
-            s2["teff_gspphot"].to_numpy(),
-            s2["logg_gspphot"].to_numpy(),
             title="Stream 2 — Gaia GSP-Phot Kiel",
             color="#9467bd",
-            cut_teff=S2_CUT_TEFF,
-            cut_logg=S2_CUT_LOGG,
-            n_full_actual=len(s2),
-            n_in_actual=len(s2),
+            n_actual=len(s2),
         )
-        _add_box_label(ax_k2, S2_CUT_TEFF, S2_CUT_LOGG)
     else:
         ax_k2.set_axis_off()
 
     ax_k3 = fig.add_subplot(gs[1, 2])
     _kiel_panel(
         ax_k3,
-        raw_andrae_teff if raw_andrae_teff.size > 0 else s3["teff_andrae"].to_numpy(),
-        raw_andrae_logg if raw_andrae_logg.size > 0 else s3["logg_andrae"].to_numpy(),
         s3["teff_andrae"].to_numpy(),
         s3["logg_andrae"].to_numpy(),
         title="Stream 3 — Andrae+23",
         color=PALETTE["andrae_volume"],
-        cut_teff=S3_CUT_TEFF,
-        cut_logg=S3_CUT_LOGG,
-        n_full_actual=n_andrae_raw if n_andrae_raw else len(s3),
-        n_in_actual=len(s3),
+        n_actual=len(s3),
     )
-    _add_box_label(ax_k3, S3_CUT_TEFF, S3_CUT_LOGG)
 
     # Summary text panel
     ax_cut = fig.add_subplot(gs[1, 3])
     ax_cut.set_axis_off()
     txt = (
-        "Cuts applied\n"
-        "─────────────\n"
-        "S1 (APOGEE training):\n"
-        "    Teff ∈ [4000, 5500] K\n"
-        "    log g ∈ [1.0, 3.5] dex\n\n"
-        "S2/S3 (inference):\n"
-        "    Teff ∈ [3500, 6500] K\n"
-        "    log g ∈ [0.0, 3.8] dex\n\n"
-        "Kiel Diagram Legend\n"
-        "─────────────────────\n"
-        "  Greyscale: pre-cut\n"
-        "  Viridis: in-cut\n"
-        "  Red dashed: selection\n"
+        "Per-stream cohort\n"
+        "──────────────────\n"
+        "S1: APOGEE × Gaia\n"
+        "    flag_bad == 0\n"
+        "    SNR > 70\n"
+        "    [M/H] in [-2.0, 0.5]\n"
+        "    + Kiel mask:\n"
+        "      logg [1.0, 3.5]\n"
+        "      Teff [4000, 5500]\n\n"
+        "S2: Hon+2021 × Gaia\n"
+        "    has_xp_continuous\n"
+        "    Ye+2024 OK\n\n"
+        "S3: Andrae+2023 × Gaia\n"
+        "    Ye+2024 OK\n"
+        "    (no Kiel mask —\n"
+        "     inference target)\n"
     )
     ax_cut.text(
-        0.0, 1.0, txt,
+        0.0,
+        1.0,
+        txt,
         transform=ax_cut.transAxes,
         fontsize=8,
         ha="left",
@@ -346,18 +249,22 @@ def main(use_synthetic: bool = False) -> None:
         family="monospace",
     )
 
+    n1 = len(s1)
+    n2 = len(s2) if s2 is not None else 0
+    n3 = len(s3)
     fig.suptitle(
-        "A1 — Raw data coverage per stream. "
-        "Stream 1 = training (324k post-cut).  "
-        "Stream 2 = asteroseismic (72k post-cut).  "
-        "Stream 3 = inference (614k post-cut).",
+        f"A1 — Raw data coverage per stream. "
+        f"Stream 1 = Kiel-masked training pool ({n1//1000}k, "
+        f"logg ∈ [1.0, 3.5], Teff ∈ [4000, 5500] K).  "
+        f"Stream 2 = asteroseismic ({n2//1000}k post-cut).  "
+        f"Stream 3 = inference ({n3//1000}k post-cut).",
         fontsize=10,
+        y=0.98,
     )
-    save_fig(fig, OUT / "source_coverage", tight=False)
+    save_fig(fig, OUT / "A1_source_coverage", tight=False)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot A1: Source coverage per stream.")
-    parser.add_argument("--synthetic", action="store_true", help="Use synthetic fixture instead of real data.")
     args = parser.parse_args()
-    main(use_synthetic=args.synthetic)
+    main()

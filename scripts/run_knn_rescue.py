@@ -43,8 +43,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("run_knn_rescue")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-_DEFAULT_ENSEMBLE = REPO_ROOT / "models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label"
-_DEFAULT_TRAIN = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
+_DEFAULT_ENSEMBLE = REPO_ROOT / "models/main/xp_abundances/20260430_1d71682_a5534e4_ensemble_5label"
+_DEFAULT_TRAIN = REPO_ROOT / "data/processed/pipeline1_features_stream1_kiel.parquet"
 _DEFAULT_INFER = REPO_ROOT / "data/processed/pipeline1_features_stream3.parquet"
 _DEFAULT_FROZEN = REPO_ROOT / "data/processed/pipeline1_features_stream1.provenance.json"
 _DEFAULT_OUTPUT = REPO_ROOT / "data/processed/pipeline1_knn_rescue.parquet"
@@ -92,8 +92,24 @@ def _load_inference_features(
     df_z["bp_c0_z"] = bp_c0_z
     df_z["rp_c0_z"] = rp_c0_z
     X = np.column_stack([df_z[c].to_numpy(dtype=np.float32) for c in feature_cols])
-    np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
     return X, sid
+
+
+def _apply_feature_scaler_or_imputed(
+    X: np.ndarray,
+    layout: FeatureLayout,
+    feature_scaler,  # FeatureScaler | None
+) -> np.ndarray:
+    """Apply training-time FeatureScaler if present, then NaN-impute to 0."""
+    if feature_scaler is not None:
+        if tuple(feature_scaler.feature_names) != tuple(layout.all_required_columns):
+            raise RuntimeError(
+                "checkpoint feature_scaler.feature_names != "
+                "layout.all_required_columns; encoder input contract drifted"
+            )
+        X = feature_scaler.transform(X)
+    np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+    return X
 
 
 def main() -> None:
@@ -135,12 +151,26 @@ def main() -> None:
     layout = FeatureLayout()
     tiers = LabelTiers.five_label()
 
+    # Pull the FeatureScaler from the checkpoint (None for legacy models).
+    fs_blob = members[args.member].blob.get("feature_scaler")
+    if fs_blob is not None:
+        from arqueogal.xp_abundances.main.data import FeatureScaler
+        feature_scaler = FeatureScaler(
+            mean=np.asarray(fs_blob["mean"], dtype=np.float32),
+            scale=np.asarray(fs_blob["scale"], dtype=np.float32),
+            feature_names=tuple(fs_blob["feature_names"]),
+            log10_mask=np.asarray(fs_blob["log10_mask"], dtype=bool),
+            apply_mask=np.asarray(fs_blob["apply_mask"], dtype=bool),
+        )
+    else:
+        feature_scaler = None
+
     _LOG.info("loading training arrays from %s", args.train_parquet)
     train = load_arrays(args.train_parquet, layout, tiers, include_label_errors=False)
     X_tr = np.asarray(train["X"])
     Y_tr = np.asarray(train["Y"])
     sid_tr = np.asarray(train["source_id"])
-    np.nan_to_num(X_tr, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+    X_tr = _apply_feature_scaler_or_imputed(X_tr, layout, feature_scaler)
     keep = np.isfinite(Y_tr).all(axis=1)
     X_tr, Y_tr, sid_tr = X_tr[keep], Y_tr[keep], sid_tr[keep]
     _, first_idx = np.unique(sid_tr, return_index=True)
@@ -153,6 +183,7 @@ def main() -> None:
 
     _LOG.info("loading inference features from %s", args.infer_parquet)
     X_q, sid_q = _load_inference_features(args.infer_parquet, layout, args.frozen_stats)
+    X_q = _apply_feature_scaler_or_imputed(X_q, layout, feature_scaler)
     _LOG.info("inference set: %d stars", len(X_q))
 
     _LOG.info("computing inference latents...")

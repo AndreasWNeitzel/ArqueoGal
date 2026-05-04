@@ -84,7 +84,7 @@ def main() -> None:
         batch_size=args.batch_size,
         seed=split_seed,
     )
-    _, val_loader, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
+    _, val_loader, _, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
     _LOG.info("val loader built, batches=%d", len(val_loader))
 
     block_layout = default_pipeline1_layout()

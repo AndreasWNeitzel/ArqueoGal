@@ -37,11 +37,16 @@ jobs:
       - name: Format check with ruff
         run: ruff format --check src/ tests/ scripts/
 
+      # CI runs the full xp_abundances/main/ tree and the release-pipeline
+      # data tests. GPU-only, slow, and stress tests are filtered out by marker
+      # so the gate stays CPU-portable. Adding a new test file under
+      # tests/xp_abundances/main/ does not require a CI edit.
       - name: Run CPU-safe tests
         run: |
-          pytest tests/xp_abundances/main/test_release.py \
+          pytest tests/xp_abundances/main/ \
                  tests/data/test_release_pipeline.py \
-                 -v --tb=short
+                 -m "not gpu and not slow and not stress" \
+                 --tb=short
         env:
           PYTHONDONTWRITEBYTECODE: "1"
           PYTHONUNBUFFERED: "1"

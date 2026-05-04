@@ -55,7 +55,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("run_contrastive_pretrain")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
+DEFAULT_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1_kiel.parquet"
 DEFAULT_MODEL_DIR = REPO_ROOT / "models/main/xp_abundances"
 DEFAULT_REPORT_DIR = REPO_ROOT / "reports/pipeline1/run_a"
 
@@ -86,6 +86,9 @@ def build_contrastive_config(
     output_dir: Path,
     epochs: int,
     batch_size: int,
+    early_stop_patience: int = 10,
+    queue_size: int = 0,
+    queue_warm_start: bool = True,
 ) -> TrainingConfig:
     return TrainingConfig(
         train_parquet=parquet,
@@ -98,12 +101,12 @@ def build_contrastive_config(
         pct_start=0.15,
         weight_decay=1e-4,
         grad_clip_norm=1.0,
-        early_stop_patience=5,
+        early_stop_patience=early_stop_patience,
         early_stop_min_delta=0.01,
         relative_min_delta=True,
         use_c0_scalars=False,
         encoder_lr_ratio=1.0,
-        checkpoint_every_n_epochs=10,
+        checkpoint_every_n_epochs=1,  # cadence-animation run: every epoch
         output_prefix="xp_abundances_main_contrastive",
         loss_weights=LossWeights(
             supcon=1.0,
@@ -113,6 +116,8 @@ def build_contrastive_config(
             supcon_label_n_first=None,  # All 5 labels — fixes α/M-blind encoder (2026-04-21).
         ),
         temperature_init=0.10,
+        queue_size=queue_size,
+        queue_warm_start=queue_warm_start,
         ensemble_seeds=(0,),
     )
 
@@ -125,20 +130,52 @@ def main() -> None:
     parser.add_argument(
         "--epochs",
         type=int,
-        default=100,
+        default=200,  # doubled from 100 for the cadence-animation run
         help="Hard cap per Run A directive; patience stops earlier.",
     )
-    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument(
+        "--early-stop-patience",
+        type=int,
+        default=20,  # doubled from 10 for the cadence-animation run
+        help="Epochs of no val improvement before stopping. Doubled to 20 "
+        "from 10 to match the doubled epoch budget for the cadence-animation run.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=2048,
+        help="Pretrain batch matches the supervised fine-tune batch (2048) — "
+        "SupCon's in-batch negative pool grows quadratically with batch, so "
+        "anchoring pretrain at the same size as fine-tune keeps the encoder's "
+        "contrastive geometry continuous between phases.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
+        "--queue-size",
+        type=int,
+        default=0,
+        help="SupCon momentum queue size. 0 disables. 8192 matches "
+        "TESS_ML's recipe and gives the contrastive loss an effective "
+        "key count of batch_size + 8192 per step.",
+    )
+    parser.add_argument(
+        "--queue-warm-start",
+        action="store_true",
+        default=True,
+        help="Initialise the queue with random unit-norm vectors so K is "
+        "static from step 1. Default True per TESS_ML.",
+    )
+    parser.add_argument(
         "--label-set",
-        choices=("21", "5"),
+        choices=("21", "5", "2"),
         default="5",
         help="21 = default LabelTiers (21 columns, several with 1-5%% NaN). "
         "5 = LabelTiers.five_label() {Teff, logg, [M/H], [α/M], [Mg/H]} — "
         "matches the 5-label production head's label space, so the "
         "SupCon kernel trains the encoder to respect the same geometry "
-        "the supervised head will fine-tune on. Default.",
+        "the supervised head will fine-tune on. Default. "
+        "2 = LabelTiers.two_label() {[M/H], [α/M]} — the TESS_ML-matched "
+        "label pair for diagnostic 2-label runs.",
     )
     parser.add_argument(
         "--dry-run",
@@ -159,6 +196,9 @@ def main() -> None:
         output_dir=args.model_dir / "pending",
         epochs=args.epochs,
         batch_size=args.batch_size,
+        early_stop_patience=args.early_stop_patience,
+        queue_size=args.queue_size,
+        queue_warm_start=args.queue_warm_start,
     )
     cfg_hash = _cfg_hash(tmp_cfg)
     run_dir = args.model_dir / f"{date_tag}_{sha7}_{cfg_hash}"
@@ -169,9 +209,17 @@ def main() -> None:
         output_dir=run_dir,
         epochs=args.epochs,
         batch_size=args.batch_size,
+        early_stop_patience=args.early_stop_patience,
+        queue_size=args.queue_size,
+        queue_warm_start=args.queue_warm_start,
     )
     layout = FeatureLayout()
-    tiers = LabelTiers.five_label() if args.label_set == "5" else LabelTiers()
+    if args.label_set == "5":
+        tiers = LabelTiers.five_label()
+    elif args.label_set == "2":
+        tiers = LabelTiers.two_label()
+    else:
+        tiers = LabelTiers()
 
     with (args.report_dir / "contrastive_config.json").open("w") as f:
         payload = asdict(cfg)
@@ -199,6 +247,7 @@ def main() -> None:
         layout=layout,
         tiers=tiers,
         label_scaler=result["label_scaler"],
+        feature_scaler=result.get("feature_scaler"),
         seed=args.seed,
         training_metrics={
             "best_val_loss": float(result["best_val_loss"]),

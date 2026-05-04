@@ -163,8 +163,25 @@ def join_predictions_with_features(
     preds = pd.read_parquet(predictions_path)
     n_pred = len(preds)
 
-    # Load only the requested feature columns.
-    available_cols = [c for c in feature_columns if c]
+    # Load only the requested feature columns, dropping any that the
+    # features parquet does not actually carry. Stream 1 / Stream 2
+    # parquets lack a few Stream-3-only columns (e.g. ``parallax_raw``);
+    # the release pipeline can proceed without them and downstream
+    # consumers fall back to ``parallax_corr`` when ``parallax_raw`` is
+    # absent.
+    import pyarrow.parquet as _pq
+    feat_schema_cols = set(_pq.read_schema(features_path).names)
+    requested = [c for c in feature_columns if c]
+    available_cols = [c for c in requested if c in feat_schema_cols]
+    missing_cols = [c for c in requested if c not in feat_schema_cols]
+    if missing_cols:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "join_predictions_with_features: features parquet %s missing "
+            "columns %s; release pipeline will fall back to default values",
+            features_path,
+            sorted(missing_cols),
+        )
     feats = pd.read_parquet(features_path, columns=list(available_cols))
     n_feat = len(feats)
 
@@ -283,7 +300,12 @@ def attach_kin_ood_flag(joined_path: Path, kin_ood_path: Path) -> dict[str, obje
     if "kin_ood_flag" in df.columns:
         df = df.drop(columns=["kin_ood_flag"])
     df = df.merge(lookup[["source_id", "kin_ood_flag"]], on="source_id", how="left")
-    df["kin_ood_flag"] = df["kin_ood_flag"].fillna(False).astype(bool)
+    # Route through float64 to keep mixed bool/int/None object Series working:
+    # ``fillna(False).astype(bool)`` raises a FutureWarning in pandas ≥ 2.1
+    # and will hard-break in 2.2, while ``astype("boolean")`` chokes on a
+    # mixed bool/int object Series. float64 accepts every shape upstream
+    # emits (see release._coerce_flag_series for the same reasoning).
+    df["kin_ood_flag"] = df["kin_ood_flag"].astype("float64").fillna(0.0).astype(bool)
     if "kin_ood_score" in lookup.columns:
         df = df.drop(columns=[c for c in ("kin_ood_score",) if c in df.columns])
         df = df.merge(lookup[["source_id", "kin_ood_score"]], on="source_id", how="left")
@@ -415,18 +437,61 @@ def run_release_pipeline(
     return manifest
 
 
-_HYBRID_ELEMENTS: tuple[str, ...] = ("teff", "logg", "mh", "alpha_m", "mg_h")
+_HYBRID_ELEMENTS: tuple[str, ...] = (
+    "teff",
+    "logg",
+    "mh",
+    "fe_h",
+    "alpha_m",
+    "mg_h",
+    "c_h",
+    "n_h",
+    "o_h",
+    "na_h",
+    "al_h",
+    "si_h",
+    "s_h",
+    "k_h",
+    "ca_h",
+    "ti_h",
+    "v_h",
+    "cr_h",
+    "mn_h",
+    "ni_h",
+    "ce_h",
+)
 _PER_ELEMENT_SIGMA_INFLATED_THRESHOLD: dict[str, float] = {
     "teff": 150.0,
     "logg": 0.30,
     "mh": 0.20,
+    "fe_h": 0.15,  # dex; v1.1 placeholder (empirical-Bayes ceiling ≈ 1·σ_train)
     "alpha_m": 0.05,  # tightened 2026-04-26 from 0.10 → 0.05; see release.py
     "mg_h": 0.20,
+    "c_h": 0.15,
+    "n_h": 0.15,
+    "o_h": 0.15,
+    "na_h": 0.15,
+    "al_h": 0.15,
+    "si_h": 0.15,
+    "s_h": 0.15,
+    "k_h": 0.15,
+    "ca_h": 0.15,
+    "ti_h": 0.15,
+    "v_h": 0.15,
+    "cr_h": 0.15,
+    "mn_h": 0.15,
+    "ni_h": 0.15,
+    "ce_h": 0.15,
 }
 """Mirror of release._PER_ELEMENT_SIGMA_INFLATED_THRESHOLD. Duplicated rather
 than imported to avoid coupling the release-pipeline orchestrator to the heavy
 release.py module (which transitively pulls torch via the model imports).
-Kept in sync by the test ``test_hybrid_thresholds_match_release``."""
+Kept in sync by the test ``test_hybrid_thresholds_match_release``.
+
+v1.1 (2026-04-29): expanded from 5 to 21 elements to match the 21-label
+production head. The 5 Stream-1-tuned entries keep their empirical-Bayes-
+calibrated thresholds; the 16 new entries use a 0.15 dex placeholder
+pending the §3.3 promotion-protocol re-run on the 21-label model."""
 
 
 def _hybrid_compose_per_element(

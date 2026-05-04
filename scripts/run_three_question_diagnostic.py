@@ -568,7 +568,7 @@ def main() -> None:
         split_seed=split_seed,
         batch_size=args.batch_size,
     )
-    train_loader, val_loader, _split_ids, scaler_human = build_dataloaders(
+    train_loader, val_loader, _split_ids, scaler_human, _ = build_dataloaders(
         cfg,
         layout,
         tiers,

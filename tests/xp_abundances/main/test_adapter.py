@@ -25,23 +25,31 @@ from arqueogal.xp_abundances.main.model import (
 
 
 def test_adapter_full_layout_input_dim() -> None:
-    """Default layout: 54 BP + 54 RP + 2 c0 + 3 residuals + 26 aux = 139."""
+    """Default layout: 54 BP + 54 RP + 2 c0 + 3 residuals + 27 aux = 140.
+
+    Aux count moved from 26 to 27 on 2026-04-29 (extinction-correction
+    protocol shipped): the five raw IR broadbands were *replaced* by five
+    Yuan+2013-dereddened columns, and ``av_los`` (the fused dust-map A_V
+    used by the dereddening) was added so the encoder still sees the
+    residual XP extinction signal. See ``docs/protocols/extinction_correction.md``.
+    """
     layout = FeatureLayout()
     adapter = XpFeatureAdapter(layout)
-    # 54 + 54 + 2 + 3 + 26 = 139
-    assert adapter.input_dim == 139
-    assert adapter.output_dim == 139
+    # 54 + 54 + 2 + 3 + 27 = 140
+    assert adapter.input_dim == 140
+    assert adapter.output_dim == 140
 
 
 def test_adapter_truncated_43d_input_dim() -> None:
-    """Truncated: 19 BP + 22 RP + 2 c0 + 3 residuals + 26 aux = 72.
+    """Truncated: 19 BP + 22 RP + 2 c0 + 3 residuals + 27 aux = 73.
 
     The "43-D XP block" is 19 + 22 + 2 = 43; total flat feature dim is
-    43 + residuals + aux.
+    43 + residuals + aux. Aux count is 27 post-2026-04-29 extinction
+    correction protocol.
     """
     layout = FeatureLayout.truncated_43d()
     adapter = XpFeatureAdapter(layout)
-    assert adapter.input_dim == 19 + 22 + 2 + 3 + 26  # 72
+    assert adapter.input_dim == 19 + 22 + 2 + 3 + 27  # 73
 
 
 def test_adapter_identity_when_use_c0_scalars_true() -> None:

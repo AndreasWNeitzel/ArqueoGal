@@ -123,6 +123,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import gc
 import hashlib
 import json
 import logging
@@ -136,6 +137,9 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import DataLoader
+
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from arqueogal.data.frozen_stats import (
     FrozenZScoreStats,
@@ -163,6 +167,7 @@ from arqueogal.xp_abundances.main.ood import (
     combined_ood_status,
     fit_mahalanobis_ood,
     flag_mahalanobis_ood,
+    percentile_mahalanobis_ood,
     score_mahalanobis_ood,
 )
 from arqueogal.xp_abundances.main.uncertainty import RegimeBEnvelope
@@ -171,23 +176,36 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG = logging.getLogger("run_pipeline1_inference")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-# Default ensemble: strong-contrastive-v2 (SupCon=1.0 + Barlow=0.5), trained 2026-04-25
-# on full Stream 1, 1 seed. The strong contrastive recipe reduces the 74k-star
-# prior-collapse spike from 18.32% (v1) to 0.20% on Stream 3 while preserving
-# Tier-1 RMSE; see HIGH_SIGMA_RESCUE_REPORT.md (2026-04-25). The legacy 5-seed
-# v1 ensemble at ``20260419_nogit_a0e10aa_ensemble_5label`` is retained for
-# methodology comparison and can be selected explicitly via ``--ensemble-dir``.
+# Default ensemble: Kiel-bounded RGB-only single-seed run trained
+# 2026-04-29. Stream 1 was masked to logg ∈ [1.0, 3.5], Teff ∈ [4000, 5500] K
+# at the parquet boundary (pipeline1_features_stream1_kiel.parquet);
+# contrastive pretrain ran for 100 epochs at batch 2048 with patience 10
+# (cfg 8870bbf), supervised fine-tune ran 1 seed at batch 2048 with patience
+# 10 (cfg 3790caf, val loss 1.5443 @ epoch 44). The legacy strong-
+# contrastive-v2 ensemble at ``20260425_6b96c06_cd1cbb9_ensemble_5label``
+# is retained for methodology comparison and can be selected explicitly via
+# ``--ensemble-dir``.
 DEFAULT_ENSEMBLE_DIR = (
-    REPO_ROOT / "models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label"
+    REPO_ROOT / "models/main/xp_abundances/20260430_1d71682_a5534e4_ensemble_5label"
 )
 LEGACY_V1_ENSEMBLE_DIR = (
     REPO_ROOT / "models/main/xp_abundances/20260419_nogit_a0e10aa_ensemble_5label"
 )
 DEFAULT_FROZEN_STATS = REPO_ROOT / "data/processed/pipeline1_features_stream1.provenance.json"
-DEFAULT_OOD_TRAIN_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1.parquet"
+DEFAULT_OOD_TRAIN_PARQUET = REPO_ROOT / "data/processed/pipeline1_features_stream1_kiel.parquet"
 DEFAULT_MODE_AMBIGUOUS_GRID = REPO_ROOT / "data/processed/mode_ambiguous_grid.npz"
 
-LABEL_SHORT_NAMES: tuple[str, ...] = ("teff", "logg", "mh", "alpha_m", "mg_h")
+LABEL_SHORT_NAMES_5: tuple[str, ...] = ("teff", "logg", "mh", "alpha_m", "mg_h")
+LABEL_SHORT_NAMES_21: tuple[str, ...] = (
+    "teff", "logg", "mh",
+    "fe_h", "alpha_m", "mg_h", "c_h", "n_h",
+    "o_h", "na_h", "al_h", "si_h", "s_h",
+    "k_h", "ca_h", "ti_h", "v_h", "cr_h",
+    "mn_h", "ni_h", "ce_h",
+)
+# Default kept as 5-label for backwards-compat with code that imports the
+# constant; the 21-label flow rebinds this at runtime in main().
+LABEL_SHORT_NAMES: tuple[str, ...] = LABEL_SHORT_NAMES_5
 """Short per-label names used for Parquet column prefixes. Order must match
 the checkpoint's ``block_layout.label_order_block`` for the 5-label tagged
 ensemble; enforced at runtime.
@@ -334,6 +352,84 @@ def _atomic_write_parquet(dest: Path, df: pd.DataFrame) -> None:
         if Path(tmp_name).exists():
             Path(tmp_name).unlink()
         raise
+
+
+# --- Streaming parquet writer ------------------------------------------------
+
+
+class _StreamingParquetWriter:
+    """Append-only Parquet writer with atomic-rename semantics.
+
+    The driver processes the input parquet in chunks of ~50 000 rows so peak
+    memory is bounded by ``O(chunk_size)`` instead of ``O(N)``. Each chunk's
+    output is converted to a :class:`pyarrow.Table` and written via
+    :class:`pyarrow.parquet.ParquetWriter.write_table`. The schema is fixed
+    on the first chunk; subsequent chunks are cast to that schema so column
+    dtypes don't drift between chunks.
+
+    On ``close()`` the on-disk tmp file is renamed atomically into ``dest``,
+    matching the prior :func:`_atomic_write_parquet` contract — readers
+    never observe a partial file.
+    """
+
+    def __init__(self, dest: Path) -> None:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        self._dest = dest
+        fd, self._tmp_name = tempfile.mkstemp(
+            prefix=dest.name + ".", suffix=".parquet.tmp", dir=dest.parent,
+        )
+        os.close(fd)
+        self._writer: pq.ParquetWriter | None = None
+        self._schema: pa.Schema | None = None
+        self._n_rows: int = 0
+        self._n_cols: int = 0
+
+    def write(self, df: pd.DataFrame) -> None:
+        """Convert ``df`` to a PyArrow table and append to the open writer."""
+        if self._schema is None:
+            table = pa.Table.from_pandas(df, preserve_index=False)
+            self._schema = table.schema
+            self._n_cols = len(self._schema)
+            self._writer = pq.ParquetWriter(self._tmp_name, self._schema)
+        else:
+            table = pa.Table.from_pandas(
+                df, schema=self._schema, preserve_index=False,
+            )
+        self._writer.write_table(table)  # type: ignore[union-attr]
+        self._n_rows += table.num_rows
+
+    def close(self) -> None:
+        if self._writer is None:
+            # Nothing was written — clean up the empty tmp file.
+            if Path(self._tmp_name).exists():
+                Path(self._tmp_name).unlink()
+            raise RuntimeError(
+                f"streaming writer closed without any rows written for {self._dest}",
+            )
+        try:
+            self._writer.close()
+            os.replace(self._tmp_name, self._dest)
+        except BaseException:
+            if Path(self._tmp_name).exists():
+                Path(self._tmp_name).unlink()
+            raise
+
+    def abort(self) -> None:
+        if self._writer is not None:
+            try:
+                self._writer.close()
+            except Exception:
+                pass
+        if Path(self._tmp_name).exists():
+            Path(self._tmp_name).unlink()
+
+    @property
+    def n_rows_written(self) -> int:
+        return self._n_rows
+
+    @property
+    def n_columns(self) -> int:
+        return self._n_cols
 
 
 # --- Input schema detection ---------------------------------------------------
@@ -601,36 +697,106 @@ def _unscale_ensemble_output(
     pred: EnsemblePrediction,
     scaler: LabelScaler,
     block_layout: CovarianceBlockLayout,
-) -> dict[str, np.ndarray]:
-    """Un-scale μ, Σ, σ, per-member μ, and epistemic diag back to physical units.
+) -> dict[str, Any]:
+    """Un-scale μ, σ_total diag, epistemic diag, and per-(i,j) cov columns back
+    to physical units **in human label order**, and aggressively release the
+    encoder-space ``Σ_aleatoric`` / ``Σ_epistemic`` / ``Σ_total`` / per-member
+    tensors after extraction.
 
-    The checkpoint stores ``label_scaler_mean`` / ``label_scaler_scale`` in
-    :attr:`LabelTiers.all_labels` order ("human" order). The ensemble output
-    is in block order. We reorder the scaler before inverting.
+    Block-vs-human label ordering
+    ------------------------------
+    The 21-label 4-block-Cholesky head produces predictions in
+    :attr:`block_layout.label_order_block`, which permutes the human label
+    order (e.g. ``alpha_m`` is at human-index 4 but block-index 17 because
+    the alpha block is stored before the diagonal-only ``s_h``/``alpha_m``
+    block). The output writer indexes columns by the human ``LABEL_SHORT_NAMES``
+    tuple, so the unscaler must permute ``pred.mu`` and ``pred.Sigma_*`` from
+    block to human order before applying the human-order
+    :class:`LabelScaler`. Skipping this permutation produced silently-wrong
+    21-label predictions on Stream 1: ``alpha_m_pred`` showed correlation
+    ``-0.42`` against APOGEE truth (i.e. inverted) because slot 4 in block
+    order is ``si_h``, not ``alpha_m``. Verified post-fix at the call site.
+
+    Memory contract
+    ---------------
+    Stays in fp32 throughout (the prior fp64 upcast caused a transient ~5 GB
+    allocation that OOMed at 617k stars × 21 labels). Folds each
+    ``s_i * s_j`` into the per-(i,j) cov column so the full scaled
+    ``(B, n, n)`` cov tensor is never materialised — only the 231 upper-
+    triangular columns the writer consumes. ``pred.Sigma_*`` and
+    ``pred.per_member_mu`` are set to ``None`` to release the encoder-space
+    copies once the diagonals and cov columns are extracted.
     """
-    scaler_block = scaler.reorder_to(block_layout.label_order_block)
-
-    mu = scaler_block.inverse_mean(pred.mu.astype(np.float64))
-    s = scaler_block.scale.astype(np.float64)
-    scale_outer = np.outer(s, s)  # (n, n)
-
-    Sigma_total = pred.Sigma_total.astype(np.float64) * scale_outer[None]
-    Sigma_epi = pred.Sigma_epistemic.astype(np.float64) * scale_outer[None]
-
-    sigma_total_diag = np.sqrt(np.clip(np.einsum("bii->bi", Sigma_total), 0.0, None))
-    epistemic_var_diag = np.clip(np.einsum("bii->bi", Sigma_epi), 0.0, None)
-
-    per_member_mu = (
-        pred.per_member_mu.astype(np.float64) * s[None, None, :]
-        + scaler_block.mean.astype(np.float64)[None, None, :]
+    block_order = list(block_layout.label_order_block)
+    human_order = list(block_layout.label_order_human)
+    if len(block_order) != len(human_order) or set(block_order) != set(human_order):
+        raise RuntimeError(
+            "block_layout label_order_block and label_order_human do not "
+            "describe the same set of labels — refusing to permute predictions",
+        )
+    # ``perm[i_human] = block_index_of(label_human[i_human])`` so that
+    # ``pred.mu[:, perm]`` is in human order.
+    perm = np.asarray(
+        [block_order.index(name) for name in human_order], dtype=np.int64,
     )
 
+    # Use the scaler in HUMAN order directly (it was constructed from the
+    # checkpoint's ``label_scaler_mean`` / ``label_scaler_scale`` against
+    # human ``label_names``). Applying it to the permuted-to-human pred
+    # arrays gives physical-units output column-aligned with the human
+    # ``LABEL_SHORT_NAMES`` tuple.
+    s32 = scaler.scale.astype(np.float32)
+    mean32 = scaler.mean.astype(np.float32)
+
+    n_labels = int(pred.mu.shape[1])
+    n_rows = int(pred.mu.shape[0])
+    if n_labels != len(human_order):
+        raise RuntimeError(
+            f"pred.mu has {n_labels} columns but block_layout describes "
+            f"{len(human_order)} labels",
+        )
+
+    # μ in physical units (B, n) fp32, in human order.
+    mu = pred.mu[:, perm] * s32[None, :] + mean32[None, :]
+
+    # Per-(i, j) covariance columns in physical units. ``perm[i]`` /
+    # ``perm[j]`` index into the BLOCK-order Sigma_total to recover the
+    # entry whose row+column correspond to human-order labels i and j.
+    diag_var = np.empty((n_rows, n_labels), dtype=np.float32)
+    cov_cols: dict[str, np.ndarray] = {}
+    Sigma_total = pred.Sigma_total
+    for i in range(n_labels):
+        bi = int(perm[i])
+        for j in range(i, n_labels):
+            bj = int(perm[j])
+            scale_ij = float(s32[i]) * float(s32[j])
+            col = (Sigma_total[:, bi, bj] * scale_ij).astype(np.float32)
+            cov_cols[f"cov_{i}_{j}"] = col
+            if i == j:
+                diag_var[:, i] = col
+    sigma_total_diag = np.sqrt(np.clip(diag_var, 0.0, None))
+
+    # Epistemic-variance diagonal in physical units. Diag of block-order
+    # Σ_epistemic, then permute to human order, then multiply by ``s²``.
+    epi_diag_block = np.einsum("bii->bi", pred.Sigma_epistemic)
+    epi_diag_human = epi_diag_block[:, perm]
+    epistemic_var_diag = np.clip(
+        epi_diag_human * (s32**2)[None, :], 0.0, None
+    ).astype(np.float32)
+
+    # Free the (B, n, n) encoder-space tensors and the per-member μ — the
+    # downstream code uses only the (B, n) marginals from ``pred`` and the
+    # cov_cols / diag arrays computed above. Saves ~3.6 GB held at 617k × 21.
+    pred.Sigma_aleatoric = None  # type: ignore[assignment]
+    pred.Sigma_epistemic = None  # type: ignore[assignment]
+    pred.Sigma_total = None  # type: ignore[assignment]
+    pred.per_member_mu = None  # type: ignore[assignment]
+
     return {
-        "mu": mu.astype(np.float32),
-        "Sigma_total": Sigma_total.astype(np.float32),
-        "sigma_total": sigma_total_diag.astype(np.float32),
-        "epistemic_var": epistemic_var_diag.astype(np.float32),
-        "per_member_mu": per_member_mu.astype(np.float32),
+        "mu": mu,
+        "cov_cols": cov_cols,
+        "sigma_total": sigma_total_diag,
+        "epistemic_var": epistemic_var_diag,
     }
 
 
@@ -657,45 +823,104 @@ def _fit_training_ood_bundle(
     return fit_mahalanobis_ood(X, p_threshold=p_threshold, regularization=1e-6)
 
 
+_LABEL_TRUTH_COLS_5: tuple[str, ...] = (
+    "teff_apogee", "logg_apogee", "mh_apogee",
+    "alpha_m_apogee", "mg_h_apogee",
+)
+
+
+def _fit_label_mahalanobis_bundle(
+    training_parquet: Path,
+    p_threshold: float = 0.99,
+) -> MahalanobisOODBundle | None:
+    """Fit a 5-D Mahalanobis bundle on the APOGEE-truth label distribution.
+
+    Used for the **label-extrapolation** flag (Tier-2 demotion gate
+    introduced 2026-05-03 to replace the σ-threshold gates that were
+    perceived as cherry-picking high-σ predictions).
+
+    The bundle is fit on the joint distribution of the five released
+    labels (Teff, log g, [M/H], [α/M], [Mg/H]) as observed by APOGEE on
+    the Stream-1 training cohort. At inference, we score the *predicted*
+    label vector against this bundle: a star whose μ_pred lies outside
+    the training-label envelope is flagged as label-extrapolation.
+
+    Returns None if the training parquet doesn't carry APOGEE truth
+    (e.g. when called against a Stream-3 inference parquet).
+    """
+    try:
+        df = pd.read_parquet(training_parquet, columns=list(_LABEL_TRUTH_COLS_5))
+    except (KeyError, ValueError) as e:
+        _LOG.warning("label-Mahalanobis bundle: training parquet lacks APOGEE truth (%s); "
+                     "label_extrapolation_flag will be False everywhere", e)
+        return None
+    Y = df.to_numpy(dtype=np.float64)
+    Y = Y[np.isfinite(Y).all(axis=1)]
+    if Y.shape[0] < 100:
+        _LOG.warning("label-Mahalanobis bundle: only %d finite truth rows; skipping", Y.shape[0])
+        return None
+    bundle = fit_mahalanobis_ood(Y, p_threshold=p_threshold, regularization=1e-8)
+    _LOG.info("label-Mahalanobis bundle fit on %d APOGEE-truth rows; "
+              "threshold=%.3f at p=%.3f",
+              bundle.n_training, bundle.threshold, bundle.p_threshold)
+    return bundle
+
+
 # --- Orchestration ------------------------------------------------------------
 
 
-def _verify_5label_ensemble(members: list[EnsembleMember]) -> None:
-    """Guard against wrong-ensemble arguments.
+def _verify_ensemble_label_set(members: list[EnsembleMember]) -> tuple[str, ...]:
+    """Verify all ensemble members agree on label_names; return that tuple.
 
-    This driver is the 5-label D-Cat-b bridge: it expects exactly the
-    ``{teff, logg, mh, alpha_m, mg_h}`` label set and a single 5x5 block.
-    A 21-label ensemble would silently produce the wrong Parquet shape.
+    Accepts either the 5-label set (production v1 / D-Cat-b bridge) or the
+    21-label set (production v2). Returns the canonical short-name tuple
+    matching ``label_names`` so the output writer can address columns
+    correctly.
     """
     first = members[0]
     blob = first.blob
-    expected = (
-        "teff_apogee",
-        "logg_apogee",
-        "mh_apogee",
-        "alpha_m_apogee",
-        "mg_h_apogee",
-    )
     label_names = tuple(blob["label_names"])
-    if label_names != expected:
+
+    expected_5 = (
+        "teff_apogee", "logg_apogee", "mh_apogee",
+        "alpha_m_apogee", "mg_h_apogee",
+    )
+    expected_21 = (
+        "teff_apogee", "logg_apogee", "mh_apogee",
+        "fe_h_apogee", "alpha_m_apogee", "mg_h_apogee", "c_h_apogee", "n_h_apogee",
+        "o_h_apogee", "na_h_apogee", "al_h_apogee", "si_h_apogee", "s_h_apogee",
+        "k_h_apogee", "ca_h_apogee", "ti_h_apogee", "v_h_apogee", "cr_h_apogee",
+        "mn_h_apogee", "ni_h_apogee", "ce_h_apogee",
+    )
+    if label_names == expected_5:
+        short = LABEL_SHORT_NAMES_5
+    elif label_names == expected_21:
+        short = LABEL_SHORT_NAMES_21
+    else:
         raise RuntimeError(
-            f"ensemble label_names {label_names} != expected 5-label set "
-            f"{expected}; this driver is the 5-label production bridge. "
-            "Use a different script for the 21-label variant.",
+            f"ensemble label_names {label_names} matches neither the v1 5-label "
+            f"set {expected_5} nor the v2 21-label set {expected_21}",
         )
     bl = CovarianceBlockLayout.from_dict(blob["block_layout"])
-    if bl.label_order_block != bl.label_order_human:
-        raise RuntimeError(
-            "checkpoint block and human label orders differ — driver assumes "
-            "they match for the 5-label ensemble",
-        )
-    # Every member must agree.
+    # Both 5-label and 21-label paths are routed through
+    # ``_build_output_dataframe``, which permutes mu / Sigma from
+    # ``label_order_block`` back to ``label_order_human`` before writing
+    # the parquet. The previous 5-label-specific assertion was an over-
+    # cautious guard that blocked the post-2026-04-30 v9 layout, where
+    # the 5-label variant uses a 4-label dense block + alpha_m diagonal-
+    # only tail (so block and human orders deliberately differ).
+    _ = bl  # layout retained for downstream callers via the blob.
     for m in members[1:]:
         if tuple(m.blob["label_names"]) != label_names:
             raise RuntimeError(
                 f"ensemble member seed={m.seed} has label_names "
                 f"{tuple(m.blob['label_names'])} != first member {label_names}",
             )
+    return short
+
+
+# Back-compat alias in case other code imports the old name.
+_verify_5label_ensemble = _verify_ensemble_label_set
 
 
 def _regime_b_envelope(cfg_path: Path | None) -> RegimeBEnvelope:
@@ -739,7 +964,7 @@ def _assemble_output_frame(  # noqa: PLR0913 — assembles a wide release frame 
     source_id: np.ndarray,
     mu: np.ndarray,
     sigma: np.ndarray,
-    Sigma: np.ndarray,
+    cov_cols: dict[str, np.ndarray],
     epi_var: np.ndarray,
     *,
     mahal_scores: np.ndarray,
@@ -751,7 +976,13 @@ def _assemble_output_frame(  # noqa: PLR0913 — assembles a wide release frame 
     selection_prob: np.ndarray,
     aux_missing_flags: dict[str, np.ndarray],
 ) -> pd.DataFrame:
-    """Build the release DataFrame with every required column in order."""
+    """Build the release DataFrame with every required column in order.
+
+    ``cov_cols`` maps ``"cov_{i}_{j}"`` (upper-triangular, ``0 ≤ i ≤ j``) to
+    a 1-D array of length ``N`` in physical units. Pre-flattening the cov
+    matrix keeps the writer from holding a ``(B, n, n)`` tensor alongside
+    the cov columns it derives.
+    """
     n_labels = mu.shape[1]
     if n_labels != len(LABEL_SHORT_NAMES):
         raise RuntimeError(
@@ -765,7 +996,13 @@ def _assemble_output_frame(  # noqa: PLR0913 — assembles a wide release frame 
         out[f"{name}_sigma"] = sigma[:, j].astype(np.float32)
     for i in range(n_labels):
         for j in range(i, n_labels):
-            out[f"cov_{i}_{j}"] = Sigma[:, i, j].astype(np.float32)
+            key = f"cov_{i}_{j}"
+            if key not in cov_cols:
+                raise KeyError(
+                    f"cov_cols missing required key {key!r}; produced keys are "
+                    f"{sorted(cov_cols.keys())[:5]}..."
+                )
+            out[key] = cov_cols[key].astype(np.float32, copy=False)
     for j, name in enumerate(LABEL_SHORT_NAMES):
         out[f"{name}_epistemic_var"] = epi_var[:, j].astype(np.float32)
     out["ood_mahalanobis_score"] = mahal_scores.astype(np.float32)
@@ -786,6 +1023,200 @@ def _assemble_output_frame(  # noqa: PLR0913 — assembles a wide release frame 
     ):
         out[key] = aux_missing_flags[key].astype(bool)
     return pd.DataFrame(out)
+
+
+def _iter_input_chunks(
+    input_parquet: Path,
+    columns: list[str],
+    chunk_size: int,
+):
+    """Yield ``pd.DataFrame`` chunks of length ≤ ``chunk_size`` from ``input_parquet``.
+
+    Uses :meth:`pyarrow.parquet.ParquetFile.iter_batches` so the parquet
+    reader streams row groups directly without ever materialising the full
+    table in memory. The returned chunks are pandas DataFrames so the rest
+    of the driver (which is pandas-flavoured) can stay unchanged.
+
+    Notes
+    -----
+    PyArrow's ``iter_batches`` already handles row-group boundaries — a
+    requested ``batch_size`` of 50 000 may be split across several row
+    groups internally without changing the per-batch row count. The driver
+    relies on this for predictable per-chunk peak memory.
+    """
+    pf = pq.ParquetFile(input_parquet)
+    for batch in pf.iter_batches(batch_size=chunk_size, columns=columns):
+        yield batch.to_pandas()
+
+
+# --- Per-chunk inference pass ------------------------------------------------
+
+
+def _process_chunk(  # noqa: PLR0913, PLR0915 — chunk pipeline reads many setup objects produced once in run_inference
+    df: pd.DataFrame,
+    *,
+    layout: FeatureLayout,
+    stats: FrozenZScoreStats,
+    schema: str,
+    members: list[EnsembleMember],
+    scaler: LabelScaler,
+    block_layout: CovarianceBlockLayout,
+    device: torch.device,
+    batch_size: int,
+    bundle: MahalanobisOODBundle,
+    label_bundle: MahalanobisOODBundle | None,
+    ood_threshold: float,
+    envelope: RegimeBEnvelope,
+    ambiguity_grid: BimodalityGrid,
+    selection_artifact_path: Path | None,
+    accumulators: dict[str, Any],
+    feature_scaler: Any = None,  # FeatureScaler | None — loaded from ckpt by run_inference
+) -> pd.DataFrame:
+    """Run the full per-star pipeline on one chunk and return its output frame.
+
+    Mutates ``accumulators`` in place: flag counters, total-row counters,
+    selection_prob raw values (collected for streaming-safe quantile stats
+    computed once at end), and per-chunk progress.
+    """
+    n_rows = len(df)
+
+    # --- assemble feature matrix + 108-D OOD block -----------------------
+    X = _assemble_feature_matrix(df, layout, stats, schema)
+    xp_block_width = len(layout.bp_coef_cols) + len(layout.rp_coef_cols)
+    xp_block_108d = X[:, :xp_block_width].copy()
+
+    # Aux-missingness flags — must be computed BEFORE NaN imputation so a
+    # NaN aux entry survives the lookup.
+    aux_missing_flags = _compute_aux_missingness_flags(df, layout)
+
+    # Apply the FeatureScaler the encoder was trained with (z-score on aux,
+    # log10 + z-score on residual RMS). Must run BEFORE nan_to_num because
+    # log10 needs to see the unimputed value. XP block columns are
+    # passthrough — they are already standardised by the frozen Hermite
+    # z-score basis and the scaler's apply_mask is False on those columns.
+    if feature_scaler is not None:
+        if tuple(feature_scaler.feature_names) != tuple(layout.all_required_columns):
+            raise RuntimeError(
+                "checkpoint feature_scaler.feature_names != layout.all_required_columns; "
+                "the encoder input contract has drifted between training and inference",
+            )
+        X = feature_scaler.transform(X)
+
+    # NaN-impute residuals + aux for the forward pass.
+    np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # --- ensemble forward + un-scale -------------------------------------
+    loader = _build_loader(X, n_labels=block_layout.n_labels, batch_size=batch_size)
+    del X
+    gc.collect()
+    pred = predict_ensemble(members, loader, device=device)
+    unscaled = _unscale_ensemble_output(pred, scaler, block_layout)
+    gc.collect()
+
+    # --- OOD scoring against the pre-fit bundles --------------------------
+    mahal_scores = score_mahalanobis_ood(xp_block_108d, bundle)
+    mahal_flags = flag_mahalanobis_ood(xp_block_108d, bundle)
+    mahal_percentile = percentile_mahalanobis_ood(xp_block_108d, bundle)
+    del xp_block_108d
+    gc.collect()
+    # Label-space Mahalanobis (Tier-2 gate, replaces σ-thresholds 2026-05-03).
+    # Score the predicted label vector (in physical units) against the
+    # APOGEE-truth-trained bundle. Only meaningful for the 5-label release.
+    if label_bundle is not None and unscaled["mu"].shape[1] == label_bundle.feature_dim:
+        label_mahal_scores = score_mahalanobis_ood(unscaled["mu"], label_bundle)
+        label_extrapolation_flags = flag_mahalanobis_ood(unscaled["mu"], label_bundle)
+        label_mahal_percentile = percentile_mahalanobis_ood(unscaled["mu"], label_bundle)
+    else:
+        label_mahal_scores = np.full(unscaled["mu"].shape[0], np.nan, dtype=np.float64)
+        label_extrapolation_flags = np.zeros(unscaled["mu"].shape[0], dtype=bool)
+        label_mahal_percentile = np.full(unscaled["mu"].shape[0], np.nan, dtype=np.float64)
+    epi_tot_ratio_per_label = pred.sigma_epistemic / np.clip(
+        np.sqrt(pred.sigma_epistemic**2 + pred.sigma_aleatoric**2),
+        1e-12,
+        None,
+    )
+    ens_ratio = epi_tot_ratio_per_label.mean(axis=1).astype(np.float64)
+    ens_flags = (ens_ratio > ood_threshold).astype(bool)
+    status = combined_ood_status(mahal_flags, ens_flags)
+    joint_flags = (status >= 1).astype(bool)
+
+    # --- Regime B + mode ambiguity ---------------------------------------
+    if "b_deg" not in df.columns:
+        raise KeyError("input parquet is missing b_deg; required for the Regime B envelope")
+    b_deg = df["b_deg"].to_numpy(dtype=np.float64)
+    teff_pred = unscaled["mu"][:, 0]
+    logg_pred = unscaled["mu"][:, 1]
+    mh_pred = unscaled["mu"][:, 2]
+    regime_b_flag = envelope.mask(teff_pred, logg_pred, b_deg)
+    in_grid_flag, in_grid = ambiguity_grid.query(teff_pred, logg_pred, mh_pred)
+    mode_ambiguous_flag = in_grid_flag | (~in_grid)
+
+    # --- selection_prob --------------------------------------------------
+    selection_prob = _selection_prob(df, artifact_path=selection_artifact_path)
+    selection_source_tag = (
+        "input_passthrough" if "selection_prob" in df.columns else "scored_from_b_deg_g_mag"
+    )
+    if accumulators.get("selection_source_tag") is None:
+        accumulators["selection_source_tag"] = selection_source_tag
+    elif accumulators["selection_source_tag"] != selection_source_tag:
+        raise RuntimeError(
+            "selection_prob source tag changed mid-stream — chunks disagree on whether "
+            "the input parquet carries a selection_prob column",
+        )
+
+    # --- assemble + return chunk frame -----------------------------------
+    source_id_arr = df["source_id"].to_numpy(dtype=np.int64)
+    out_df = _assemble_output_frame(
+        source_id=source_id_arr,
+        mu=unscaled["mu"],
+        sigma=unscaled["sigma_total"],
+        cov_cols=unscaled["cov_cols"],
+        epi_var=unscaled["epistemic_var"],
+        mahal_scores=mahal_scores,
+        ens_flags=ens_flags,
+        joint_flags=joint_flags,
+        regime_b_flag=regime_b_flag,
+        mode_ambiguous_flag=mode_ambiguous_flag,
+        mode_ambiguous_in_grid=in_grid,
+        selection_prob=selection_prob,
+        aux_missing_flags=aux_missing_flags,
+    )
+    # Inject the new label-Mahalanobis columns directly (assemble_output_frame
+    # signature kept stable to avoid touching every other caller).
+    out_df["label_mahalanobis_score"] = label_mahal_scores.astype(np.float32)
+    out_df["label_extrapolation_flag"] = label_extrapolation_flags.astype(bool)
+    # Per-star empirical percentiles against training distance ECDF — let
+    # the user pick their own cutoff (e.g. 0.95 for stricter, 0.999 for laxer).
+    out_df["ood_mahalanobis_percentile"] = mahal_percentile.astype(np.float32)
+    out_df["label_mahalanobis_percentile"] = label_mahal_percentile.astype(np.float32)
+
+    # --- accumulate provenance counters ----------------------------------
+    accumulators["n_rows"] += n_rows
+    accumulators["mahal_count"] += int(mahal_flags.sum())
+    accumulators["ens_count"] += int(ens_flags.sum())
+    accumulators["joint_count"] += int(joint_flags.sum())
+    accumulators["regime_b_count"] += int(regime_b_flag.sum())
+    accumulators["mode_ambiguous_count"] += int(mode_ambiguous_flag.sum())
+    accumulators["in_grid_bimodal_count"] += int(in_grid_flag.sum())
+    accumulators["in_grid_count"] += int(in_grid.sum())
+    accumulators["out_of_grid_count"] += int((~in_grid).sum())
+    for key in (
+        "ir_missing_flag",
+        "parallax_missing_flag",
+        "extinction_missing_flag",
+        "aux_missing_any",
+    ):
+        accumulators[f"{key}_count"] += int(aux_missing_flags[key].sum())
+    accumulators["selection_prob_chunks"].append(selection_prob.astype(np.float64))
+
+    # Drop everything we don't return.
+    unscaled.clear()
+    del unscaled, pred, df, mahal_scores, mahal_flags
+    del ens_flags, joint_flags, regime_b_flag, mode_ambiguous_flag
+    del in_grid_flag, in_grid, selection_prob, aux_missing_flags
+    gc.collect()
+
+    return out_df
 
 
 def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knobs are release-contract arguments
@@ -823,7 +1254,12 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     ckpt_paths = _resolve_ensemble_checkpoints(ensemble_dir)
     members = load_ensemble(ckpt_paths, device=device)
     _LOG.info("loaded %d ensemble members from %s", len(members), ensemble_dir)
-    _verify_5label_ensemble(members)
+    short_names = _verify_ensemble_label_set(members)
+    # Rebind module-global LABEL_SHORT_NAMES so _build_output_dataframe and
+    # downstream consumers address the right column count for this run.
+    global LABEL_SHORT_NAMES
+    LABEL_SHORT_NAMES = short_names
+    _LOG.info("label set: %d labels (%s)", len(short_names), ", ".join(short_names))
 
     first_blob = members[0].blob
     block_layout = CovarianceBlockLayout.from_dict(first_blob["block_layout"])
@@ -839,6 +1275,21 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
             "checkpoint was saved before the scaler was fit — refuse to run",
         )
 
+    # Pull the FeatureScaler from the checkpoint (None for older models that
+    # predate the feature-scaling change). Applied later, after assembly.
+    fs_blob = first_blob.get("feature_scaler")
+    if fs_blob is not None:
+        from arqueogal.xp_abundances.main.data import FeatureScaler
+        feature_scaler = FeatureScaler(
+            mean=np.asarray(fs_blob["mean"], dtype=np.float32),
+            scale=np.asarray(fs_blob["scale"], dtype=np.float32),
+            feature_names=tuple(fs_blob["feature_names"]),
+            log10_mask=np.asarray(fs_blob["log10_mask"], dtype=bool),
+            apply_mask=np.asarray(fs_blob["apply_mask"], dtype=bool),
+        )
+    else:
+        feature_scaler = None
+
     # --- frozen stats + basis fingerprint --------------------------------
     stats = load_frozen_zscore_stats(frozen_stats_path)
     current_fp = _build_hermite_basis()["fingerprint_sha256"]
@@ -849,7 +1300,7 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
         stats.n_reference_population,
     )
 
-    # --- read input -------------------------------------------------------
+    # --- read input schema + select needed columns -----------------------
     layout = layout or FeatureLayout()  # default 139-D — matches the 5-label ensemble
     if int(first_blob["input_dim"]) != layout.input_dim:
         raise RuntimeError(
@@ -858,145 +1309,159 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
             "trained on a non-default layout and this driver only supports "
             "the default 139-D layout",
         )
-    df = pd.read_parquet(input_parquet)
-    n_rows = len(df)
-    if "source_id" not in df.columns:
+    pf = pq.ParquetFile(input_parquet)
+    schema_cols = {f.name for f in pf.schema_arrow}
+    n_rows = int(pf.metadata.num_rows)
+    needed: set[str] = {"source_id"}
+    needed.update(layout.all_required_columns)
+    needed.update(c for c in schema_cols if c.startswith(("bp_coef_norm_", "rp_coef_norm_")))
+    needed.update({"bp_c0_log", "rp_c0_log", "bp_c0_z", "rp_c0_z"})
+    needed.update({"j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag"})
+    needed.update({"parallax", "parallax_error", "ruwe"})
+    needed.update({"av_edenhofer", "av_lallement", "av_sfd", "av_nbhd_median"})
+    needed.update({"av_los", "av_los_source"})
+    needed.update({"ra_deg", "dec_deg", "b_deg", "g_mag"})
+    if "selection_prob" in schema_cols:
+        needed.add("selection_prob")
+    keep = sorted(c for c in needed if c in schema_cols)
+    if "source_id" not in keep:
         raise KeyError(f"input parquet {input_parquet} missing source_id")
-    schema = _detect_input_schema(set(df.columns))
-    _LOG.info("input %s: n=%d schema=%s", input_parquet, n_rows, schema)
-
-    # --- feature matrix + ensemble inference -----------------------------
-    X = _assemble_feature_matrix(df, layout, stats, schema)
-
-    # Aux-missingness flags must be computed from the RAW input frame before
-    # NaN imputation — otherwise every flag is always False because the
-    # nan_to_num call below replaces NaN with 0.0 in the assembled matrix.
-    aux_missing_flags = _compute_aux_missingness_flags(df, layout)
+    if "b_deg" not in keep:
+        raise KeyError(f"input parquet {input_parquet} missing b_deg (required for Regime B)")
+    schema_inferred = _detect_input_schema(set(keep))
     _LOG.info(
-        "aux-missingness: ir=%.4f parallax=%.4f extinction=%.4f any=%.4f",
-        float(aux_missing_flags["ir_missing_flag"].mean()),
-        float(aux_missing_flags["parallax_missing_flag"].mean()),
-        float(aux_missing_flags["extinction_missing_flag"].mean()),
-        float(aux_missing_flags["aux_missing_any"].mean()),
+        "input %s: schema=%s, n=%d, reading %d/%d cols",
+        input_parquet, schema_inferred, n_rows, len(keep), len(schema_cols),
     )
 
-    # Mirror training.py:153 — impute any remaining NaN/±inf in the feature
-    # matrix to 0.0. Training drops rows with NaN in the 108-D XP block and
-    # then nan_to_num's the residuals + aux priors; at inference we keep
-    # all rows (the Mahalanobis OOD flag marks NaN-XP stars via its NaN
-    # score, and the aux flags above capture missingness separately), and
-    # nan_to_num keeps the forward pass finite. Without this, a single NaN
-    # aux entry propagates through the trunk and yields NaN predictions —
-    # the release-gate bug this hardening patch closes.
-    np.nan_to_num(X, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
-
-    loader = _build_loader(X, n_labels=block_layout.n_labels, batch_size=batch_size)
-    _LOG.info("running ensemble on %d stars, batch_size=%d", n_rows, batch_size)
-    pred = predict_ensemble(members, loader, device=device)
-
-    # --- un-scale ---------------------------------------------------------
-    unscaled = _unscale_ensemble_output(pred, scaler, block_layout)
-
-    # --- OOD flags --------------------------------------------------------
-    xp_block_108d = _xp_108d_block(df, layout, schema=schema, stats=stats)
+    # --- one-time setup of OOD bundle, regime-B envelope, ambiguity grid -
     bundle = _fit_training_ood_bundle(
         ood_training_parquet,
         layout,
         p_threshold=0.99,
     )
-    mahal_scores = score_mahalanobis_ood(xp_block_108d, bundle)
-    mahal_flags = flag_mahalanobis_ood(xp_block_108d, bundle)
-    # Ensemble-disagreement ratio per :mod:`.ood` convention:
-    # mean_j ( σ_epi_j / sqrt(σ_epi_j² + σ_alea_j²) ). `pred.sigma_*` already
-    # aggregate across members, and this ratio is what
-    # :func:`ensemble_disagreement_ratio` computes elementwise — re-deriving
-    # from `pred` avoids re-running the ensemble just to collect per-member
-    # σ diagonals that are equivalent information.
-    epi_tot_ratio_per_label = pred.sigma_epistemic / np.clip(
-        np.sqrt(pred.sigma_epistemic**2 + pred.sigma_aleatoric**2),
-        1e-12,
-        None,
+    # Label-space Mahalanobis bundle — fit on APOGEE truth; powers Tier-2.
+    label_bundle = _fit_label_mahalanobis_bundle(
+        ood_training_parquet,
+        p_threshold=0.99,
     )
-    ens_ratio = epi_tot_ratio_per_label.mean(axis=1).astype(np.float64)
-    ens_flags = (ens_ratio > ood_threshold).astype(bool)
-    status = combined_ood_status(mahal_flags, ens_flags)
-    joint_flags = (status >= 1).astype(bool)  # either-or-red
-    _LOG.info(
-        "OOD: mahalanobis_rate=%.4f ensemble_rate=%.4f joint_rate=%.4f",
-        float(mahal_flags.mean()),
-        float(ens_flags.mean()),
-        float(joint_flags.mean()),
-    )
-
-    # --- Regime B ---------------------------------------------------------
     envelope = _regime_b_envelope(regime_b_config)
-    if "b_deg" not in df.columns:
-        raise KeyError(
-            "input parquet is missing b_deg; required for the Regime B envelope",
-        )
-    b_deg = df["b_deg"].to_numpy(dtype=np.float64)
-    teff_pred = unscaled["mu"][:, 0]
-    logg_pred = unscaled["mu"][:, 1]
-    regime_b_flag = envelope.mask(teff_pred, logg_pred, b_deg)
-    _LOG.info(
-        "Regime B: %d/%d (%.3f%%) inside envelope (excluded from Tier 1)",
-        int(regime_b_flag.sum()),
-        n_rows,
-        100.0 * float(regime_b_flag.mean()),
-    )
-
-    # --- mode-ambiguous (bimodal-target) flag -----------------------------
-    # See ``bimodality.py``: Gaussian-NLL μ* = E[y|x] collapses bimodal
-    # targets onto the conditional mean (the valley between modes). For
-    # stars whose predicted (Teff, log g, [M/H]) cell is bimodal in the
-    # training target, per-star α/M is not recoverable from XP alone.
-    # Out-of-grid stars default to True (conservative — we can't testify).
-    mh_pred = unscaled["mu"][:, 2]
     if mode_ambiguous_grid_path is None or not mode_ambiguous_grid_path.is_file():
         raise FileNotFoundError(
             f"mode-ambiguous grid not found at {mode_ambiguous_grid_path!r}; "
             "build it first with scripts/build_mode_ambiguous_mask.py",
         )
     ambiguity_grid = BimodalityGrid.load(mode_ambiguous_grid_path)
-    in_grid_flag, in_grid = ambiguity_grid.query(teff_pred, logg_pred, mh_pred)
-    mode_ambiguous_flag = in_grid_flag | (~in_grid)
-    _LOG.info(
-        "mode-ambiguous: %d/%d (%.3f%%) flagged (%d in-grid bimodal + %d out-of-grid)",
-        int(mode_ambiguous_flag.sum()),
-        n_rows,
-        100.0 * float(mode_ambiguous_flag.mean()),
-        int(in_grid_flag.sum()),
-        int((~in_grid).sum()),
-    )
 
-    # --- selection_prob ---------------------------------------------------
-    selection_prob = _selection_prob(df, artifact_path=selection_artifact_path)
+    # --- streaming chunk loop --------------------------------------------
+    # 50 000 rows per chunk keeps the per-chunk peak under ~700 MB at
+    # 21 labels × 5 ensemble members; bounded by O(chunk_size), not O(N).
+    # The earlier all-at-once flow held ~3.3 GB of (B, n, n) covariance
+    # tensors plus a ~5 GB transient during fp64 unscale, which OOMed on
+    # the 9.7 GB WSL2 instance at 617k stars.
+    chunk_size = 50_000
+    accumulators: dict[str, Any] = {
+        "n_rows": 0,
+        "mahal_count": 0,
+        "ens_count": 0,
+        "joint_count": 0,
+        "regime_b_count": 0,
+        "mode_ambiguous_count": 0,
+        "in_grid_bimodal_count": 0,
+        "in_grid_count": 0,
+        "out_of_grid_count": 0,
+        "ir_missing_flag_count": 0,
+        "parallax_missing_flag_count": 0,
+        "extinction_missing_flag_count": 0,
+        "aux_missing_any_count": 0,
+        "selection_prob_chunks": [],
+        "selection_source_tag": None,
+    }
 
-    # --- assemble frame + write ------------------------------------------
-    out_df = _assemble_output_frame(
-        source_id=df["source_id"].to_numpy(dtype=np.int64),
-        mu=unscaled["mu"],
-        sigma=unscaled["sigma_total"],
-        Sigma=unscaled["Sigma_total"],
-        epi_var=unscaled["epistemic_var"],
-        mahal_scores=mahal_scores,
-        ens_flags=ens_flags,
-        joint_flags=joint_flags,
-        regime_b_flag=regime_b_flag,
-        mode_ambiguous_flag=mode_ambiguous_flag,
-        mode_ambiguous_in_grid=in_grid,
-        selection_prob=selection_prob,
-        aux_missing_flags=aux_missing_flags,
-    )
-    if len(out_df) != n_rows:
+    writer = _StreamingParquetWriter(output_parquet)
+    chunk_idx = 0
+    try:
+        for chunk_df in _iter_input_chunks(input_parquet, keep, chunk_size):
+            chunk_idx += 1
+            chunk_n = len(chunk_df)
+            _LOG.info(
+                "chunk %d: rows=%d (cumulative %d/%d)",
+                chunk_idx, chunk_n, accumulators["n_rows"] + chunk_n, n_rows,
+            )
+            chunk_out = _process_chunk(
+                chunk_df,
+                layout=layout,
+                stats=stats,
+                schema=schema_inferred,
+                members=members,
+                scaler=scaler,
+                block_layout=block_layout,
+                device=device,
+                batch_size=batch_size,
+                bundle=bundle,
+                label_bundle=label_bundle,
+                ood_threshold=ood_threshold,
+                envelope=envelope,
+                ambiguity_grid=ambiguity_grid,
+                selection_artifact_path=selection_artifact_path,
+                accumulators=accumulators,
+                feature_scaler=feature_scaler,
+            )
+            writer.write(chunk_out)
+            del chunk_out, chunk_df
+            gc.collect()
+        writer.close()
+    except BaseException:
+        writer.abort()
+        raise
+
+    # Stitch streaming-state into the existing-shape provenance: the prior
+    # version held flag arrays in memory; here we work from accumulator
+    # counts plus a single concatenated selection_prob array (forming
+    # ``selection_prob`` as a (N,) float64 — only ~5 MB at 617k rows so we
+    # can compute exact median/p05 without a streaming-quantile estimator).
+    if accumulators["n_rows"] != n_rows:
         raise RuntimeError(
-            f"output row count {len(out_df)} != input row count {n_rows}",
+            f"streaming wrote {accumulators['n_rows']} rows but input had {n_rows}",
         )
-    _atomic_write_parquet(output_parquet, out_df)
-    _LOG.info("wrote %s (%d rows, %d cols)", output_parquet, len(out_df), len(out_df.columns))
+    selection_prob = np.concatenate(accumulators["selection_prob_chunks"])
+    accumulators["selection_prob_chunks"].clear()
+    selection_source_tag = accumulators["selection_source_tag"] or "scored_from_b_deg_g_mag"
+    n_rows_written = writer.n_rows_written
+    n_cols_written = writer.n_columns
+    schema = schema_inferred
+    _LOG.info(
+        "wrote %s (%d rows, %d cols) via %d chunks of size %d",
+        output_parquet, n_rows_written, n_cols_written, chunk_idx, chunk_size,
+    )
+    _LOG.info(
+        "OOD: mahalanobis_rate=%.4f ensemble_rate=%.4f joint_rate=%.4f",
+        accumulators["mahal_count"] / max(n_rows, 1),
+        accumulators["ens_count"] / max(n_rows, 1),
+        accumulators["joint_count"] / max(n_rows, 1),
+    )
+    _LOG.info(
+        "Regime B: %d/%d (%.3f%%) inside envelope",
+        accumulators["regime_b_count"], n_rows,
+        100.0 * accumulators["regime_b_count"] / max(n_rows, 1),
+    )
+    _LOG.info(
+        "mode-ambiguous: %d/%d (%.3f%%) flagged",
+        accumulators["mode_ambiguous_count"], n_rows,
+        100.0 * accumulators["mode_ambiguous_count"] / max(n_rows, 1),
+    )
+    _LOG.info(
+        "aux-missingness: ir=%.4f parallax=%.4f extinction=%.4f any=%.4f",
+        accumulators["ir_missing_flag_count"] / max(n_rows, 1),
+        accumulators["parallax_missing_flag_count"] / max(n_rows, 1),
+        accumulators["extinction_missing_flag_count"] / max(n_rows, 1),
+        accumulators["aux_missing_any_count"] / max(n_rows, 1),
+    )
 
     # --- provenance -------------------------------------------------------
     ensemble_member_shas = {ckpt.name: _sha256_of_file(ckpt) for ckpt in ckpt_paths}
+    n_rows_safe = max(n_rows, 1)
+    column_names = [field.name for field in (writer._schema or pa.schema([]))]
     provenance: dict[str, Any] = {
         "output_file": str(output_parquet.relative_to(REPO_ROOT))
         if output_parquet.is_relative_to(REPO_ROOT)
@@ -1006,7 +1471,20 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
         "git_sha": _git_sha(),
         "device": str(device),
         "n_input_rows": int(n_rows),
-        "n_output_rows": int(len(out_df)),
+        "n_output_rows": int(n_rows_written),
+        "streaming": {
+            "chunk_size": int(chunk_size),
+            "n_chunks": int(chunk_idx),
+            "writer": "pyarrow.parquet.ParquetWriter (atomic tmp+rename)",
+            "rationale": (
+                "Per-chunk inference bounds peak RAM by O(chunk_size) instead "
+                "of O(N). At 50 000 rows/chunk × 21 labels × 5 members the "
+                "predict_ensemble (B, n, n) covariance tensors and the unscale "
+                "transients all stay below ~700 MB, enabling 617k-row "
+                "inference inside the 9.7 GB WSL2 envelope that previously "
+                "OOMed on the all-at-once flow."
+            ),
+        },
         "input": {
             "path": str(input_parquet),
             "sha256": _sha256_of_file(input_parquet),
@@ -1034,17 +1512,17 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
                 "threshold_distance": float(bundle.threshold),
                 "n_training": int(bundle.n_training),
                 "regularization": float(bundle.regularization),
-                "flag_count": int(mahal_flags.sum()),
-                "flag_rate": float(mahal_flags.mean()),
+                "flag_count": int(accumulators["mahal_count"]),
+                "flag_rate": float(accumulators["mahal_count"] / n_rows_safe),
             },
             "disagreement": {
                 "ratio_threshold": float(ood_threshold),
-                "flag_count": int(ens_flags.sum()),
-                "flag_rate": float(ens_flags.mean()),
+                "flag_count": int(accumulators["ens_count"]),
+                "flag_rate": float(accumulators["ens_count"] / n_rows_safe),
             },
             "joint": {
-                "flag_count": int(joint_flags.sum()),
-                "flag_rate": float(joint_flags.mean()),
+                "flag_count": int(accumulators["joint_count"]),
+                "flag_rate": float(accumulators["joint_count"] / n_rows_safe),
                 "convention": (
                     "joint_flag = mahalanobis_flag OR disagreement_flag "
                     "(yellow-or-red per ood.combined_ood_status codes 1+2)"
@@ -1054,9 +1532,9 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
         "regime_b": {
             "envelope": envelope.to_dict(),
             "config_path": str(regime_b_config) if regime_b_config else None,
-            "n_excluded": int(regime_b_flag.sum()),
-            "n_released": int((~regime_b_flag).sum()),
-            "frac_excluded": float(regime_b_flag.mean()),
+            "n_excluded": int(accumulators["regime_b_count"]),
+            "n_released": int(n_rows - accumulators["regime_b_count"]),
+            "frac_excluded": float(accumulators["regime_b_count"] / n_rows_safe),
         },
         "mode_ambiguous": {
             "grid_path": str(mode_ambiguous_grid_path),
@@ -1072,11 +1550,11 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
                 "min_mean_sep": float(ambiguity_grid.min_mean_sep),
                 "bic_delta_min": float(ambiguity_grid.bic_delta_min),
             },
-            "n_in_grid": int(in_grid.sum()),
-            "n_out_of_grid": int((~in_grid).sum()),
-            "n_in_grid_bimodal": int(in_grid_flag.sum()),
-            "n_flagged": int(mode_ambiguous_flag.sum()),
-            "frac_flagged": float(mode_ambiguous_flag.mean()),
+            "n_in_grid": int(accumulators["in_grid_count"]),
+            "n_out_of_grid": int(accumulators["out_of_grid_count"]),
+            "n_in_grid_bimodal": int(accumulators["in_grid_bimodal_count"]),
+            "n_flagged": int(accumulators["mode_ambiguous_count"]),
+            "frac_flagged": float(accumulators["mode_ambiguous_count"] / n_rows_safe),
             "convention": (
                 "mode_ambiguous_flag = (cell is bimodal in training α/M) "
                 "OR (predicted (Teff, log g, [M/H]) is outside the grid). "
@@ -1092,9 +1570,7 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
             ),
         },
         "selection_prob": {
-            "source": "input_passthrough"
-            if "selection_prob" in df.columns
-            else "scored_from_b_deg_g_mag",
+            "source": selection_source_tag,
             "mean": float(np.nanmean(selection_prob)),
             "median": float(np.nanmedian(selection_prob)),
             "p05": float(np.nanquantile(selection_prob, 0.05)),
@@ -1129,24 +1605,20 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
                 "extinction_cols_in_layout": [c for c in EXTINCTION_COLS if c in layout.aux_cols],
             },
             "flag_rates": {
-                "ir_missing_flag": float(aux_missing_flags["ir_missing_flag"].mean()),
+                "ir_missing_flag": float(accumulators["ir_missing_flag_count"] / n_rows_safe),
                 "parallax_missing_flag": float(
-                    aux_missing_flags["parallax_missing_flag"].mean(),
+                    accumulators["parallax_missing_flag_count"] / n_rows_safe,
                 ),
                 "extinction_missing_flag": float(
-                    aux_missing_flags["extinction_missing_flag"].mean(),
+                    accumulators["extinction_missing_flag_count"] / n_rows_safe,
                 ),
-                "aux_missing_any": float(aux_missing_flags["aux_missing_any"].mean()),
+                "aux_missing_any": float(accumulators["aux_missing_any_count"] / n_rows_safe),
             },
             "flag_counts": {
-                "ir_missing_flag": int(aux_missing_flags["ir_missing_flag"].sum()),
-                "parallax_missing_flag": int(
-                    aux_missing_flags["parallax_missing_flag"].sum(),
-                ),
-                "extinction_missing_flag": int(
-                    aux_missing_flags["extinction_missing_flag"].sum(),
-                ),
-                "aux_missing_any": int(aux_missing_flags["aux_missing_any"].sum()),
+                "ir_missing_flag": int(accumulators["ir_missing_flag_count"]),
+                "parallax_missing_flag": int(accumulators["parallax_missing_flag_count"]),
+                "extinction_missing_flag": int(accumulators["extinction_missing_flag_count"]),
+                "aux_missing_any": int(accumulators["aux_missing_any_count"]),
             },
             "independence_note": (
                 "Aux-missingness flags are DATA-availability signals and are "
@@ -1167,7 +1639,7 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
             "teff": RELEASE_NOTES_TEFF,
             "logg": RELEASE_NOTES_LOGG,
         },
-        "columns": list(out_df.columns),
+        "columns": column_names,
         "notes": (
             "Output μ / Σ / σ / epistemic_var are in raw physical units "
             "(Teff: K, log g: dex, abundances: dex). cov_{i}_{j} matrix is "

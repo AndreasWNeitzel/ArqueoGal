@@ -1,1 +1,0 @@
-_archive_pre_redesign_2026-04-29/plot_29_extinction_ablation_demo.py

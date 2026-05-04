@@ -121,7 +121,7 @@ def fit_mahalanobis_ood(
     dists = np.sqrt(sq_dists)
     threshold = float(np.quantile(dists, p_threshold))
 
-    return MahalanobisOODBundle(
+    bundle = MahalanobisOODBundle(
         feature_mean=mu,
         feature_precision=precision,
         threshold=threshold,
@@ -129,6 +129,13 @@ def fit_mahalanobis_ood(
         n_training=int(X.shape[0]),
         regularization=float(regularization),
     )
+    # Attach the sorted training distances as a non-persisted attribute
+    # so score_percentile_mahalanobis_ood can compute per-star empirical
+    # percentile against the training distribution at inference time.
+    # Sorted ascending; searchsorted gives the percentile directly.
+    object.__setattr__(bundle, "training_distances_sorted",
+                        np.sort(dists).astype(np.float64))
+    return bundle
 
 
 def score_mahalanobis_ood(
@@ -168,6 +175,32 @@ def flag_mahalanobis_ood(
     """
     dists = score_mahalanobis_ood(features, bundle)
     return ~(dists <= bundle.threshold)  # NaN → True via negation of NaN≤x = False
+
+
+def percentile_mahalanobis_ood(
+    features: np.ndarray,
+    bundle: MahalanobisOODBundle,
+) -> np.ndarray:
+    """Per-star empirical percentile against the training-distance ECDF.
+
+    Returns a value in [0, 1]: the fraction of training stars whose
+    Mahalanobis distance is ≤ this star's distance. ``0.99`` means this
+    star is at the 99th percentile of the training distribution; users
+    pick their own cutoff (e.g. > 0.99 = stricter than default Tier-3).
+
+    Returns ``np.nan`` for stars whose Mahalanobis distance is ``nan``
+    (non-finite features).
+    """
+    dists = score_mahalanobis_ood(features, bundle)
+    train = getattr(bundle, "training_distances_sorted", None)
+    if train is None or len(train) == 0:
+        return np.full(dists.shape, np.nan, dtype=np.float64)
+    out = np.full(dists.shape, np.nan, dtype=np.float64)
+    ok = np.isfinite(dists)
+    if ok.any():
+        idx = np.searchsorted(train, dists[ok], side="right")
+        out[ok] = idx.astype(np.float64) / float(len(train))
+    return out
 
 
 def ensemble_disagreement_ratio(
@@ -385,5 +418,6 @@ __all__ = [
     "flag_dual_mahalanobis_ood",
     "flag_ensemble_ood",
     "flag_mahalanobis_ood",
+    "percentile_mahalanobis_ood",
     "score_mahalanobis_ood",
 ]

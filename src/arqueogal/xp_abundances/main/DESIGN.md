@@ -540,7 +540,7 @@ Counts and the flag-column provenance are emitted to
 
 Under `tests/xp_abundances/main/`. Smoke tests for model forward/backward,
 preprocessing round-trip, calibration post-hoc application, ensemble aggregation
-correctness, per-cell coverage assertion on a held-out synthetic fixture. Schema
+correctness, per-cell coverage assertion on held-out real Stream-1 data. Schema
 contract tests assert the parquet schema matches `FeatureLayout` exactly, the
 sanity battery is the runtime enforcement; the unit tests are the static
 enforcement.

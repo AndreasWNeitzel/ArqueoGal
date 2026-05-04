@@ -95,7 +95,7 @@ def main() -> None:
     cfg = build_cfg()
     layout = FeatureLayout()
     tiers = LabelTiers.five_label()
-    train_loader, _val_loader, _split_ids, label_scaler = build_dataloaders(
+    train_loader, _val_loader, _split_ids, label_scaler, _ = build_dataloaders(
         cfg,
         layout,
         tiers,

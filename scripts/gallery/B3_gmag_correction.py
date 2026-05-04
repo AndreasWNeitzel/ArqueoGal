@@ -6,12 +6,9 @@ What this shows:
   showing the cubic color dependence of the Riello+2021 correction.
 
 What it reads:
-- data/processed/pipeline1_features_stream1.parquet (must have g_mag, bp_rp).
+- data/processed/pipeline1_features_stream1_kiel.parquet (must have g_mag, bp_rp).
 - Provenance audit in data/processed/pipeline1_features_stream1.provenance.json
   for detailed per-star correction history (optional).
-
-Synthetic fixture support: --synthetic flag generates realistic Riello
-colour-dependent corrections.
 """
 
 from __future__ import annotations
@@ -29,90 +26,85 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 
 from _common import apply_style, save_fig
 
-OUT = REPO / "reports/gallery/B3_gmag_correction"
+OUT = REPO / "reports/gallery/B_preprocessing"
 
 
-def _make_synthetic():
-    """Generate synthetic Riello G-mag correction data."""
-    rng = np.random.default_rng(42)
-    n = 5000
-
-    # Raw G-magnitude
-    g_raw = rng.uniform(6, 17, n)
-
-    # Colour (BP-RP) — typically 0.3 to 3.0 for RGB giants
-    bp_rp = rng.uniform(0.3, 3.0, n)
-
-    # Riello+2021 correction: cubic in (BP-RP), magnitude-dependent coefficient
-    # Simplified model: ΔG ≈ c0 + c1*(BP-RP) + c2*(BP-RP)^2 + c3*(BP-RP)^3
-    # with magnitude-dependent scaling
-    color_norm = (bp_rp - 1.5) / 1.5  # normalize to ~0 at BP-RP=1.5
-    delta_g = 0.002 + 0.008 * color_norm + 0.003 * color_norm ** 2 + 0.001 * color_norm ** 3
-    delta_g *= (1.0 + 0.01 * (g_raw - 12))  # weak magnitude dependence
-
-    g_corrected = g_raw + delta_g
-
-    return pd.DataFrame({
-        "g_mag_raw": g_raw,
-        "g_mag": g_corrected,
-        "bp_rp": bp_rp,
-    })
-
-
-def main(use_synthetic: bool = False) -> None:
+def main() -> None:
     apply_style()
 
-    if use_synthetic:
-        s1 = _make_synthetic()
-        # Rename to match real data columns
-        if "g_mag_raw" in s1.columns:
-            s1 = s1.rename(columns={"g_mag_raw": "g_mag_before_correction"})
-    else:
-        s1 = pd.read_parquet(
-            REPO / "data/processed/pipeline1_features_stream1.parquet",
-            columns=["g_mag", "bp_rp"],
-        )
-        # Note: raw g_mag is not preserved in the feature parquet (only corrected).
-        # For a real implementation, read provenance.json or the interim parquet.
+    # The processed Stream-1 feature parquet only carries the corrected
+    # G (column ``g_mag``). The upstream interim parquet
+    # ``data/interim/stream1_apogee_gaia.parquet`` has both
+    # ``phot_g_mean_mag`` (raw) and ``phot_g_mean_mag_corr`` (Riello+2021
+    # corrected). Join on source_id to recover the per-star delta.
+    s1_proc = pd.read_parquet(
+        REPO / "data/processed/pipeline1_features_stream1_kiel.parquet",
+        columns=["source_id", "bp_rp"],
+    )
+    s1_int = pd.read_parquet(
+        REPO / "data/interim/stream1_apogee_gaia.parquet",
+        columns=["source_id", "phot_g_mean_mag", "phot_g_mean_mag_corr"],
+    )
+    s1 = s1_proc.merge(s1_int, on="source_id", how="inner").drop_duplicates("source_id")
+
+    g_raw = s1["phot_g_mean_mag"].values
+    g_corr = s1["phot_g_mean_mag_corr"].values
+    bp_rp = s1["bp_rp"].values
+    m = np.isfinite(g_raw) & np.isfinite(g_corr) & np.isfinite(bp_rp)
+    delta_g = g_corr - g_raw   # mag (Riello correction is sub-mmag in most cases)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 
-    # For synthetic: show the correction
-    if use_synthetic and "g_mag_before_correction" in s1.columns:
-        g_raw = s1["g_mag_before_correction"].values
-        g_corr = s1["g_mag"].values
-        delta_g = g_corr - g_raw
-    else:
-        g_raw = s1["g_mag"].values
-        g_corr = g_raw
-        delta_g = np.zeros_like(g_raw)
-
-    m = np.isfinite(g_raw) & np.isfinite(g_corr) & np.isfinite(s1["bp_rp"])
-
-    # Panel 1: raw vs corrected with 1:1 line
-    axes[0].scatter(g_raw[m], g_corr[m], c=s1["bp_rp"][m], s=3, alpha=0.4, cmap="viridis", rasterized=True)
+    # Panel 1: raw vs corrected with 1:1 line. Most stars sit on the diagonal
+    # because the correction is sub-mmag for the bulk; the ~3% with non-zero
+    # corrections deviate.
+    sc0 = axes[0].scatter(
+        g_raw[m], g_corr[m], c=bp_rp[m], s=3, alpha=0.4, cmap="coolwarm", rasterized=True,
+    )
+    plt.colorbar(sc0, ax=axes[0], label=r"BP − RP [mag]")
     g_lims = [g_raw[m].min(), g_raw[m].max()]
-    axes[0].plot(g_lims, g_lims, "k--", lw=0.5, alpha=0.5, label="1:1 line")
+    axes[0].plot(g_lims, g_lims, "k--", lw=0.6, alpha=0.7, label="1:1")
     axes[0].set_xlabel(r"$G_\mathrm{raw}$ [mag]")
-    axes[0].set_ylabel(r"$G_\mathrm{corrected}$ [mag]")
-    axes[0].set_title(f"Raw vs corrected G (n={m.sum():,})")
-    axes[0].legend(fontsize=8)
+    axes[0].set_ylabel(r"$G_\mathrm{corrected}$ [mag] (Riello+2021)")
+    axes[0].set_title(f"Raw vs Riello-corrected G (n={int(m.sum()):,})")
+    axes[0].legend(fontsize=8, loc="upper left")
+    axes[0].grid(True, alpha=0.25)
 
-    # Panel 2: ΔG vs raw G, coloured by BP-RP
-    scatter = axes[1].scatter(g_raw[m], delta_g[m] * 1000, c=s1["bp_rp"][m], s=3, alpha=0.4, cmap="viridis", rasterized=True)
-    axes[1].axhline(0, color="k", lw=0.5, alpha=0.5)
+    # Panel 2: residual ΔG vs raw G in MAGNITUDES (not mmag). Per the user
+    # request, keep the y-axis in mag; use a tight ylim to make the bulk
+    # residuals visible.
+    scatter = axes[1].scatter(
+        g_raw[m],
+        delta_g[m],
+        c=bp_rp[m],
+        s=3,
+        alpha=0.4,
+        cmap="coolwarm",
+        rasterized=True,
+    )
+    axes[1].axhline(0, color="k", lw=0.6, ls="--", alpha=0.6)
+    # Auto-tight y-range: clip to the bulk percentiles so a few extreme
+    # corrections do not flatten the vertical spread.
+    if m.sum() > 0:
+        p05, p95 = np.nanpercentile(delta_g[m], [0.5, 99.5])
+        if p95 > p05:
+            axes[1].set_ylim(p05 - 0.0005, p95 + 0.0005)
     axes[1].set_xlabel(r"$G_\mathrm{raw}$ [mag]")
-    axes[1].set_ylabel(r"$\Delta G$ [mmag] (Riello+21)")
-    axes[1].set_title(f"Correction magnitude (n={m.sum():,})")
+    axes[1].set_ylabel(r"$\Delta G = G_\mathrm{corr} - G_\mathrm{raw}$ [mag]")
+    axes[1].set_title(f"Riello+2021 correction magnitude (n={int(m.sum()):,})")
     cbar = plt.colorbar(scatter, ax=axes[1])
     cbar.set_label(r"BP − RP [mag]")
+    axes[1].grid(True, alpha=0.25)
 
-    fig.suptitle("B3 — Riello+2021 G-magnitude correction (colour-cubic model)", fontsize=11)
-    save_fig(fig, OUT / "gmag_correction")
+    fig.suptitle(
+        "B3 — Stream 1 (APOGEE × Gaia DR3): Riello+2021 G-mag correction "
+        "(blue→red colormap = bluer→redder BP−RP)",
+        fontsize=11,
+    )
+    save_fig(fig, OUT / "B3_gmag_correction")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot B3: G-magnitude correction.")
-    parser.add_argument("--synthetic", action="store_true", help="Use synthetic fixture.")
     args = parser.parse_args()
-    main(use_synthetic=args.synthetic)
+    main()

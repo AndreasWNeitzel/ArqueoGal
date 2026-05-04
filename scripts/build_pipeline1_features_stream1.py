@@ -28,6 +28,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.compute  # noqa: F401  (import side-effect: registers pa.compute)
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 
@@ -217,12 +219,64 @@ def main() -> None:
     s1 = pd.read_parquet(s1_path)
     logger.info("  %d rows × %d cols", len(s1), len(s1.columns))
 
-    logger.info("loading %s", xp_path)
-    xp = pd.read_parquet(xp_path)
-    logger.info("  %d rows × %d cols", len(xp), len(xp.columns))
+    # Memory-aware XP load via row-group streaming. The XP parquet has a
+    # ``corrected_flux`` list<float32>(330) column; loading 700k+ rows into
+    # pandas costs >10 GB of RAM and OOMs on a 9.7 GB box. Stream the
+    # parquet row-group at a time, drop non-matching source_ids per group,
+    # and accumulate only the survivors. The XP parquet is typically
+    # written with row-groups of ~50k rows, so peak transient memory is
+    # one row-group (~1 GB with corrected_flux) plus the accumulator
+    # (the survivors, ~5 GB total for ~330k matched rows).
+    import gc
+    import pyarrow.parquet as _pq
+    s1_ids_arr = s1["source_id"].to_numpy()
+    s1_ids = pa.array(s1_ids_arr)
+    s1_ids_set = pa.compute.SetLookupOptions(value_set=s1_ids)
+
+    # CRITICAL: project corrected_flux OUT at parquet read time. The build
+    # script does not need it; carrying the list<float32>(330) column into
+    # pandas costs ~10 KB / row in Python-list overhead, blowing out memory
+    # on the 717k-row XP parquet. emit_stream1_with_hermite.py reads
+    # corrected_flux directly from xp_sampled_corrected.parquet via its own
+    # row-group streaming filter; build only needs source_id, ye2024_flag,
+    # and a_v_sfd here.
+    XP_KEEP_COLS = ["source_id", "ye2024_flag", "a_v_sfd"]
+    logger.info("streaming %s row-groups, projection=%s, filtering to Stream 1 source_ids",
+                xp_path, XP_KEEP_COLS)
+    xp_pf = _pq.ParquetFile(xp_path)
+    n_rg = xp_pf.metadata.num_row_groups
+    survivor_batches: list = []
+    n_kept = 0
+    n_seen = 0
+    for rg_idx in range(n_rg):
+        rg = xp_pf.read_row_group(rg_idx, columns=XP_KEEP_COLS)
+        n_seen += rg.num_rows
+        mask = pa.compute.is_in(rg.column("source_id"), options=s1_ids_set)
+        kept = rg.filter(mask)
+        if kept.num_rows:
+            survivor_batches.append(kept)
+            n_kept += kept.num_rows
+        del rg, mask, kept
+        if (rg_idx + 1) % 5 == 0 or rg_idx == n_rg - 1:
+            logger.info(
+                "  row-group %d/%d: kept %d / %d total",
+                rg_idx + 1, n_rg, n_kept, n_seen,
+            )
+        gc.collect()
+    xp_table = pa.concat_tables(survivor_batches)
+    del survivor_batches
+    gc.collect()
+    logger.info("  XP rows matching Stream 1: %d (3-col projection only)", xp_table.num_rows)
+
+    xp = xp_table.to_pandas()
+    del xp_table
+    gc.collect()
+    logger.info("  XP DataFrame: %d rows × %d cols", len(xp), len(xp.columns))
 
     logger.info("inner-joining Stream 1 × Ye-corrected XP on source_id")
     merged = s1.merge(xp, on="source_id", how="inner")
+    del s1, xp
+    gc.collect()
     logger.info("  %d rows after join", len(merged))
     n_before = len(merged)
 
@@ -236,29 +290,13 @@ def main() -> None:
         )
     merged = merged.rename(columns=present_renames)
 
+    # RGB scope cut on Teff / log g removed 2026-04-29: the OOD flags
+    # (ood_mahalanobis_score, ood_disagreement_flag, regime_b_flag,
+    # mode_ambiguous_flag) handle evolutionary-stage out-of-distribution stars
+    # at inference time. The training set therefore retains the full APOGEE
+    # post-quality-cut cohort regardless of Kiel position.
     logger.info(
-        "applying RGB scope cut: Teff ∈ [%.0f, %.0f] K AND logg ∈ [%.1f, %.1f]",
-        RGB_TEFF_MIN_K,
-        RGB_TEFF_MAX_K,
-        RGB_LOGG_MIN,
-        RGB_LOGG_MAX,
-    )
-    teff = merged["teff_apogee"].to_numpy(dtype=np.float64)
-    logg = merged["logg_apogee"].to_numpy(dtype=np.float64)
-    rgb_mask = (
-        np.isfinite(teff)
-        & (teff >= RGB_TEFF_MIN_K)
-        & (teff <= RGB_TEFF_MAX_K)
-        & np.isfinite(logg)
-        & (logg >= RGB_LOGG_MIN)
-        & (logg <= RGB_LOGG_MAX)
-    )
-    n_rgb_before = len(merged)
-    merged = merged.loc[rgb_mask].reset_index(drop=True)
-    n_rgb_dropped = n_rgb_before - len(merged)
-    logger.info(
-        "  dropped %d rows outside RGB window (keep %d)",
-        n_rgb_dropped,
+        "RGB scope cut deprecated; retaining all %d rows post-APOGEE-quality-cut",
         len(merged),
     )
 
@@ -354,8 +392,9 @@ def main() -> None:
         # flag stratification (p99 thresholds in pre_emit_decisions.json were
         # computed against this column). Not an ML input; retained for audit.
         "teff_gspphot",
-        # Sampled flux — replaced by Hermite coefficients in stage B
-        "corrected_flux",
+        # corrected_flux dropped from this stage 2026-04-29 (memory budget):
+        # emit_stream1_with_hermite.py reads it directly from
+        # data/interim/xp_sampled_corrected.parquet via row-group streaming.
         "ye2024_flag",
     ]
     missing = [c for c in keep if c not in merged.columns]
@@ -396,10 +435,7 @@ def main() -> None:
         ],
         cuts_applied=[
             "INNER JOIN stream1_apogee_gaia × xp_sampled_corrected on source_id",
-            f"RGB scope cut: teff_apogee ∈ [{RGB_TEFF_MIN_K:.0f}, "
-            f"{RGB_TEFF_MAX_K:.0f}] K AND logg_apogee ∈ [{RGB_LOGG_MIN:.1f}, "
-            f"{RGB_LOGG_MAX:.1f}]  "
-            f"(dropped {n_rgb_dropped} / {n_rgb_before} rows)",
+            "RGB scope cut: REMOVED 2026-04-29 (OOD flags handle Kiel-outlier stars downstream)",
         ],
         corrections=[
             "Renamed APOGEE columns to *_apogee convention (teff → teff_apogee, "
@@ -435,17 +471,11 @@ def main() -> None:
         ),
         extra={
             "rgb_cut": {
-                "teff_min_K": RGB_TEFF_MIN_K,
-                "teff_max_K": RGB_TEFF_MAX_K,
-                "logg_min": RGB_LOGG_MIN,
-                "logg_max": RGB_LOGG_MAX,
-                "n_rows_before": int(n_rgb_before),
-                "n_dropped": int(n_rgb_dropped),
-                "n_rows_after": int(n_rgb_before - n_rgb_dropped),
+                "status": "removed_2026_04_29",
                 "note": (
-                    "Explicit scope-of-validity cut. Zero drops on 2026-04-18 "
-                    "data (emergent intersection); retained so future APOGEE "
-                    "DR20 rebuilds surface Teff/logg drift as a named drop count."
+                    "Teff / log g Kiel-validity cut dropped 2026-04-29; downstream "
+                    "OOD flags (ood_mahalanobis_score, ood_disagreement_flag, "
+                    "regime_b_flag, mode_ambiguous_flag) handle evolutionary outliers."
                 ),
             },
             "nbhd_radius_pc": float(NEIGHBORHOOD_RADIUS_PC),

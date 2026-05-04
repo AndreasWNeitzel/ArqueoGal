@@ -157,6 +157,39 @@ def test_beta_nll_ignores_masked_out_labels() -> None:
     assert abs(full.item() - masked_all.item()) < 1e-4
 
 
+def test_beta_nll_fully_masked_star_contributes_zero_gradient() -> None:
+    """A star with every label masked out must contribute neither to the loss
+    numerator nor to the gradient. The earlier ``obs_per_star.clamp_min(eps)``
+    underflow path scaled the NLL down by ~1e-9 instead of zeroing it, so a
+    fully-masked star with placeholder ``y`` values still injected noise into
+    the optimiser. Regression guard for that bug.
+    """
+    B, blocks, n_diag = 3, (2, 2), 2
+    n = sum(blocks) + n_diag
+    L = _fake_cholesky_batch(B, n, blocks, n_diag, seed=7)
+    mu = torch.zeros(B, n, requires_grad=True)
+    y = torch.randn(B, n)
+
+    # Star 0 is fully masked; stars 1 and 2 have all labels observed.
+    mask = torch.ones(B, n)
+    mask[0, :] = 0.0
+    loss_with_masked = beta_nll_block_cholesky(mu, L, y, beta=0.0, mask=mask)
+    loss_with_masked.backward()
+    grad_full = mu.grad.detach().clone()
+    assert torch.allclose(grad_full[0], torch.zeros(n)), (
+        "fully-masked star produced non-zero μ gradient"
+    )
+
+    # Reference: dropping the fully-masked star from the batch must yield the
+    # same loss value as the masked-batch run, up to fp tolerance.
+    mu2 = torch.zeros(B - 1, n)
+    L2 = L[1:]
+    y2 = y[1:]
+    mask2 = torch.ones(B - 1, n)
+    loss_ref = beta_nll_block_cholesky(mu2, L2, y2, beta=0.0, mask=mask2)
+    assert abs(loss_with_masked.item() - loss_ref.item()) < 1e-5
+
+
 def test_beta_nll_mask_shape_validation() -> None:
     B, blocks, n_diag = 2, (2, 2), 2
     n = sum(blocks) + n_diag

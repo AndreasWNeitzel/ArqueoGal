@@ -206,12 +206,29 @@ def predict_ensemble(
     *,
     device: torch.device | None = None,
     cell_ids: np.ndarray | None = None,
+    amp_dtype: torch.dtype | None = None,
 ) -> EnsemblePrediction:
     """Run every ensemble member, apply calibration, aggregate.
 
     ``cell_ids`` (optional) is a per-star cell ID array used for per-cell
     temperature scaling. If omitted, the cell ID 0 is used for every star —
     equivalent to a single global calibration cell.
+
+    ``amp_dtype`` (optional) mirrors the training-time autocast contract:
+    pass ``torch.bfloat16`` to reproduce the bf16 forward pass on CUDA so a
+    bf16-trained checkpoint does not silently fall back to fp32 at inference.
+    Ignored on CPU.
+
+    Notes
+    -----
+    Ensemble aggregation assumes the members are *conditionally independent
+    given the input* (deep-ensemble Bayesian-model-averaging contract,
+    Lakshminarayanan+2017). The training driver enforces this by seeding each
+    member with a distinct RNG and (optionally) a distinct data subsample;
+    members that share weights, share data, or share an upstream contrastive
+    trunk without independent fine-tuning will *under*-estimate epistemic
+    variance and the resulting ``Sigma_total`` coverage will be optimistic in
+    the tails.
 
     Raises
     ------
@@ -223,17 +240,33 @@ def predict_ensemble(
     """
     if not ensemble:
         raise ValueError("ensemble is empty")
-    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Pre-flight check: verify frozen v1 stats are available and basis matches.
+    # Pre-flight: verify frozen v1 stats fingerprint *before* any device or
+    # loader resource is acquired. A mismatch here is a hard contract failure
+    # (the basis on which the calibration thresholds were derived has shifted)
+    # and we want it to surface before we touch the GPU.
     assert_frozen_stats_match()
 
-    mus: list[np.ndarray] = []
-    Sigmas_alea: list[np.ndarray] = []
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    M = len(ensemble)
+
+    # Single-pass streaming accumulator. Earlier code held two lists (one of
+    # per-member mu of shape (B, n), one of per-member aleatoric covariance of
+    # shape (B, n, n)) and only collapsed them at the end. At catalogue scale
+    # (B ≈ 50 M, n = 21, M = 5) the covariance list alone was ~88 GB and forced
+    # an OOM on the 32 GB pc127 sibling. We now keep one (M, B, n) array of
+    # member means (returned to the caller anyway as ``per_member_mu``) and
+    # one (B, n, n) running ``Sigma_alea`` accumulator; epistemic covariance
+    # is computed via the second-moment identity
+    # ``Σ_epi = E[μ_m μ_mᵀ] − μ̄ μ̄ᵀ`` so no (M, B, n) ``delta`` temporary
+    # is materialised. Peak memory drops by ~109 GB at 50 M-star scale.
+    per_mu: np.ndarray | None = None
+    Sigma_alea: np.ndarray | None = None
+    second_moment: np.ndarray | None = None  # Σ_m μ_m μ_mᵀ accumulator
     y_ref: np.ndarray | None = None
 
-    for m in ensemble:
-        preds = collect_predictions(m.model, loader, device=device)
+    for member_idx, m in enumerate(ensemble):
+        preds = collect_predictions(m.model, loader, device=device, amp_dtype=amp_dtype)
         mu_m, L_m = preds["mu"], preds["L"]
         # NaN safety (ADR-0012): sanitise predictions before aggregation.
         # This catches any NaN/Inf that slipped through the data loader.
@@ -252,24 +285,32 @@ def predict_ensemble(
                 raise ValueError(f"cell_ids length {cell_ids.shape[0]} != batch N {mu_m.shape[0]}")
             cell_ids_m = cell_ids
         mu_m, L_m = apply_calibration(mu_m, L_m, m.calibration, cell_ids=cell_ids_m)
-        mus.append(mu_m)
-        Sigmas_alea.append(np.einsum("bij,bkj->bik", L_m, L_m))
-        if y_ref is None:
+
+        if per_mu is None:
+            B, n = mu_m.shape
+            per_mu = np.empty((M, B, n), dtype=mu_m.dtype)
+            Sigma_alea = np.zeros((B, n, n), dtype=np.float64)
+            second_moment = np.zeros((B, n, n), dtype=np.float64)
             y_ref = preds["y"]
+        per_mu[member_idx] = mu_m
+        # Σ_alea = (1/M) Σ_m L_m L_mᵀ; accumulate in fp64 for numerical safety,
+        # then divide once at the end.
+        Sigma_alea += np.einsum("bij,bkj->bik", L_m, L_m, dtype=np.float64)
+        # Second-moment accumulator for Σ_epi via the parallel-axis identity.
+        second_moment += np.einsum("bi,bj->bij", mu_m, mu_m, dtype=np.float64)
 
-    # Streaming aggregation (memory-efficient, avoids O(M * B * n^2) stacking).
-    # Accumulate Σ_alea and epistemic moments without holding the full per-member stack.
-    per_mu = np.stack(mus, axis=0)  # (M, B, n) — required for epistemic covariance
+    assert per_mu is not None and Sigma_alea is not None and second_moment is not None
+    Sigma_alea /= M
     mu_mean = per_mu.mean(axis=0)  # (B, n)
-
-    # Accumulate aleatoric covariance via streaming; free per-member covariance after use.
-    Sigma_alea = np.zeros_like(Sigmas_alea[0]) if Sigmas_alea else np.zeros((1, 1, 1))
-    for Sigma_m in Sigmas_alea:
-        Sigma_alea += Sigma_m / len(Sigmas_alea)
-
-    # Epistemic covariance from centered per-member means.
-    delta = per_mu - mu_mean[None, :, :]  # (M, B, n)
-    Sigma_epi = np.einsum("mbi,mbj->bij", delta, delta) / per_mu.shape[0]
+    # Σ_epi = E[μ_m μ_mᵀ] − μ̄ μ̄ᵀ. Equivalent to ``mean over m of (μ_m − μ̄)(μ_m − μ̄)ᵀ``
+    # but skips the (M, B, n) centred-mean intermediate.
+    Sigma_epi = second_moment / M - np.einsum("bi,bj->bij", mu_mean, mu_mean, dtype=np.float64)
+    # Defensive PSD floor on the diagonal: catastrophic cancellation in the
+    # second-moment form can leave eigenvalues at -O(eps_fp64) on stars where
+    # every member agreed. Clipping the diagonal to ≥ 0 preserves the off-diag
+    # correlation structure and keeps Σ_total numerically PSD downstream.
+    diag_idx = np.arange(Sigma_epi.shape[1])
+    Sigma_epi[:, diag_idx, diag_idx] = np.clip(Sigma_epi[:, diag_idx, diag_idx], 0.0, None)
     Sigma_total = Sigma_alea + Sigma_epi
 
     sigma_alea = np.sqrt(np.clip(np.einsum("bii->bi", Sigma_alea), 0.0, None))

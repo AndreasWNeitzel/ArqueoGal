@@ -31,7 +31,6 @@ Ye et al. 2025 (A&A 695, A75; arXiv:2411.19105); Zenodo 10.5281/zenodo.14028588.
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -53,6 +52,7 @@ from arqueogal.data.gaia_xp import (
 )
 from arqueogal.data.provenance import Provenance, TapSource, write_sidecar
 from arqueogal.data.tap import AIP_TAP_URL, DEFAULT_ASYNC_TIMEOUT_SEC, aip_service
+from arqueogal.utils.io import save_parquet
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,7 @@ def ingest_xp(  # noqa: PLR0913 — keyword-only tuning knobs with safe defaults
     }
 
     logger.info("Level-3: writing %s", output_path)
-    _write_parquet_atomic(corrected, output_path)
+    save_parquet(corrected, output_path)
 
     n_batches = (n_requested + batch_size - 1) // batch_size
     prov = Provenance(
@@ -208,14 +208,6 @@ def ingest_xp(  # noqa: PLR0913 — keyword-only tuning knobs with safe defaults
         flag_counts,
     )
     return output_path, flag_counts
-
-
-def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
-    """Write a Parquet file via temp + rename so crashes never leave a partial."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".part")
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, path)
 
 
 __all__ = ["DEFAULT_OUTPUT_FILENAME", "ingest_xp"]

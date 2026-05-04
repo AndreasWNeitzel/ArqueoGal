@@ -22,17 +22,14 @@ publication-bound deliverable schedule.
 
 ## Environment
 
-```bash
-# Install via uv (recommended)
-uv venv .venv --python 3.12
-source .venv/bin/activate
-uv pip install -e ".[dev]"
-```
-
-GPU-dependent training and inference require RAPIDS 25.10 and CUDA 13.
-The CI workflow runs only the CPU-safe test subset (release-tier
-schema, adapter, config, sanity battery, release-pipeline mirror) on
-ubuntu-latest.
+The README "Environment" section documents both the CPU-only contributor
+setup (the same dep set CI installs) and the maintainer's full RAPIDS / CUDA
+stack. Use the CPU-only path unless you are building or running training
+checkpoints. The CI workflow exercises the full ``tests/xp_abundances/main/``
+tree and ``tests/data/test_release_pipeline.py``, filtered with
+``-m "not gpu and not slow and not stress"`` so it stays portable; passing
+``ruff check`` and ``pytest`` locally with that marker filter implies passing
+on push.
 
 ## Development workflow
 
@@ -72,9 +69,9 @@ ubuntu-latest.
 
 ## Citation
 
-If you use this software, please cite it via [`CITATION.cff`](CITATION.cff).
-The DOI placeholder will be replaced after the Zenodo mint accompanying
-the v1 publication.
+A `CITATION.cff` ships with the repo at version `1.0.0-pre`. It does not yet
+carry a DOI: the Zenodo mint will accompany the v1 methods-paper submission.
+Until then, cite by repository URL and commit SHA.
 
 ## License
 

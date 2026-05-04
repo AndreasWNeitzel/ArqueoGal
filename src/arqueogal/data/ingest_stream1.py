@@ -9,25 +9,31 @@ Ties the single-purpose data-layer modules into the §2.1 Stream 1 pipeline:
         → inner join on ``source_id``
         → Lindegren+2021 parallax zero-point
         → Riello+2021 G-band flux/magnitude correction
+        → CCM89 R_V=3.1 + Yuan+2013 IR dereddening (when broadband cols exist)
         → write ``stream1_apogee_gaia.parquet``
         → write ``stream1_apogee_gaia.provenance.json``
 
-All three corrections are live: Mészáros+2025 (Table 3 linear Δ[X/M] fit to
+All four corrections are live: Mészáros+2025 (Table 3 linear Δ[X/M] fit to
 open clusters), Lindegren+2021 parallax zero-point (via ``gaiadr3-zeropoint``),
-and Riello+2021 (A&A 649 A3 Appendix A) G-band flux/magnitude correction
-(see ``gaia_corrections.apply_g_mag_correction``).
+Riello+2021 (A&A 649 A3 Appendix A) G-band flux/magnitude correction (see
+``gaia_corrections.apply_g_mag_correction``), and the v1 frozen extinction
+recipe — CCM89 R_V=3.1 with Yuan+2013 broadband ratios applied to whichever
+of (J, H, Ks, W1, W2) the merged frame carries; see ``data.extinction`` and
+``docs/protocols/extinction_correction.md``. The dereddening step is a
+no-op when the broadband columns are absent (Stream 1 carries them only
+after the IR cross-match step).
 AIP Gaia enrichment is the only remaining user-gated step.
 
 References
 ----------
 data_acquisition.md §2.1 (Stream 1), §3 (DR19), §3.6 (enrichment),
-§3.7 (corrections), §14 (layout + provenance).
+§3.7 (corrections), §14 (layout + provenance);
+docs/protocols/extinction_correction.md (v1 dereddening contract).
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -43,8 +49,9 @@ from arqueogal.data.apogee_dr19 import (
     load_dr19,
 )
 from arqueogal.data.downloads import download, sha256_file
-from arqueogal.data.gaia_corrections import apply_g_mag_correction, apply_parallax_zpt
+from arqueogal.data.extinction import DEFAULT_EXTINCTION_LAW
 from arqueogal.data.gaia_enrich import ENRICHMENT_ADQL, enrich_source_ids
+from arqueogal.data.preprocessing import apply_pipeline1_preprocessing
 from arqueogal.data.provenance import (
     HttpSource,
     LocalSource,
@@ -53,6 +60,7 @@ from arqueogal.data.provenance import (
     write_sidecar,
 )
 from arqueogal.data.tap import AIP_TAP_URL, aip_service
+from arqueogal.utils.io import save_parquet
 
 logger = logging.getLogger(__name__)
 
@@ -146,22 +154,26 @@ def ingest_stream1(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     # driver dedups (training.py:122-135) before splitting so the multi-spectrum
     # rows do not leak across train/val/test.
     merged = corrected.merge(enriched, on="source_id", how="inner", validate="many_to_one")
-    n_merged = len(merged)
+    n_merged_pre_preprocessing = len(merged)
     logger.info(
         "Stream 1: merged %d rows (APOGEE post-cut %d × Gaia %d)",
-        n_merged,
+        n_merged_pre_preprocessing,
         len(corrected),
         len(enriched),
     )
 
-    logger.info("Stream 1: Lindegren+2021 parallax zero-point")
-    merged = apply_parallax_zpt(merged)
-
-    logger.info("Stream 1: Riello+2021 G-mag correction")
-    merged = apply_g_mag_correction(merged)
+    logger.info("Stream 1: unified preprocessing pipeline (steps 1-8)")
+    processed = apply_pipeline1_preprocessing(
+        merged,
+        mode="train",
+        aip=tap,
+        apply_extinction=True,
+    )
+    extinction_applied = any(c in processed.columns for c in ("j_mag_dered",))
+    n_merged = len(processed)
 
     logger.info("Stream 1: writing %s", output_path)
-    _write_parquet_atomic(merged, output_path)
+    save_parquet(processed, output_path)
 
     n_enrich_batches = (len(corrected) + enrich_batch_size - 1) // enrich_batch_size
     prov = Provenance(
@@ -188,11 +200,22 @@ def ingest_stream1(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
             ),
         ],
         cuts_applied=cuts.as_predicates(),
-        corrections=[
-            "Mészáros+2025 [X/M]/Teff polynomial corrections (DR19)",
-            "Lindegren+2021 parallax zero-point",
-            "Riello+2021 G-band flux/magnitude correction (A&A 649, A3 Appendix A)",
-        ],
+        corrections=(
+            [
+                "Mészáros+2025 [X/M]/Teff polynomial corrections (DR19)",
+                "Lindegren+2021 parallax zero-point",
+                "Riello+2021 G-band flux/magnitude correction (A&A 649, A3 Appendix A)",
+            ]
+            + (
+                [
+                    f"Extinction: {DEFAULT_EXTINCTION_LAW.name} "
+                    "(Yuan+2013 broadband ratios, dust-map fusion via "
+                    "data.extinction.apply_extinction_corrections)"
+                ]
+                if extinction_applied
+                else []
+            )
+        ),
         row_count_before=cut_stats["before"],
         row_count_after=n_merged,
         notes=(
@@ -213,19 +236,39 @@ def ingest_stream1(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
                 if isinstance(corrected.attrs.get("meszaros_correction_summary"), pd.DataFrame)
                 else corrected.attrs.get("meszaros_correction_summary")
             ),
+            # Extinction-correction provenance: full law fingerprint + flag
+            # firing rates so the v1 contract is reproducible from the
+            # sidecar alone (no need to read source code).
+            "extinction_correction": (
+                {
+                    "applied": True,
+                    "law": DEFAULT_EXTINCTION_LAW.fingerprint(),
+                    "flag_counts": {
+                        "av_is_neighborhood_fallback": int(
+                            processed["av_is_neighborhood_fallback"].sum()
+                        )
+                        if "av_is_neighborhood_fallback" in processed.columns
+                        else 0,
+                        "av_distance_prior_dominated": int(
+                            processed["av_distance_prior_dominated"].sum()
+                        )
+                        if "av_distance_prior_dominated" in processed.columns
+                        else 0,
+                        "av_neighbourhood_high_dispersion": int(
+                            processed["av_neighbourhood_high_dispersion"].sum()
+                        )
+                        if "av_neighbourhood_high_dispersion" in processed.columns
+                        else 0,
+                    },
+                }
+                if extinction_applied
+                else {"applied": False, "reason": "broadband or av_layer columns absent"}
+            ),
         },
     )
     write_sidecar(prov)
     logger.info("Stream 1: done (%d rows → %s)", n_merged, output_path)
     return output_path
-
-
-def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
-    """Write a Parquet file via temp + rename so crashes never leave a partial."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".part")
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, path)
 
 
 __all__ = [

@@ -22,9 +22,15 @@ cd "$REPO_ROOT"
 
 PY="${PY:-${REPO_ROOT}/.venv/bin/python}"
 
-ENSEMBLE_DIR="${REPO_ROOT}/models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label"
-TRAIN_PARQUET="${REPO_ROOT}/data/processed/pipeline1_features_stream1.parquet"
+ENSEMBLE_DIR="${ENSEMBLE_DIR:-${REPO_ROOT}/models/main/xp_abundances/20260430_1d71682_a5534e4_ensemble_5label}"
+# Kiel-bounded Stream-1 training pool: logg ∈ [1.0, 3.5], Teff ∈ [4000, 5500].
+# Built once from pipeline1_features_stream1.parquet by
+# scripts/build_pipeline1_features_stream1_kiel.py — no re-query, just a
+# label-space row mask. Frozen Hermite z-score stats are inherited unchanged.
+TRAIN_PARQUET="${REPO_ROOT}/data/processed/pipeline1_features_stream1_kiel.parquet"
 S3_FEATURES="${REPO_ROOT}/data/processed/pipeline1_features_stream3.parquet"
+# Frozen stats sidecar: shared with the canonical Stream-1 (basis fingerprint
+# is feature-space, untouched by the Kiel mask).
 FROZEN_STATS="${REPO_ROOT}/data/processed/pipeline1_features_stream1.provenance.json"
 PRED_PARQUET="${REPO_ROOT}/data/processed/pipeline1_predictions_stream3.parquet"
 KNN_PARQUET="${REPO_ROOT}/data/processed/pipeline1_knn_rescue.parquet"

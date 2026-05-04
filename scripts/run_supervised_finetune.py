@@ -93,7 +93,7 @@ def build_finetune_config(
         pct_start=0.15,
         weight_decay=1e-4,
         grad_clip_norm=1.0,
-        early_stop_patience=3,
+        early_stop_patience=20,  # cadence run: 200 ep / patience 20 to match pretrain
         early_stop_min_delta=1e-4,
         relative_min_delta=False,
         use_c0_scalars=True,
@@ -103,8 +103,12 @@ def build_finetune_config(
         checkpoint_every_n_epochs=1,
         output_prefix=output_prefix,
         loss_weights=LossWeights(
-            supcon=0.0,
-            beta_nll=1.0,
+            supcon=1.0,        # canonical
+            beta_nll=1.0,      # canonical
+            barlow=0.5,        # canonical
+            ari=0.0,           # OFF — sigmoid-hard split at [α/M]=0.15 was
+                               # creating a "barbell" prediction pattern at
+                               # any weight; user disabled 2026-05-03.
             beta=beta,
             supcon_sigma=0.10,
             supcon_label_n_first=None,
@@ -121,7 +125,7 @@ def main() -> None:
     parser.add_argument("--parquet", type=Path, default=DEFAULT_PARQUET)
     parser.add_argument("--model-dir", type=Path, default=DEFAULT_MODEL_DIR)
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=200)  # cadence run: 200 ep / patience 20
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
@@ -227,6 +231,7 @@ def main() -> None:
         layout=layout,
         tiers=tiers,
         label_scaler=result["label_scaler"],
+        feature_scaler=result.get("feature_scaler"),  # required for inference reload
         seed=args.seed,
         training_metrics={
             "best_val_loss": float(result["best_val_loss"]),

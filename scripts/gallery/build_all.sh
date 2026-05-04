@@ -8,24 +8,42 @@ set -euo pipefail
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$REPO"
 
-# Optional: --synthetic flag passes through to all plot scripts
+# Flags:
+#   --synthetic     use synthetic fixtures (no real data required)
+#   --n-stars N     synthetic-fixture sample size (default: per-stream realistic — see below)
 USE_SYNTHETIC=""
-if [[ "${1:-}" == "--synthetic" ]]; then
-    USE_SYNTHETIC="--synthetic"
-    echo "Building gallery with SYNTHETIC fixtures (no real data required)"
+N_STARS=""
+for arg in "$@"; do
+    case "$arg" in
+        --synthetic) USE_SYNTHETIC="--synthetic" ;;
+        --n-stars=*) N_STARS="--n-stars ${arg#--n-stars=}" ;;
+    esac
+done
+
+if [[ -n "$USE_SYNTHETIC" ]]; then
+    echo "Building gallery with SYNTHETIC fixtures"
 else
     echo "Building gallery with REAL DATA (production mode)"
 fi
 
-# Helper: run a plot script with optional synthetic flag
+# Per-stream realistic sample sizes (used when caller does not pass --n-stars=N).
+# Stream 1 (APOGEE × Gaia DR3 train pool): ~50k. Stream 2 (TESS Mon+2021 giants):
+# ~2k. Stream 3 (Gaia BP/RP broader cohort): ~100k. We size synthetic figures
+# to the largest stream by default so multi-stream plots are not under-sampled.
+DEFAULT_N_STARS="--n-stars 50000"
+if [[ -z "$N_STARS" ]]; then
+    N_STARS="$DEFAULT_N_STARS"
+fi
+
+# Helper: run a plot script with optional synthetic + n-stars flags
 run_plot() {
     local script="$1"
     if [[ ! -f "scripts/gallery/$script" ]]; then
         echo "  SKIP: $script (not found)"
         return 0
     fi
-    echo "  → $script"
-    python "scripts/gallery/$script" $USE_SYNTHETIC 2>&1 | grep -E "(ERROR|created|skipped)" || true
+    echo "  → $script ($USE_SYNTHETIC $N_STARS)"
+    python "scripts/gallery/$script" $USE_SYNTHETIC $N_STARS 2>&1 | tail -n 5 || true
 }
 
 echo "======================================================================="

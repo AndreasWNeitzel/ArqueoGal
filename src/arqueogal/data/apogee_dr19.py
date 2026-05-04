@@ -46,8 +46,10 @@ data_acquisition.md §3 (columns, cuts, corrections, cross-match)
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 import numpy as np
 import pandas as pd
@@ -243,23 +245,22 @@ def kept_columns() -> list[str]:
 
 @dataclass(frozen=True, slots=True)
 class QualityCuts:
-    """Training-set quality cuts. Bounds match data_acquisition.md §3.3."""
+    """Training-set quality cuts.
+
+    Kiel-diagram cuts (Teff, log g) were dropped on 2026-04-29 — the OOD-flag
+    machinery downstream is responsible for catching evolutionary-stage
+    out-of-distribution stars at inference time. Only spectroscopic-quality
+    and metallicity-range cuts remain.
+    """
 
     min_snr: float = 70.0
-    teff_min: float = 4000.0
-    teff_max: float = 5500.0
-    logg_min: float = 1.0
-    logg_max: float = 3.5
     m_h_min: float = -2.0
     m_h_max: float = 0.5
 
     def as_predicates(self) -> list[str]:
-        """Human-readable predicate strings — goes straight into provenance."""
         return [
             "flag_bad == 0",
             f"snr > {self.min_snr}",
-            f"teff in [{self.teff_min}, {self.teff_max}]",
-            f"logg in [{self.logg_min}, {self.logg_max}]",
             f"m_h_atm in [{self.m_h_min}, {self.m_h_max}]",
         ]
 
@@ -371,10 +372,8 @@ def apply_quality_cuts(
     stats["after_flag_bad"] = int(mask.sum())
     mask &= df["snr"] > cuts.min_snr
     stats["after_snr"] = int(mask.sum())
-    mask &= df["teff"].between(cuts.teff_min, cuts.teff_max)
-    stats["after_teff"] = int(mask.sum())
-    mask &= df["logg"].between(cuts.logg_min, cuts.logg_max)
-    stats["after_logg"] = int(mask.sum())
+    # Teff / log g Kiel cuts removed 2026-04-29 (OOD flags handle evolutionary
+    # out-of-distribution stars downstream).
     mask &= df["m_h_atm"].between(cuts.m_h_min, cuts.m_h_max)
     stats["after_m_h"] = int(mask.sum())
 
@@ -422,7 +421,33 @@ MESZAROS2025_LOGG_MAX = 3.8
 # detrending is not astrophysically valid for those elements. Fe is the
 # reference (Δ[Fe/M] ≡ 0 by construction). V and Cu are not published in
 # Mészáros+2025 Table 3 so they receive no correction here.
-MESZAROS2025_COEFFS: dict[str, tuple[float, float, float, float]] = {
+# Allowlist: the exact 14 columns Mészáros+2025 Table 3 publishes coefficients
+# for. Any new key in MESZAROS2025_COEFFS must be peer-reviewed *and* added to
+# this allowlist deliberately. The module-import-time assertion catches drift
+# (typo, accidental copy/paste, double-correction of an unpublished element)
+# before any pipeline runs; the ``MappingProxyType`` wrapper below freezes the
+# dict at *runtime* too, so a contributor cannot widen the contract by
+# mutating the dict after import. See AGENTS.md invariant 13.
+MESZAROS2025_ALLOWED_KEYS: frozenset[str] = frozenset(
+    {
+        "alpha_m_atm",
+        "o_h_atm",
+        "na_h_atm",
+        "mg_h_atm",
+        "al_h_atm",
+        "si_h_atm",
+        "s_h_atm",
+        "k_h_atm",
+        "ca_h_atm",
+        "ti_h_atm",
+        "cr_h_atm",
+        "mn_h_atm",
+        "ni_h_atm",
+        "ce_h_atm",
+    }
+)
+
+_MESZAROS2025_COEFFS_RAW: dict[str, tuple[float, float, float, float]] = {
     # canonical column → (a, b, offset_hot_Teff>6000, offset_cold_Teff<3500)
     "alpha_m_atm": (-2.2918e-5, 0.0861, -0.0514, 0.0059),
     "o_h_atm": (-4.0909e-5, 0.1651, -0.0804, 0.0219),
@@ -439,6 +464,22 @@ MESZAROS2025_COEFFS: dict[str, tuple[float, float, float, float]] = {
     "ni_h_atm": (-2.3203e-5, 0.0806, -0.0586, -0.0006),
     "ce_h_atm": (1.3833e-4, -0.5431, 0.2869, -0.0589),
 }
+if frozenset(_MESZAROS2025_COEFFS_RAW) != MESZAROS2025_ALLOWED_KEYS:
+    raise RuntimeError(
+        "MESZAROS2025_COEFFS drifted from the published Table 3 allowlist. "
+        f"Coefficient keys: {sorted(_MESZAROS2025_COEFFS_RAW)}. "
+        f"Allowed keys: {sorted(MESZAROS2025_ALLOWED_KEYS)}. "
+        "Updating either set requires the corresponding peer-reviewed source "
+        "and a documented rationale."
+    )
+
+# Public read-only view: ``MappingProxyType`` rejects __setitem__/__delitem__ at
+# runtime so the 14-element contract cannot be widened post-import without
+# touching this file (which then re-runs the allowlist check). Every consumer
+# below reads it as a normal mapping; only mutation paths trip.
+MESZAROS2025_COEFFS: Mapping[str, tuple[float, float, float, float]] = MappingProxyType(
+    _MESZAROS2025_COEFFS_RAW
+)
 
 
 def _meszaros_delta(

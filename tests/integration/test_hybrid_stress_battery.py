@@ -39,6 +39,12 @@ import pandas as pd
 import pytest
 import torch
 
+# Mark every test in this module so the CI marker filter
+# ``-m "not gpu and not slow and not stress"`` excludes them at collection
+# time, not just at fixture time. The opt-in flag ``--run-stress`` lifts the
+# skip applied by ``tests/integration/conftest.py`` separately.
+pytestmark = pytest.mark.stress
+
 REPO = Path(__file__).resolve().parents[2]
 ENCODER_DIR = (
     REPO

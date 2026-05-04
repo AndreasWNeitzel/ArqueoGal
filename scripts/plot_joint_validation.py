@@ -127,7 +127,7 @@ def _predict_val(
     layout = _layout_from_input_dim(int(blob["input_dim"]))
     tiers = LabelTiers.five_label()
 
-    train_loader, val_loader, _split_ids, label_scaler = build_dataloaders(
+    train_loader, val_loader, _split_ids, label_scaler, _ = build_dataloaders(
         cfg,
         layout,
         tiers,

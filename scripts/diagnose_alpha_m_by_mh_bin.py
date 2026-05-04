@@ -63,7 +63,7 @@ def _ensemble_predict(ensemble_dir: Path, device: torch.device) -> dict:
         batch_size=1024,
         seed=split_seed,
     )
-    _, val_loader, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
+    _, val_loader, _, _, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
 
     per_mu: list[np.ndarray] = []
     y_human_scaled: np.ndarray | None = None

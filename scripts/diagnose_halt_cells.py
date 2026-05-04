@@ -136,7 +136,7 @@ def main() -> None:
         ensemble_seeds=(0,),
     )
     layout = FeatureLayout()
-    _, val_loader, _, _scaler = build_dataloaders(cfg, layout, tiers, seed=split_seed)
+    _, val_loader, _, _scaler, _ = build_dataloaders(cfg, layout, tiers, seed=split_seed)
     _LOG.info("val loader built, batches=%d", len(val_loader))
 
     # Build model and collect predictions + attach the val source_ids so we

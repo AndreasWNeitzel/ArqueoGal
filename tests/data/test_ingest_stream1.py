@@ -109,8 +109,23 @@ def patched_pipeline(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(mod, "load_dr19", fake_load_dr19)
     monkeypatch.setattr(mod, "apply_meszaros2025_corrections", fake_meszaros)
     monkeypatch.setattr(mod, "enrich_source_ids", fake_enrich)
-    monkeypatch.setattr(mod, "apply_parallax_zpt", fake_parallax_zpt)
-    monkeypatch.setattr(mod, "apply_g_mag_correction", fake_g_mag)
+
+    # Post-2026-04-29: parallax-zpt + G-mag corrections moved into the
+    # unified preprocessing pipeline. Patch at the new home and short-
+    # circuit apply_pipeline1_preprocessing so the test stays focused on
+    # Stream-1 orchestration logic.
+    from arqueogal.data import preprocessing as preproc_mod
+
+    monkeypatch.setattr(preproc_mod, "apply_parallax_zpt", fake_parallax_zpt)
+    monkeypatch.setattr(preproc_mod, "apply_g_mag_correction", fake_g_mag)
+
+    def fake_preprocessing(df, **kwargs):
+        out = fake_parallax_zpt(df)
+        out = fake_g_mag(out)
+        return out
+
+    monkeypatch.setattr(preproc_mod, "apply_pipeline1_preprocessing", fake_preprocessing)
+    monkeypatch.setattr(mod, "apply_pipeline1_preprocessing", fake_preprocessing)
     return captured
 
 
@@ -260,7 +275,17 @@ def test_meszaros_runs_on_real_implementation(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr(mod, "download", fake_download)
     monkeypatch.setattr(mod, "load_dr19", fake_load_dr19)
     monkeypatch.setattr(mod, "enrich_source_ids", fake_enrich)
-    monkeypatch.setattr(mod, "apply_parallax_zpt", fake_zpt)
+
+    # Post-2026-04-29 unified-preprocessing migration: patch at the new home.
+    from arqueogal.data import preprocessing as preproc_mod
+
+    monkeypatch.setattr(preproc_mod, "apply_parallax_zpt", fake_zpt)
+
+    def fake_preprocessing(df, **kwargs):
+        return fake_zpt(df)
+
+    monkeypatch.setattr(preproc_mod, "apply_pipeline1_preprocessing", fake_preprocessing)
+    monkeypatch.setattr(mod, "apply_pipeline1_preprocessing", fake_preprocessing)
 
     service = MagicMock(spec=TAPService)
     mod.ingest_stream1(tmp_path, service=service, download_progress=False)

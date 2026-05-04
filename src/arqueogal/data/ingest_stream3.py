@@ -25,20 +25,19 @@ data_acquisition.md §2.3 (Stream 3), §5 (selection + stratification),
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 from pyvo.dal.tap import TAPService
 
 from arqueogal.data.andrae2023 import ANDRAE2023_ZENODO_RECORD, load_andrae2023
 from arqueogal.data.downloads import sha256_file
-from arqueogal.data.gaia_corrections import apply_g_mag_correction, apply_parallax_zpt
 from arqueogal.data.gaia_enrich import ENRICHMENT_ADQL, enrich_source_ids
+from arqueogal.data.preprocessing import apply_pipeline1_preprocessing
 from arqueogal.data.provenance import LocalSource, Provenance, TapSource, write_sidecar
 from arqueogal.data.stream3_selection import DEFAULT_PER_CELL, stratified_subsample
 from arqueogal.data.tap import AIP_TAP_URL, aip_service
+from arqueogal.utils.io import save_parquet
 
 logger = logging.getLogger(__name__)
 
@@ -126,22 +125,25 @@ def ingest_stream3(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
 
     logger.info("Stream 3: inner merge Andrae × Gaia on source_id")
     merged = sampled.merge(enriched, on="source_id", how="inner", suffixes=("", "_gaia"))
-    n_merged = len(merged)
+    n_merged_pre_preprocessing = len(merged)
     logger.info(
         "Stream 3: merged %d rows (sampled %d × Gaia %d)",
-        n_merged,
+        n_merged_pre_preprocessing,
         n_sampled,
         len(enriched),
     )
 
-    logger.info("Stream 3: Lindegren+2021 parallax zero-point")
-    merged = apply_parallax_zpt(merged)
-
-    logger.info("Stream 3: Riello+2021 G-mag correction")
-    merged = apply_g_mag_correction(merged)
+    logger.info("Stream 3: unified preprocessing pipeline (steps 1-8)")
+    processed = apply_pipeline1_preprocessing(
+        merged,
+        mode="inference",
+        aip=tap,
+        apply_extinction=False,
+    )
+    n_merged = len(processed)
 
     logger.info("Stream 3: writing %s", output_path)
-    _write_parquet_atomic(merged, output_path)
+    save_parquet(processed, output_path)
 
     n_enrich_batches = (n_sampled + enrich_batch_size - 1) // enrich_batch_size
     strat_prov = strat_result.to_provenance()
@@ -189,14 +191,6 @@ def ingest_stream3(  # noqa: PLR0913 — keyword-only tuning knobs with safe def
     write_sidecar(prov)
     logger.info("Stream 3: done (%d rows → %s)", n_merged, output_path)
     return output_path
-
-
-def _write_parquet_atomic(df: pd.DataFrame, path: Path) -> None:
-    """Write a Parquet file via temp + rename so crashes never leave a partial."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".part")
-    df.to_parquet(tmp, index=False)
-    os.replace(tmp, path)
 
 
 __all__ = ["DEFAULT_OUTPUT_FILENAME", "ingest_stream3"]

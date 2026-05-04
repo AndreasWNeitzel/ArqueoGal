@@ -67,6 +67,19 @@ class XpFeatureAdapter(nn.Module):
         pretraining zeroes c0 or supervised fine-tuning passes it through, which
         is what lets Run A reuse a contrastive trunk on a supervised head
         without re-wiring dimensions.
+    assert_finite
+        When ``True``, the forward pass first checks ``x`` for NaN / Inf entries
+        and raises :class:`ValueError` naming the offending columns. Default
+        ``False`` because the production training loop sanitises features
+        upstream via ``np.nan_to_num`` (see ``training.py``), so paying the
+        per-batch isfinite cost would be wasted work. **Diagnostic and ad-hoc
+        inference scripts should pass ``assert_finite=True``** so a forgotten
+        ``np.nan_to_num`` at the inference driver boundary fails loud rather
+        than silently corrupting predictions. The canonical inference path
+        (``inference.py`` → ``uncertainty.collect_predictions``) bypasses the
+        adapter entirely and applies its own NaN sanitisation; the flag is
+        therefore strictly opt-in for callers that *do* go through this adapter
+        post-train.
 
     Notes
     -----
@@ -107,8 +120,11 @@ class XpFeatureAdapter(nn.Module):
         """The flat feature dimension consumed by the encoder trunk.
 
         For the default layout: 110 XP (54 BP + 54 RP + 2 c0) + 3 residuals +
-        26 aux = 139-D. For the 43-D-truncated layout: 43 XP (19 BP + 22 RP +
-        2 c0) + residuals + aux.
+        27 aux = 140-D (the aux count moved from 26 to 27 on 2026-04-29 when
+        the extinction-correction protocol replaced the five raw IR broadbands
+        with their Yuan+2013-dereddened counterparts and added ``av_los``;
+        see ``docs/protocols/extinction_correction.md``). For the
+        43-D-truncated layout: 43 XP (19 BP + 22 RP + 2 c0) + residuals + aux.
         """
         return self.layout.input_dim
 

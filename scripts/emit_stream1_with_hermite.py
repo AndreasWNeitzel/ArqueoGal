@@ -200,6 +200,46 @@ def main() -> None:
     logger.info("loaded %d rows × %d cols", len(df), len(df.columns))
     src_sha = sha256_file(src)
 
+    # Memory-efficient corrected_flux retrieval. As of 2026-04-29 the
+    # build_pipeline1_features_stream1 stage drops corrected_flux from its
+    # output (330 floats × ~330k rows ~5 GB pandas blow-up). Stream the
+    # column from xp_sampled_corrected.parquet for the build's source_ids
+    # only.
+    if "corrected_flux" not in df.columns:
+        import gc
+        import pyarrow as pa
+        import pyarrow.compute as pc
+        import pyarrow.parquet as _pq
+        xp_path = repo / "data" / "interim" / "xp_sampled_corrected.parquet"
+        logger.info("streaming corrected_flux from %s", xp_path)
+        wanted = pa.array(df["source_id"].to_numpy())
+        opts = pc.SetLookupOptions(value_set=wanted)
+        pf = _pq.ParquetFile(xp_path)
+        kept = []
+        for rg_idx in range(pf.metadata.num_row_groups):
+            rg = pf.read_row_group(rg_idx, columns=["source_id", "corrected_flux"])
+            mask = pc.is_in(rg.column("source_id"), options=opts)
+            chunk = rg.filter(mask)
+            if chunk.num_rows:
+                kept.append(chunk)
+            del rg, mask, chunk
+            gc.collect()
+        flux_table = pa.concat_tables(kept)
+        del kept
+        gc.collect()
+        flux_df = flux_table.to_pandas()
+        del flux_table
+        gc.collect()
+        logger.info("  retrieved corrected_flux for %d rows", len(flux_df))
+        df = df.merge(flux_df[["source_id", "corrected_flux"]], on="source_id", how="left")
+        del flux_df
+        gc.collect()
+        n_missing = df["corrected_flux"].isna().sum()
+        if n_missing:
+            logger.warning("  %d rows have no corrected_flux match (will skip Hermite)", n_missing)
+            df = df[df["corrected_flux"].notna()].reset_index(drop=True)
+        logger.info("  post-merge df: %d rows", len(df))
+
     thresholds = _load_thresholds(decisions_path)
     logger.info("loaded per-Teff-bin thresholds from %s", decisions_path.name)
     for label, thr in thresholds["p99_by_label"].items():
