@@ -32,10 +32,18 @@ HYBRID_S3 = REPO / "release/D-Cat-b/hybrid_pipeline_run/predictions_with_feature
 
 
 def _load() -> pd.DataFrame:
-    pcols = ["source_id", "mh_pred", "alpha_m_pred",
-             "teff_sigma", "logg_sigma", "mh_sigma",
-             "alpha_m_sigma", "mg_h_sigma", "ood_joint_flag",
-             "label_extrapolation_flag"]
+    pcols = [
+        "source_id",
+        "mh_pred",
+        "alpha_m_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+        "ood_joint_flag",
+        "label_extrapolation_flag",
+    ]
     pred = pd.read_parquet(PRED_S3, columns=pcols).drop_duplicates("source_id")
     feat = pd.read_parquet(
         FEAT_S3,
@@ -84,24 +92,45 @@ def main() -> int:
     vsig = np.nanstd(c[ok])
 
     hb = ax.hexbin(
-        x[ok], y[ok], C=c[ok], reduce_C_function=np.median,
-        gridsize=70, extent=extent, mincnt=4,
-        vmin=vmed - 2 * vsig, vmax=vmed + 2 * vsig,
-        cmap="viridis", edgecolors="none",
+        x[ok],
+        y[ok],
+        C=c[ok],
+        reduce_C_function=np.median,
+        gridsize=70,
+        extent=extent,
+        mincnt=4,
+        vmin=vmed - 2 * vsig,
+        vmax=vmed + 2 * vsig,
+        cmap="viridis",
+        edgecolors="none",
     )
     # Sun and Galactic centre.
-    ax.scatter([-8.122], [0.0], marker="*", s=420, color="white",
-               edgecolor=PALETTE["ink"], linewidth=1.6, zorder=5,
-               label="Sun")
-    ax.scatter([0.0], [0.0], marker="x", s=200, color="white",
-               linewidth=2.6, zorder=5, label="Galactic centre")
+    ax.scatter(
+        [-8.122],
+        [0.0],
+        marker="*",
+        s=420,
+        color="white",
+        edgecolor=PALETTE["ink"],
+        linewidth=1.6,
+        zorder=5,
+        label="Sun",
+    )
+    ax.scatter(
+        [0.0],
+        [0.0],
+        marker="x",
+        s=200,
+        color="white",
+        linewidth=2.6,
+        zorder=5,
+        label="Galactic centre",
+    )
     # Concentric Rgal rings.
     for r in (4, 8, 12):
-        circle = plt.Circle((0, 0), r, fill=False, lw=0.8,
-                            ls=":", color=PALETTE["ash"], alpha=0.7)
+        circle = plt.Circle((0, 0), r, fill=False, lw=0.8, ls=":", color=PALETTE["ash"], alpha=0.7)
         ax.add_patch(circle)
-        ax.text(r, -r * 0.05, f" R={r} kpc",
-                ha="left", va="top", fontsize=9, color=PALETTE["ash"])
+        ax.text(r, -r * 0.05, f" R={r} kpc", ha="left", va="top", fontsize=9, color=PALETTE["ash"])
 
     ax.set_xlim(extent[0], extent[1])
     ax.set_ylim(extent[2], extent[3])

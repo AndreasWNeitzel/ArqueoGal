@@ -22,8 +22,9 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 
 from _presentation import PALETTE, apply_style, headline, save  # noqa: E402
 
-PRED = {sid: REPO / f"data/processed/pipeline1_predictions_stream{sid}.parquet"
-        for sid in (1, 2, 3)}
+PRED = {
+    sid: REPO / f"data/processed/pipeline1_predictions_stream{sid}.parquet" for sid in (1, 2, 3)
+}
 
 
 def _count(sid: int) -> int:
@@ -33,40 +34,78 @@ def _count(sid: int) -> int:
 
 def _card(ax, *, name, role, body, color, n):
     rect = mpatches.FancyBboxPatch(
-        (0.04, 0.04), 0.92, 0.92,
+        (0.04, 0.04),
+        0.92,
+        0.92,
         boxstyle="round,pad=0.02,rounding_size=0.04",
-        linewidth=2.4, facecolor="white", edgecolor=color,
+        linewidth=2.4,
+        facecolor="white",
+        edgecolor=color,
         transform=ax.transAxes,
     )
     ax.add_patch(rect)
     # Stripe accent at the top.
     stripe = mpatches.Rectangle(
-        (0.04, 0.85), 0.92, 0.11,
-        linewidth=0, facecolor=color, transform=ax.transAxes, alpha=0.92,
+        (0.04, 0.85),
+        0.92,
+        0.11,
+        linewidth=0,
+        facecolor=color,
+        transform=ax.transAxes,
+        alpha=0.92,
     )
     ax.add_patch(stripe)
     ax.text(
-        0.5, 0.905, name, ha="center", va="center",
-        fontsize=22, fontweight="bold", color="white",
+        0.5,
+        0.905,
+        name,
+        ha="center",
+        va="center",
+        fontsize=22,
+        fontweight="bold",
+        color="white",
         transform=ax.transAxes,
     )
     ax.text(
-        0.5, 0.78, role, ha="center", va="center",
-        fontsize=14, fontstyle="italic", color=PALETTE["ink"],
+        0.5,
+        0.78,
+        role,
+        ha="center",
+        va="center",
+        fontsize=14,
+        fontstyle="italic",
+        color=PALETTE["ink"],
         transform=ax.transAxes,
     )
     ax.text(
-        0.5, 0.55, body, ha="center", va="center",
-        fontsize=13, color=PALETTE["ink"], transform=ax.transAxes,
-    )
-    ax.text(
-        0.5, 0.20, f"n = {n:,}", ha="center", va="center",
-        fontsize=26, fontweight="bold", color=color,
+        0.5,
+        0.55,
+        body,
+        ha="center",
+        va="center",
+        fontsize=13,
+        color=PALETTE["ink"],
         transform=ax.transAxes,
     )
     ax.text(
-        0.5, 0.10, "Gaia DR3 source_ids after dedup",
-        ha="center", va="center", fontsize=10, color=PALETTE["ash"],
+        0.5,
+        0.20,
+        f"n = {n:,}",
+        ha="center",
+        va="center",
+        fontsize=26,
+        fontweight="bold",
+        color=color,
+        transform=ax.transAxes,
+    )
+    ax.text(
+        0.5,
+        0.10,
+        "Gaia DR3 source_ids after dedup",
+        ha="center",
+        va="center",
+        fontsize=10,
+        color=PALETTE["ash"],
         transform=ax.transAxes,
     )
     ax.set_xlim(0, 1)
@@ -86,32 +125,35 @@ def main() -> int:
         name="STREAM 1",
         role="Training cohort",
         body="APOGEE DR19 × Gaia DR3 XP\n"
-             "Truth labels: Teff, log g, [M/H],\n"
-             "[α/M], [Mg/H]\n\n"
-             "Kiel mask:\nTeff ∈ [4000, 5500] K\nlog g ∈ [1.0, 3.5]",
-        color=PALETTE["navy"], n=n1,
+        "Truth labels: Teff, log g, [M/H],\n"
+        "[α/M], [Mg/H]\n\n"
+        "Kiel mask:\nTeff ∈ [4000, 5500] K\nlog g ∈ [1.0, 3.5]",
+        color=PALETTE["navy"],
+        n=n1,
     )
     _card(
         axes[1],
         name="STREAM 2",
         role="Asteroseismic cross-check",
         body="TESS giants × Gaia DR3 XP\n"
-             "νmax / Δν → seismic log g\n\n"
-             "Used to test the model on\n"
-             "an independent gravity scale,\n"
-             "not for training.",
-        color=PALETTE["accent"], n=n2,
+        "νmax / Δν → seismic log g\n\n"
+        "Used to test the model on\n"
+        "an independent gravity scale,\n"
+        "not for training.",
+        color=PALETTE["accent"],
+        n=n2,
     )
     _card(
         axes[2],
         name="STREAM 3",
         role="Inference at scale",
         body="Andrae+23 RGB stratified\n"
-             "Gaia DR3 XP (no truth labels)\n\n"
-             "The downstream Starfold\n"
-             "consumer; predictions are the\n"
-             "deliverable for D-Cat-d.",
-        color=PALETTE["tier1"], n=n3,
+        "Gaia DR3 XP (no truth labels)\n\n"
+        "The downstream Starfold\n"
+        "consumer; predictions are the\n"
+        "deliverable for D-Cat-d.",
+        color=PALETTE["tier1"],
+        n=n3,
     )
 
     headline(

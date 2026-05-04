@@ -65,9 +65,15 @@ N_PIX = hp.nside2npix(NSIDE)
 
 def _load_stream(stream_id: int) -> pd.DataFrame:
     pred_cols = [
-        "source_id", "mh_pred", "alpha_m_pred",
-        "teff_sigma", "logg_sigma", "mh_sigma",
-        "alpha_m_sigma", "mg_h_sigma", "ood_joint_flag",
+        "source_id",
+        "mh_pred",
+        "alpha_m_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+        "ood_joint_flag",
         "label_extrapolation_flag",
     ]
     df_p = pd.read_parquet(PRED_PATHS[stream_id], columns=pred_cols)
@@ -105,7 +111,8 @@ def _load_stream(stream_id: int) -> pd.DataFrame:
 
 
 def _healpix_median(
-    ra_deg: np.ndarray, dec_deg: np.ndarray, value: np.ndarray, nside: int = NSIDE) -> tuple[np.ndarray, np.ndarray]:
+    ra_deg: np.ndarray, dec_deg: np.ndarray, value: np.ndarray, nside: int = NSIDE
+) -> tuple[np.ndarray, np.ndarray]:
     """Per-HEALPix-pixel median of `value`, returned with a count map."""
     l_deg, b_deg = radec_to_galactic(ra_deg, dec_deg)
     # HEALPix conventions: theta = colatitude (= 90 - b), phi = l (radians).
@@ -142,27 +149,52 @@ def _pixel_to_mollweide(pix_idx: np.ndarray, nside: int) -> tuple[np.ndarray, np
 
 
 def _draw_panel(
-    ax: plt.Axes, df: pd.DataFrame, value_col: str,
-    *, vmin: float, vmax: float, cmap: str, label: str, title: str):
+    ax: plt.Axes,
+    df: pd.DataFrame,
+    value_col: str,
+    *,
+    vmin: float,
+    vmax: float,
+    cmap: str,
+    label: str,
+    title: str,
+):
     pix_med, pix_n = _healpix_median(
-        df["ra_deg"].to_numpy(), df["dec_deg"].to_numpy(),
-        df[value_col].to_numpy())
+        df["ra_deg"].to_numpy(), df["dec_deg"].to_numpy(), df[value_col].to_numpy()
+    )
     have = np.where(np.isfinite(pix_med))[0]
     if have.size == 0:
-        ax.text(0.5, 0.5, "no Tier-1 stars", transform=ax.transAxes,
-                ha="center", va="center", fontsize=11)
+        ax.text(
+            0.5,
+            0.5,
+            "no Tier-1 stars",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=11,
+        )
         return None
 
     lon, lat = _pixel_to_mollweide(have, NSIDE)
     sc = ax.scatter(
-        lon, lat, c=pix_med[have], cmap=cmap, vmin=vmin, vmax=vmax,
-        s=6.0, marker="s", edgecolors="none", alpha=0.95)
+        lon,
+        lat,
+        c=pix_med[have],
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        s=6.0,
+        marker="s",
+        edgecolors="none",
+        alpha=0.95,
+    )
     style_galactic_mollweide(ax)
     ax.set_title(
         f"{title}\nN={len(df):,} Tier-1 stars; "
         f"NSIDE={NSIDE} ({pix_med.shape[0]:,} pixels, "
         f"{int(pix_n.sum()):,} stars binned)",
-        fontsize=10)
+        fontsize=10,
+    )
     cb = plt.colorbar(sc, ax=ax, fraction=0.030, pad=0.04, orientation="vertical")
     cb.set_label(label, fontsize=9)
     return sc
@@ -178,8 +210,10 @@ def main() -> int:
             print(f"[F4] skipping Stream {sid}: predictions parquet missing")
             continue
         df = _load_stream(sid)
-        print(f"[F4] Stream {sid}: Tier-1 n={len(df):,}  "
-              f"({'held-out only' if sid == 1 else 'full release'})")
+        print(
+            f"[F4] Stream {sid}: Tier-1 n={len(df):,}  "
+            f"({'held-out only' if sid == 1 else 'full release'})"
+        )
         streams[sid] = df
 
     if not streams:
@@ -187,22 +221,21 @@ def main() -> int:
         return 1
 
     # APOGEE DR19 truth-label reference cohort (Stream-1 features, no tier filter).
-    apogee_cols = ["source_id", "ra_deg", "dec_deg",
-                   "mh_apogee", "alpha_m_apogee"]
+    apogee_cols = ["source_id", "ra_deg", "dec_deg", "mh_apogee", "alpha_m_apogee"]
     df_apogee = pd.read_parquet(FEAT_PATHS[1], columns=apogee_cols)
     df_apogee = df_apogee.drop_duplicates(subset="source_id", keep="first")
-    df_apogee = df_apogee.dropna(subset=["mh_apogee", "alpha_m_apogee",
-                                         "ra_deg", "dec_deg"])
-    df_apogee = df_apogee.rename(columns={
-        "mh_apogee": "mh_pred",
-        "alpha_m_apogee": "alpha_m_pred",
-    })
+    df_apogee = df_apogee.dropna(subset=["mh_apogee", "alpha_m_apogee", "ra_deg", "dec_deg"])
+    df_apogee = df_apogee.rename(
+        columns={
+            "mh_apogee": "mh_pred",
+            "alpha_m_apogee": "alpha_m_pred",
+        }
+    )
     print(f"[F4] APOGEE DR19 truth: n={len(df_apogee):,} (full Stream-1, no tier filter)")
 
     # Common color limits across all rows (predictions + truth) for direct comparison.
     mh_all = np.concatenate(
-        [d["mh_pred"].to_numpy() for d in streams.values()]
-        + [df_apogee["mh_pred"].to_numpy()]
+        [d["mh_pred"].to_numpy() for d in streams.values()] + [df_apogee["mh_pred"].to_numpy()]
     )
     am_all = np.concatenate(
         [d["alpha_m_pred"].to_numpy() for d in streams.values()]
@@ -212,8 +245,10 @@ def main() -> int:
     mh_vmax = float(np.nanpercentile(mh_all, 99.0))
     am_vmin = float(np.nanpercentile(am_all, 1.0))
     am_vmax = float(np.nanpercentile(am_all, 99.0))
-    print(f"[F4] color limits: [M/H] = ({mh_vmin:+.2f}, {mh_vmax:+.2f})  "
-          f"[α/M] = ({am_vmin:+.2f}, {am_vmax:+.2f})")
+    print(
+        f"[F4] color limits: [M/H] = ({mh_vmin:+.2f}, {mh_vmax:+.2f})  "
+        f"[α/M] = ({am_vmin:+.2f}, {am_vmax:+.2f})"
+    )
 
     rows: list[tuple[str, str, pd.DataFrame]] = []
     for sid in sorted(streams.keys()):
@@ -223,29 +258,43 @@ def main() -> int:
 
     n_rows = len(rows)
     fig = plt.figure(figsize=(20, 5.5 * n_rows))
-    gs = fig.add_gridspec(n_rows, 2, hspace=0.45, wspace=0.20,
-                          top=0.94, bottom=0.04, left=0.05, right=0.97)
+    gs = fig.add_gridspec(
+        n_rows, 2, hspace=0.45, wspace=0.20, top=0.94, bottom=0.04, left=0.05, right=0.97
+    )
 
     for row, (label, scope, df) in enumerate(rows):
         ax = fig.add_subplot(gs[row, 0], projection="mollweide")
         _draw_panel(
-            ax, df, "mh_pred",
-            vmin=mh_vmin, vmax=mh_vmax, cmap="cividis",
+            ax,
+            df,
+            "mh_pred",
+            vmin=mh_vmin,
+            vmax=mh_vmax,
+            cmap="cividis",
             label="[M/H] (dex)",
-            title=f"{label}, {scope}, [M/H] median per pixel")
+            title=f"{label}, {scope}, [M/H] median per pixel",
+        )
 
         ax = fig.add_subplot(gs[row, 1], projection="mollweide")
         _draw_panel(
-            ax, df, "alpha_m_pred",
-            vmin=am_vmin, vmax=am_vmax, cmap="cividis",
+            ax,
+            df,
+            "alpha_m_pred",
+            vmin=am_vmin,
+            vmax=am_vmax,
+            cmap="cividis",
             label=r"[$\alpha$/M] (dex)",
-            title=rf"{label}, {scope}, [$\alpha$/M] median per pixel")
+            title=rf"{label}, {scope}, [$\alpha$/M] median per pixel",
+        )
 
     fig.suptitle(
         "F4, Tier-1 chemistry sky distribution + APOGEE DR19 truth\n"
         f"Galactic Mollweide  (HEALPix NSIDE={NSIDE}, median per pixel; "
         "common color limits across rows for direct comparison)",
-        fontsize=13, fontweight="semibold", y=0.985)
+        fontsize=13,
+        fontweight="semibold",
+        y=0.985,
+    )
 
     save_fig(fig, OUT / "F4_tier1_chemistry_skymap", tight=False)
     return 0

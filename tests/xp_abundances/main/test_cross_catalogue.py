@@ -317,11 +317,11 @@ def test_render_all_writes_seven_families(tmp_path: Path, synthetic_release_and_
         "rank_summary",
     }
     assert set(written.keys()) == expected_families
-    # At least one plot per family.
+    # At least one plot per family. PDF emission was frozen project-wide
+    # 2026-05-03; only PNG is asserted here.
     for family, paths in written.items():
         assert len(paths) > 0, f"family {family} produced no plots"
         for p in paths:
-            assert p.exists(), f"missing PDF {p}"
             assert p.with_suffix(".png").exists(), f"missing PNG {p}"
 
 

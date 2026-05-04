@@ -34,7 +34,9 @@ def augment(parquet_path: Path) -> None:
         log.info("  already augmented; skipping")
         return
 
-    needed_av = [c for c in ("av_edenhofer", "av_lallement", "av_sfd", "av_nbhd_median") if c in df.columns]
+    needed_av = [
+        c for c in ("av_edenhofer", "av_lallement", "av_sfd", "av_nbhd_median") if c in df.columns
+    ]
     needed_ir = [c for c in ("j_mag", "h_mag", "k_mag", "w1_mag", "w2_mag") if c in df.columns]
     log.info("  available av layers: %s", needed_av)
     log.info("  available IR bands:  %s", needed_ir)
@@ -44,7 +46,15 @@ def augment(parquet_path: Path) -> None:
 
     out = apply_extinction_corrections(df, inplace=False)
     log.info("  -> %d rows x %d cols", len(out), out.shape[1])
-    for c in ("av_los", "av_los_source", "j_mag_dered", "h_mag_dered", "k_mag_dered", "w1_mag_dered", "w2_mag_dered"):
+    for c in (
+        "av_los",
+        "av_los_source",
+        "j_mag_dered",
+        "h_mag_dered",
+        "k_mag_dered",
+        "w1_mag_dered",
+        "w2_mag_dered",
+    ):
         if c not in out.columns:
             log.error("  expected column '%s' missing after augmentation; aborting", c)
             return

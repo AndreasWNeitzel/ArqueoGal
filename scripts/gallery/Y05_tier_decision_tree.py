@@ -39,13 +39,21 @@ FEAT_S1 = REPO / "data/processed/pipeline1_features_stream1_kiel.parquet"
 
 def _tier_fractions() -> dict[int, float]:
     p = pd.read_parquet(
-        PRED_S1, columns=[
-            "source_id", "teff_sigma", "logg_sigma", "mh_sigma",
-            "alpha_m_sigma", "mg_h_sigma", "ood_joint_flag",
+        PRED_S1,
+        columns=[
+            "source_id",
+            "teff_sigma",
+            "logg_sigma",
+            "mh_sigma",
+            "alpha_m_sigma",
+            "mg_h_sigma",
+            "ood_joint_flag",
             "label_extrapolation_flag",
-        ]).drop_duplicates("source_id")
+        ],
+    ).drop_duplicates("source_id")
     f = pd.read_parquet(
-        FEAT_S1, columns=["source_id", "fe_h_apogee", "teff_apogee", "b_deg"]).drop_duplicates("source_id")
+        FEAT_S1, columns=["source_id", "fe_h_apogee", "teff_apogee", "b_deg"]
+    ).drop_duplicates("source_id")
     df = f.merge(p, on="source_id", how="inner")
     df["kin_ood_flag"] = False
     split = stratified_split_ids(df, seed=0)
@@ -63,38 +71,76 @@ def _tier_fractions() -> dict[int, float]:
 
 def _diamond(ax, x, y, w, h, text, color):
     diamond = mpatches.FancyBboxPatch(
-        (x - w / 2, y - h / 2), w, h,
+        (x - w / 2, y - h / 2),
+        w,
+        h,
         boxstyle="round,pad=0.02,rounding_size=0.04",
-        linewidth=1.6, facecolor="white", edgecolor=color)
+        linewidth=1.6,
+        facecolor="white",
+        edgecolor=color,
+    )
     ax.add_patch(diamond)
-    ax.text(x, y, text, ha="center", va="center", fontsize=12,
-            color=PALETTE["ink"], fontweight="bold")
+    ax.text(
+        x, y, text, ha="center", va="center", fontsize=12, color=PALETTE["ink"], fontweight="bold"
+    )
 
 
 def _tier_box(ax, x, y, w, h, name, fraction, n, color, body):
     rect = mpatches.FancyBboxPatch(
-        (x - w / 2, y - h / 2), w, h,
+        (x - w / 2, y - h / 2),
+        w,
+        h,
         boxstyle="round,pad=0.02,rounding_size=0.04",
-        linewidth=2.4, facecolor=color, edgecolor="white")
+        linewidth=2.4,
+        facecolor=color,
+        edgecolor="white",
+    )
     ax.add_patch(rect)
-    ax.text(x, y + h * 0.30, name,
-            ha="center", va="center", fontsize=20, fontweight="bold", color="white")
-    ax.text(x, y + h * 0.05, body,
-            ha="center", va="center", fontsize=11, color="white", alpha=0.95)
-    ax.text(x, y - h * 0.30, f"{fraction*100:.1f}%  (n={n:,})",
-            ha="center", va="center", fontsize=14, fontweight="bold", color="white")
+    ax.text(
+        x,
+        y + h * 0.30,
+        name,
+        ha="center",
+        va="center",
+        fontsize=20,
+        fontweight="bold",
+        color="white",
+    )
+    ax.text(x, y + h * 0.05, body, ha="center", va="center", fontsize=11, color="white", alpha=0.95)
+    ax.text(
+        x,
+        y - h * 0.30,
+        f"{fraction * 100:.1f}%  (n={n:,})",
+        ha="center",
+        va="center",
+        fontsize=14,
+        fontweight="bold",
+        color="white",
+    )
 
 
 def _arrow(ax, x0, y0, x1, y1, color, label=None, label_side="right"):
     ax.annotate(
-        "", xy=(x1, y1), xytext=(x0, y0),
-        arrowprops=dict(arrowstyle="-|>", color=color, lw=2.0,
-                        shrinkA=4, shrinkB=4, mutation_scale=18))
+        "",
+        xy=(x1, y1),
+        xytext=(x0, y0),
+        arrowprops=dict(
+            arrowstyle="-|>", color=color, lw=2.0, shrinkA=4, shrinkB=4, mutation_scale=18
+        ),
+    )
     if label is not None:
         mx, my = (x0 + x1) / 2, (y0 + y1) / 2
         offset = 0.18 if label_side == "right" else -0.18
-        ax.text(mx + offset, my, label, ha="left" if offset > 0 else "right",
-                va="center", fontsize=11, color=color, fontweight="bold")
+        ax.text(
+            mx + offset,
+            my,
+            label,
+            ha="left" if offset > 0 else "right",
+            va="center",
+            fontsize=11,
+            color=color,
+            fontweight="bold",
+        )
 
 
 def main() -> int:
@@ -112,28 +158,69 @@ def main() -> int:
     ax.axis("off")
 
     # Top: input.
-    _diamond(ax, 6.0, 6.4, 4.4, 0.7,
-             "per-star prediction\n(μ, σ for each label)", PALETTE["navy"])
+    _diamond(ax, 6.0, 6.4, 4.4, 0.7, "per-star prediction\n(μ, σ for each label)", PALETTE["navy"])
 
     # Decision 1: ood_joint_flag.
-    _diamond(ax, 6.0, 5.0, 4.6, 0.85,
-             "ood_joint_flag fired?\n(Mahalanobis on XP block, or any NaN)",
-             PALETTE["tier3"])
+    _diamond(
+        ax,
+        6.0,
+        5.0,
+        4.6,
+        0.85,
+        "ood_joint_flag fired?\n(Mahalanobis on XP block, or any NaN)",
+        PALETTE["tier3"],
+    )
     # Decision 2: σ-inflation OR kin_ood, split into two lines for legibility.
-    _diamond(ax, 6.0, 3.3, 5.6, 1.1,
-             "any σ over training threshold?\n"
-             r"$\sigma_{T_{\rm eff}}>150,\ \sigma_{\log g}>0.30$" + "\n"
-             r"$\sigma_{[M/H]}>0.20,\ \sigma_{[\alpha/M]}>0.05,\ \sigma_{[Mg/H]}>0.20$"
-             "\nOR kin_ood_flag",
-             PALETTE["tier2"])
+    _diamond(
+        ax,
+        6.0,
+        3.3,
+        5.6,
+        1.1,
+        "any σ over training threshold?\n"
+        r"$\sigma_{T_{\rm eff}}>150,\ \sigma_{\log g}>0.30$" + "\n"
+        r"$\sigma_{[M/H]}>0.20,\ \sigma_{[\alpha/M]}>0.05,\ \sigma_{[Mg/H]}>0.20$"
+        "\nOR kin_ood_flag",
+        PALETTE["tier2"],
+    )
 
     # Tier outcome boxes.
-    _tier_box(ax, 1.6, 1.0, 2.6, 1.5, "TIER 3", frac[3], n3,
-              PALETTE["tier3"], "do-not-trust\n(mask in science cuts)")
-    _tier_box(ax, 6.0, 1.0, 2.6, 1.5, "TIER 2", frac[2], n2,
-              PALETTE["tier2"], "use with caution\n(σ-inflated or kin OOD)")
-    _tier_box(ax, 10.4, 1.0, 2.6, 1.5, "TIER 1", frac[1], n1,
-              PALETTE["tier1"], "science-grade\n(default for analysis)")
+    _tier_box(
+        ax,
+        1.6,
+        1.0,
+        2.6,
+        1.5,
+        "TIER 3",
+        frac[3],
+        n3,
+        PALETTE["tier3"],
+        "do-not-trust\n(mask in science cuts)",
+    )
+    _tier_box(
+        ax,
+        6.0,
+        1.0,
+        2.6,
+        1.5,
+        "TIER 2",
+        frac[2],
+        n2,
+        PALETTE["tier2"],
+        "use with caution\n(σ-inflated or kin OOD)",
+    )
+    _tier_box(
+        ax,
+        10.4,
+        1.0,
+        2.6,
+        1.5,
+        "TIER 1",
+        frac[1],
+        n1,
+        PALETTE["tier1"],
+        "science-grade\n(default for analysis)",
+    )
 
     # Arrows.
     _arrow(ax, 6.0, 6.05, 6.0, 5.45, PALETTE["navy"])
@@ -146,7 +233,8 @@ def main() -> int:
         fig,
         "Release tiering, three rules, evaluated in this order",
         f"Live fractions on Stream 1 held-out (val+test, seed=0), n = {n:,}.",
-        top=0.88)
+        top=0.88,
+    )
     save(fig, "Y05_tier_decision_tree")
     return 0
 

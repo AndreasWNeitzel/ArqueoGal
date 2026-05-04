@@ -32,7 +32,10 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 
 from _common import (  # noqa: E402
-    apply_style, galactic_mollweide, radec_to_galactic, save_fig,
+    apply_style,
+    galactic_mollweide,
+    radec_to_galactic,
+    save_fig,
     style_galactic_mollweide,
 )
 
@@ -87,8 +90,9 @@ def _galactocentric_xyz(df: pd.DataFrame) -> dict[str, np.ndarray]:
 def _mollweide_panel(ax, df, sid):
     l, b = radec_to_galactic(df["ra_deg"].to_numpy(), df["dec_deg"].to_numpy())
     lon, lat = galactic_mollweide(l, b)
-    ax.scatter(lon, lat, s=1.5, alpha=0.30, color=STREAM_COLOR[sid],
-               edgecolors="none", rasterized=True)
+    ax.scatter(
+        lon, lat, s=1.5, alpha=0.30, color=STREAM_COLOR[sid], edgecolors="none", rasterized=True
+    )
     style_galactic_mollweide(ax)
     ax.set_title(f"{STREAM_LABEL[sid]}  n = {len(df):,}", fontsize=10)
 
@@ -96,13 +100,30 @@ def _mollweide_panel(ax, df, sid):
 def _xy_panel(ax, geom, sid):
     x, y = geom["X"], geom["Y"]
     ok = np.isfinite(x) & np.isfinite(y)
-    ax.hexbin(x[ok], y[ok], gridsize=80, extent=(-15, 15, -15, 15),
-              mincnt=1, bins="log", cmap="viridis", edgecolors="none")
-    ax.scatter([-8.122], [0.0], marker="*", s=120, color="white",
-               edgecolor="black", linewidth=0.8, zorder=4)
-    ax.scatter([0.0], [0.0], marker="x", s=80, color="white",
-               linewidth=1.4, zorder=4)
-    ax.set_xlim(-15, 15); ax.set_ylim(-15, 15); ax.set_aspect("equal")
+    ax.hexbin(
+        x[ok],
+        y[ok],
+        gridsize=80,
+        extent=(-15, 15, -15, 15),
+        mincnt=1,
+        bins="log",
+        cmap="viridis",
+        edgecolors="none",
+    )
+    ax.scatter(
+        [-8.122],
+        [0.0],
+        marker="*",
+        s=120,
+        color="white",
+        edgecolor="black",
+        linewidth=0.8,
+        zorder=4,
+    )
+    ax.scatter([0.0], [0.0], marker="x", s=80, color="white", linewidth=1.4, zorder=4)
+    ax.set_xlim(-15, 15)
+    ax.set_ylim(-15, 15)
+    ax.set_aspect("equal")
     ax.set_xlabel("X (kpc)")
     ax.set_ylabel("Y (kpc)")
     ax.set_title(f"{STREAM_LABEL[sid]}  (top-down)", fontsize=10)
@@ -112,11 +133,28 @@ def _xy_panel(ax, geom, sid):
 def _rz_panel(ax, geom, sid):
     R, Z = geom["R"], geom["Z"]
     ok = np.isfinite(R) & np.isfinite(Z)
-    ax.hexbin(R[ok], Z[ok], gridsize=80, extent=(0, 20, -5, 5),
-              mincnt=1, bins="log", cmap="viridis", edgecolors="none")
-    ax.scatter([8.122], [0.0208], marker="*", s=120, color="white",
-               edgecolor="black", linewidth=0.8, zorder=4)
-    ax.set_xlim(0, 20); ax.set_ylim(-5, 5)
+    ax.hexbin(
+        R[ok],
+        Z[ok],
+        gridsize=80,
+        extent=(0, 20, -5, 5),
+        mincnt=1,
+        bins="log",
+        cmap="viridis",
+        edgecolors="none",
+    )
+    ax.scatter(
+        [8.122],
+        [0.0208],
+        marker="*",
+        s=120,
+        color="white",
+        edgecolor="black",
+        linewidth=0.8,
+        zorder=4,
+    )
+    ax.set_xlim(0, 20)
+    ax.set_ylim(-5, 5)
     ax.set_xlabel(r"$R_{\rm gal}$ (kpc)")
     ax.set_ylabel("Z (kpc)")
     ax.set_title(f"{STREAM_LABEL[sid]}  (side view)", fontsize=10)
@@ -128,9 +166,14 @@ def _distance_overlay(ax, frames):
     for sid, df in frames.items():
         d = df["r_med_photogeo"].to_numpy()
         d = d[np.isfinite(d) & (d > 0)] / 1000.0  # kpc
-        ax.hist(d, bins=bins / 1000.0, histtype="step",
-                color=STREAM_COLOR[sid], lw=2.2,
-                label=f"{STREAM_LABEL[sid]}  median={np.median(d):.2f} kpc")
+        ax.hist(
+            d,
+            bins=bins / 1000.0,
+            histtype="step",
+            color=STREAM_COLOR[sid],
+            lw=2.2,
+            label=f"{STREAM_LABEL[sid]}  median={np.median(d):.2f} kpc",
+        )
     ax.set_xlabel("BJ21 photogeometric distance  (kpc)")
     ax.set_ylabel("count")
     ax.set_xlim(0, 12)
@@ -146,9 +189,17 @@ def main() -> int:
 
     # 4-row × 3-col layout. Row 4 spans all 3 columns for the distance overlay.
     fig = plt.figure(figsize=(20, 22))
-    gs = fig.add_gridspec(4, 3, hspace=0.40, wspace=0.30,
-                          height_ratios=[1.0, 1.2, 1.0, 0.9],
-                          top=0.95, bottom=0.05, left=0.05, right=0.97)
+    gs = fig.add_gridspec(
+        4,
+        3,
+        hspace=0.40,
+        wspace=0.30,
+        height_ratios=[1.0, 1.2, 1.0, 0.9],
+        top=0.95,
+        bottom=0.05,
+        left=0.05,
+        right=0.97,
+    )
 
     # Row 1: Mollweide per stream.
     for c, sid in enumerate((1, 2, 3)):
@@ -169,7 +220,9 @@ def main() -> int:
     fig.suptitle(
         f"F2. Per-stream spatial geometry  ({N_PER_STREAM:,} stars per stream;"
         " BJ21 photogeometric distance + astropy Galactocentric)",
-        fontsize=12, fontweight="semibold", y=0.985,
+        fontsize=12,
+        fontweight="semibold",
+        y=0.985,
     )
     save_fig(fig, REPO / "reports/gallery/F_kinematics/F2_geometry", tight=False)
     return 0

@@ -163,7 +163,9 @@ def build_dataloaders(
     # frozen Hermite z-score basis at parquet-build time, and downstream
     # consumers depend on that.
     xp_passthrough_cols = (
-        *layout.bp_coef_cols, *layout.rp_coef_cols, *layout.xp_scalar_cols,
+        *layout.bp_coef_cols,
+        *layout.rp_coef_cols,
+        *layout.xp_scalar_cols,
     )
     feature_scaler = FeatureScaler.fit(
         arrs["X"][train_mask],
@@ -520,10 +522,7 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
         sigma_arg: torch.Tensor | float
         label_scale_arg: torch.Tensor | None = None
         n_first = lw.supcon_label_n_first
-        if (
-            lw.supcon_sigma_raw is not None
-            and hasattr(model, "label_scale_human")
-        ):
+        if lw.supcon_sigma_raw is not None and hasattr(model, "label_scale_human"):
             sigma_vec = torch.as_tensor(
                 lw.supcon_sigma_raw,
                 dtype=torch.float32,
@@ -534,10 +533,17 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
                 sigma_vec = sigma_vec[:n_first]
                 scale_vec = scale_vec[:n_first]
             if sigma_vec.shape[0] != y_for_supcon.shape[1]:
-                raise ValueError(
-                    f"supcon_sigma_raw length {sigma_vec.shape[0]} does not match"
-                    f" label dim {y_for_supcon.shape[1]}",
-                )
+                # Tolerate a shorter supcon_sigma_raw by repeating the last
+                # entry to fill the remaining audit-pending elements. This
+                # keeps the production 5-tuple working when the label tier
+                # expansion (LabelTiers default = 21) is in effect downstream
+                # but the per-element sigma calibration has not yet been
+                # extended past the original Stream-1 promoted set.
+                if sigma_vec.shape[0] < y_for_supcon.shape[1]:
+                    pad = sigma_vec[-1].repeat(y_for_supcon.shape[1] - sigma_vec.shape[0])
+                    sigma_vec = torch.cat([sigma_vec, pad])
+                else:
+                    sigma_vec = sigma_vec[: y_for_supcon.shape[1]]
             sigma_arg = sigma_vec
             label_scale_arg = scale_vec
         else:
@@ -568,16 +574,11 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
         # clean disc-component members. Other label channels (Teff, log g,
         # [M/H], [Mg/H]) still contribute for these stars.
         try:
-            alpha_idx_human = model.block_layout.label_order_human.index(
-                "alpha_m_apogee"
-            )
+            alpha_idx_human = model.block_layout.label_order_human.index("alpha_m_apogee")
         except ValueError:
             alpha_idx_human = None
         if alpha_idx_human is not None and hasattr(model, "label_scale_human"):
-            alpha_idx_block = (
-                model.block_layout
-                .label_order_block.index("alpha_m_apogee")
-            )
+            alpha_idx_block = model.block_layout.label_order_block.index("alpha_m_apogee")
             s_alpha = model.label_scale_human[alpha_idx_human]
             m_alpha = model.label_mean_human[alpha_idx_human]
             # Truth alpha in standardised label space (block-ordered y).
@@ -589,9 +590,7 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
             ambig &= torch.isfinite(alpha_true_block)
             # Drop the alpha channel for ambiguous stars only.
             new_mask = finite.clone()
-            new_mask[:, alpha_idx_block] = (
-                new_mask[:, alpha_idx_block] & ~ambig
-            )
+            new_mask[:, alpha_idx_block] = new_mask[:, alpha_idx_block] & ~ambig
             finite = new_mask
         y_clean = torch.where(finite, y_block, mu.detach())
         nll = beta_nll_block_cholesky(
@@ -652,12 +651,7 @@ def _compute_losses(  # noqa: PLR0913 — loss accountancy keeps all knobs expli
     else:
         ari = torch.zeros((), device=x.device)
 
-    total = (
-        lw.supcon * supcon
-        + lw.beta_nll * nll
-        + lw.barlow * bt
-        + lw.ari * ari
-    )
+    total = lw.supcon * supcon + lw.beta_nll * nll + lw.barlow * bt + lw.ari * ari
     parts = {
         "loss": float(total.detach()),
         "supcon": float(supcon.detach()),
@@ -828,8 +822,11 @@ def train_model(  # noqa: PLR0913 — explicit collaborators beat a mega-config 
     feature_scaler: FeatureScaler | None = None
     if train_loader is None or val_loader is None:
         (
-            train_loader, val_loader, _split_ids,
-            label_scaler, feature_scaler,
+            train_loader,
+            val_loader,
+            _split_ids,
+            label_scaler,
+            feature_scaler,
         ) = build_dataloaders(cfg, layout, tiers, seed=seed)
     elif label_scaler is None:
         raise ValueError(

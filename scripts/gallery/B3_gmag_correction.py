@@ -51,7 +51,7 @@ def main() -> None:
     g_corr = s1["phot_g_mean_mag_corr"].values
     bp_rp = s1["bp_rp"].values
     m = np.isfinite(g_raw) & np.isfinite(g_corr) & np.isfinite(bp_rp)
-    delta_g = g_corr - g_raw   # mag (Riello correction is sub-mmag in most cases)
+    delta_g = g_corr - g_raw  # mag (Riello correction is sub-mmag in most cases)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
 
@@ -59,7 +59,13 @@ def main() -> None:
     # because the correction is sub-mmag for the bulk; the ~3% with non-zero
     # corrections deviate.
     sc0 = axes[0].scatter(
-        g_raw[m], g_corr[m], c=bp_rp[m], s=3, alpha=0.4, cmap="coolwarm", rasterized=True,
+        g_raw[m],
+        g_corr[m],
+        c=bp_rp[m],
+        s=3,
+        alpha=0.4,
+        cmap="coolwarm",
+        rasterized=True,
     )
     plt.colorbar(sc0, ax=axes[0], label=r"BP − RP [mag]")
     g_lims = [g_raw[m].min(), g_raw[m].max()]

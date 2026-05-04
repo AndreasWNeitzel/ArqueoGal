@@ -62,9 +62,7 @@ def main() -> None:
         c = s1["bp_rp"].to_numpy()
         g = s1["g_mag"].to_numpy()
         m = np.isfinite(c) & np.isfinite(g)
-        h = axes[1].hexbin(
-            c[m], g[m], gridsize=70, mincnt=1, cmap="viridis"
-        )
+        h = axes[1].hexbin(c[m], g[m], gridsize=70, mincnt=1, cmap="viridis")
         plt.colorbar(h, ax=axes[1], label="stars per bin (2D-histogram density)")
         axes[1].invert_yaxis()
         axes[1].set_xlabel(r"BP - RP [mag, raw]")
@@ -76,7 +74,11 @@ def main() -> None:
         fontsize=11,
         fontweight="semibold",
     )
-    save_fig(fig, REPO / "reports/gallery/B_preprocessing" / "B1_gaia_corrections", formats=("pdf", "png"))
+    save_fig(
+        fig,
+        REPO / "reports/gallery/B_preprocessing" / "B1_gaia_corrections",
+        formats=("pdf", "png"),
+    )
 
 
 if __name__ == "__main__":

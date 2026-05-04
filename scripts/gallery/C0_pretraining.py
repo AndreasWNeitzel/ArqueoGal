@@ -83,8 +83,7 @@ def main() -> None:
     components.append(("loss", "Total weighted loss", "all components"))
 
     n_panels = len(components)
-    fig, axes = plt.subplots(2, max(n_panels, 2),
-                              figsize=(4.0 * max(n_panels, 2), 8))
+    fig, axes = plt.subplots(2, max(n_panels, 2), figsize=(4.0 * max(n_panels, 2), 8))
     axes = axes if n_panels > 1 else axes.reshape(2, -1)
 
     for j, (key, name, sub) in enumerate(components):
@@ -94,16 +93,28 @@ def main() -> None:
             tr = arr(f"train_{key}")
             va = arr(f"val_{key}")
         except (KeyError, ValueError):
-            ax.text(0.5, 0.5, f"no '{key}' history", transform=ax.transAxes,
-                    ha="center", va="center", fontsize=10, color="gray")
+            ax.text(
+                0.5,
+                0.5,
+                f"no '{key}' history",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=10,
+                color="gray",
+            )
             ax.set_title(f"{name}\n({sub})", fontsize=10)
             continue
-        ax.plot(ep, tr, "-", color=SEED_COLOR, lw=1.0, alpha=0.65,
-                label="train")
-        ax.plot(ep, va, "--", color=SEED_COLOR, lw=1.4, alpha=0.95,
-                label="val")
-        ax.axvline(run["best_epoch"], color="black", lw=0.6, ls=":",
-                    alpha=0.5, label=f"best ep {run['best_epoch']}")
+        ax.plot(ep, tr, "-", color=SEED_COLOR, lw=1.0, alpha=0.65, label="train")
+        ax.plot(ep, va, "--", color=SEED_COLOR, lw=1.4, alpha=0.95, label="val")
+        ax.axvline(
+            run["best_epoch"],
+            color="black",
+            lw=0.6,
+            ls=":",
+            alpha=0.5,
+            label=f"best ep {run['best_epoch']}",
+        )
         ax.set_xlabel("epoch")
         ax.set_ylabel(f"{name} loss")
         ax.set_title(f"{name}\n({sub})", fontsize=10)
@@ -121,40 +132,59 @@ def main() -> None:
         ax.set_title(r"SupCon temperature $\tau$ (learned)")
         ax.grid(True, alpha=0.25)
     except (KeyError, ValueError):
-        ax.text(0.5, 0.5, "no τ history", transform=ax.transAxes,
-                ha="center", va="center", fontsize=10, color="gray")
+        ax.text(
+            0.5,
+            0.5,
+            "no τ history",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=10,
+            color="gray",
+        )
 
     # Bottom row, panel 2: gradient norms.
     ax = axes[1, 1]
     try:
         ep = arr("epoch")
-        ax.plot(ep, arr("train_grad_norm_max"), "-", color="#d62728",
-                lw=1.0, alpha=0.85, label="max")
-        ax.plot(ep, arr("train_grad_norm_mean"), "-", color="#2ca02c",
-                lw=1.0, alpha=0.85, label="mean")
+        ax.plot(
+            ep, arr("train_grad_norm_max"), "-", color="#d62728", lw=1.0, alpha=0.85, label="max"
+        )
+        ax.plot(
+            ep, arr("train_grad_norm_mean"), "-", color="#2ca02c", lw=1.0, alpha=0.85, label="mean"
+        )
         ax.set_xlabel("epoch")
         ax.set_ylabel(r"$|\nabla|$")
         ax.set_title("Gradient norm (per-batch)")
         ax.legend(fontsize=8)
         ax.grid(True, alpha=0.25)
     except (KeyError, ValueError):
-        ax.text(0.5, 0.5, "no grad-norm history", transform=ax.transAxes,
-                ha="center", va="center", fontsize=10, color="gray")
+        ax.text(
+            0.5,
+            0.5,
+            "no grad-norm history",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=10,
+            color="gray",
+        )
 
     # Hide remaining unused bottom-row panels.
     for j in range(2, n_panels):
         axes[1, j].set_axis_off()
 
-    weights_str = " + ".join(
-        f"{k}={v:g}" for k, v in weights.items() if v > 0
-    ) or "no weights parsed"
+    weights_str = (
+        " + ".join(f"{k}={v:g}" for k, v in weights.items() if v > 0) or "no weights parsed"
+    )
     fig.suptitle(
         "C0. Stream 1 contrastive-pretraining history "
         f"({len(h)} epochs, encoder + projection head, "
         r"5-label kernel)."
         "\n"
         f"weights: {weights_str}.  Real per-epoch metrics.",
-        fontsize=10, fontweight="semibold",
+        fontsize=10,
+        fontweight="semibold",
     )
     fig.tight_layout(rect=(0, 0, 1, 0.92))
     save_fig(fig, OUT / "C0_pretraining")

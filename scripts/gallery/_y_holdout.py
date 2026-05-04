@@ -23,31 +23,48 @@ from arqueogal.xp_abundances.main.release import assign_release_tier  # noqa: E4
 # Env override lets the eval figures read from a non-canonical predictions
 # parquet without editing every Y script. Set ARQUEOGAL_PRED_S1=path.parquet
 # to evaluate a different model run; unset to use the canonical 5-ensemble.
-PRED_S1 = Path(os.environ.get(
-    "ARQUEOGAL_PRED_S1",
-    str(REPO / "data/processed/pipeline1_predictions_stream1.parquet")))
+PRED_S1 = Path(
+    os.environ.get(
+        "ARQUEOGAL_PRED_S1", str(REPO / "data/processed/pipeline1_predictions_stream1.parquet")
+    )
+)
 FEAT_S1 = REPO / "data/processed/pipeline1_features_stream1_kiel.parquet"
 
 LABELS = (
-    {"key": "teff", "name": r"$T_{\rm eff}$", "unit": "K",  "rmse_unit": "K"},
-    {"key": "logg", "name": r"$\log g$",       "unit": "dex","rmse_unit": "dex"},
-    {"key": "mh",   "name": "[M/H]",            "unit": "dex","rmse_unit": "dex"},
-    {"key": "alpha_m", "name": r"[$\alpha$/M]","unit": "dex","rmse_unit": "dex"},
-    {"key": "mg_h", "name": "[Mg/H]",           "unit": "dex","rmse_unit": "dex"})
+    {"key": "teff", "name": r"$T_{\rm eff}$", "unit": "K", "rmse_unit": "K"},
+    {"key": "logg", "name": r"$\log g$", "unit": "dex", "rmse_unit": "dex"},
+    {"key": "mh", "name": "[M/H]", "unit": "dex", "rmse_unit": "dex"},
+    {"key": "alpha_m", "name": r"[$\alpha$/M]", "unit": "dex", "rmse_unit": "dex"},
+    {"key": "mg_h", "name": "[Mg/H]", "unit": "dex", "rmse_unit": "dex"},
+)
 
 
 def load_holdout() -> pd.DataFrame:
     pcols = [
-        "source_id", "teff_pred", "logg_pred", "mh_pred",
-        "alpha_m_pred", "mg_h_pred",
-        "teff_sigma", "logg_sigma", "mh_sigma",
-        "alpha_m_sigma", "mg_h_sigma", "ood_joint_flag",
+        "source_id",
+        "teff_pred",
+        "logg_pred",
+        "mh_pred",
+        "alpha_m_pred",
+        "mg_h_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+        "ood_joint_flag",
         "label_extrapolation_flag",
     ]
     pred = pd.read_parquet(PRED_S1, columns=pcols).drop_duplicates("source_id")
     fcols = [
-        "source_id", "fe_h_apogee", "teff_apogee", "b_deg",
-        "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apogee",
+        "source_id",
+        "fe_h_apogee",
+        "teff_apogee",
+        "b_deg",
+        "logg_apogee",
+        "mh_apogee",
+        "alpha_m_apogee",
+        "mg_h_apogee",
     ]
     feat = pd.read_parquet(FEAT_S1, columns=fcols).drop_duplicates("source_id")
     df = feat.merge(pred, on="source_id", how="inner")

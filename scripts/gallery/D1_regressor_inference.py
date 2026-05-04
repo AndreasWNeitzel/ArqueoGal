@@ -19,7 +19,6 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 
-import pandas as pd
 
 from _common import load_real_stream, save_fig
 
@@ -33,15 +32,33 @@ def main(n_stars: int | None = None) -> None:
     # (incl. real per-label sigma). Don't downsample by default.
     cols = [
         "source_id",
-        "teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apogee",
+        "teff_apogee",
+        "logg_apogee",
+        "mh_apogee",
+        "alpha_m_apogee",
+        "mg_h_apogee",
     ]
     data = load_real_stream(1, columns=cols)
     # Keep only rows with finite truth labels for at least the 5 elements used.
-    data = data.dropna(subset=[
-        "teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apogee",
-        "teff_pred", "logg_pred", "mh_pred", "alpha_m_pred", "mg_h_pred",
-        "teff_sigma", "logg_sigma", "mh_sigma", "alpha_m_sigma", "mg_h_sigma",
-    ])
+    data = data.dropna(
+        subset=[
+            "teff_apogee",
+            "logg_apogee",
+            "mh_apogee",
+            "alpha_m_apogee",
+            "mg_h_apogee",
+            "teff_pred",
+            "logg_pred",
+            "mh_pred",
+            "alpha_m_pred",
+            "mg_h_pred",
+            "teff_sigma",
+            "logg_sigma",
+            "mh_sigma",
+            "alpha_m_sigma",
+            "mg_h_sigma",
+        ]
+    )
 
     if n_stars is not None and n_stars < len(data):
         data = data.sample(n=n_stars, random_state=42)
@@ -49,14 +66,16 @@ def main(n_stars: int | None = None) -> None:
     # Use real per-label sigma columns from the predictions parquet — DO NOT
     # fabricate sigma from |pred - truth|.
     preds = {
-        "Teff":      ("teff_apogee",    "teff_pred",    "teff_sigma"),
-        "log g":     ("logg_apogee",    "logg_pred",    "logg_sigma"),
-        "[M/H]":     ("mh_apogee",      "mh_pred",      "mh_sigma"),
+        "Teff": ("teff_apogee", "teff_pred", "teff_sigma"),
+        "log g": ("logg_apogee", "logg_pred", "logg_sigma"),
+        "[M/H]": ("mh_apogee", "mh_pred", "mh_sigma"),
         "[alpha/M]": ("alpha_m_apogee", "alpha_m_pred", "alpha_m_sigma"),
-        "[Mg/H]":    ("mg_h_apogee",    "mg_h_pred",    "mg_h_sigma"),
+        "[Mg/H]": ("mg_h_apogee", "mg_h_pred", "mg_h_sigma"),
     }
-    preds = {k: {"y_true": data[t].values, "y_pred": data[p].values, "sigma": data[s].values}
-             for k, (t, p, s) in preds.items()}
+    preds = {
+        k: {"y_true": data[t].values, "y_pred": data[p].values, "sigma": data[s].values}
+        for k, (t, p, s) in preds.items()
+    }
 
     elements = list(preds.keys())
     n_cols = 5
@@ -79,8 +98,13 @@ def main(n_stars: int | None = None) -> None:
         # Top row: pred vs truth, hex cells coloured by **median predicted σ**.
         ax = axes[0, i]
         hb = ax.hexbin(
-            y_true, y_pred, C=sigma, reduce_C_function=np.median,
-            gridsize=GRID, cmap="viridis", mincnt=1,
+            y_true,
+            y_pred,
+            C=sigma,
+            reduce_C_function=np.median,
+            gridsize=GRID,
+            cmap="viridis",
+            mincnt=1,
         )
         cbar = plt.colorbar(hb, ax=ax, pad=0.02)
         cbar.set_label(r"median $\sigma$ in cell", fontsize=7)
@@ -98,9 +122,13 @@ def main(n_stars: int | None = None) -> None:
         ax.set_ylabel(f"{elem} pred", fontsize=8)
         ax.set_title(f"{elem}", fontsize=9, fontweight="semibold")
         ax.text(
-            0.05, 0.95,
+            0.05,
+            0.95,
             f"RMSE={rmse:.2g}\nbias={bias:+.2g}",
-            transform=ax.transAxes, fontsize=6.5, ha="left", va="top",
+            transform=ax.transAxes,
+            fontsize=6.5,
+            ha="left",
+            va="top",
             bbox=dict(facecolor="white", edgecolor="0.7", alpha=0.88, pad=2),
         )
         ax.grid(True, alpha=0.25)
@@ -108,12 +136,16 @@ def main(n_stars: int | None = None) -> None:
         # Bottom row: residual vs truth, hex cells coloured by **log10 density**.
         ax = axes[1, i]
         hb2 = ax.hexbin(
-            y_true, resid, gridsize=GRID, cmap="plasma", mincnt=1, bins="log",
+            y_true,
+            resid,
+            gridsize=GRID,
+            cmap="plasma",
+            mincnt=1,
+            bins="log",
         )
         cbar2 = plt.colorbar(hb2, ax=ax, pad=0.02)
         cbar2.set_label(r"log$_{10}$ N", fontsize=7)
-        ax.axhline(0, color="k", lw=0.7, ls="--", alpha=0.4,
-                   label="zero-bias reference")
+        ax.axhline(0, color="k", lw=0.7, ls="--", alpha=0.4, label="zero-bias reference")
 
         # Bias of the residual distribution (median = robust estimator) and a
         # shaded ±1σ band around it. The σ here is the residual std — the
@@ -122,15 +154,17 @@ def main(n_stars: int | None = None) -> None:
         bias = float(np.median(resid))
         sigma_std = float(np.std(resid))
         x_lo, x_hi = ax.get_xlim()
-        ax.axhspan(bias - sigma_std, bias + sigma_std,
-                   color="#ffffff", alpha=0.18, zorder=2,
-                   label=fr"bias $\pm 1\sigma$  ({bias:+.2g}, $\sigma={sigma_std:.2g}$)")
-        ax.axhline(bias, color="white", lw=1.4, ls="-", alpha=0.95,
-                   zorder=3)
-        ax.axhline(bias + sigma_std, color="white", lw=0.6, ls=":",
-                   alpha=0.7, zorder=3)
-        ax.axhline(bias - sigma_std, color="white", lw=0.6, ls=":",
-                   alpha=0.7, zorder=3)
+        ax.axhspan(
+            bias - sigma_std,
+            bias + sigma_std,
+            color="#ffffff",
+            alpha=0.18,
+            zorder=2,
+            label=rf"bias $\pm 1\sigma$  ({bias:+.2g}, $\sigma={sigma_std:.2g}$)",
+        )
+        ax.axhline(bias, color="white", lw=1.4, ls="-", alpha=0.95, zorder=3)
+        ax.axhline(bias + sigma_std, color="white", lw=0.6, ls=":", alpha=0.7, zorder=3)
+        ax.axhline(bias - sigma_std, color="white", lw=0.6, ls=":", alpha=0.7, zorder=3)
         ax.set_xlim(x_lo, x_hi)
         ax.legend(fontsize=6, loc="upper right", framealpha=0.85)
 

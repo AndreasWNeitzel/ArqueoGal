@@ -30,8 +30,7 @@ N_BINS = 10
 
 
 def _sigma_axis_max(key: str) -> float:
-    return {"teff": 250.0, "logg": 0.45, "mh": 0.30,
-            "alpha_m": 0.10, "mg_h": 0.30}[key]
+    return {"teff": 250.0, "logg": 0.45, "mh": 0.30, "alpha_m": 0.10, "mg_h": 0.30}[key]
 
 
 def main() -> int:
@@ -54,14 +53,10 @@ def main() -> int:
         # Quantile-bin by predicted σ.
         edges = np.quantile(sig, np.linspace(0.0, 1.0, N_BINS + 1))
         edges[0] -= 1e-6
-        bin_idx = np.clip(np.searchsorted(edges, sig, side="right") - 1,
-                          0, N_BINS - 1)
-        sig_centres = np.array(
-            [float(np.mean(sig[bin_idx == b])) for b in range(N_BINS)]
-        )
+        bin_idx = np.clip(np.searchsorted(edges, sig, side="right") - 1, 0, N_BINS - 1)
+        sig_centres = np.array([float(np.mean(sig[bin_idx == b])) for b in range(N_BINS)])
         rmse_emp = np.array(
-            [float(np.sqrt(np.mean(delta[bin_idx == b] ** 2)))
-             for b in range(N_BINS)]
+            [float(np.sqrt(np.mean(delta[bin_idx == b] ** 2))) for b in range(N_BINS)]
         )
         # Bootstrap 1σ error band on RMSE per bin.
         rng = np.random.default_rng(0)
@@ -71,18 +66,41 @@ def main() -> int:
             d_b = delta[bin_idx == b]
             for j in range(n_boot):
                 draw = rng.choice(d_b, size=len(d_b), replace=True)
-                rmse_boot[j, b] = float(np.sqrt(np.mean(draw ** 2)))
+                rmse_boot[j, b] = float(np.sqrt(np.mean(draw**2)))
         lo = np.quantile(rmse_boot, 0.16, axis=0)
         hi = np.quantile(rmse_boot, 0.84, axis=0)
 
         smax = _sigma_axis_max(k)
-        ax.plot([0, smax], [0, smax], color=PALETTE["accent"], ls="--", lw=2.0,
-                label="ideal (calibrated)", zorder=1)
-        ax.fill_between(sig_centres, lo, hi, color=PALETTE["navy_light"],
-                        alpha=0.30, zorder=2, label="1σ bootstrap")
-        ax.plot(sig_centres, rmse_emp, "o-", color=PALETTE["navy"],
-                lw=2.2, ms=8, mec="white", mew=1.3, label="empirical",
-                zorder=3)
+        ax.plot(
+            [0, smax],
+            [0, smax],
+            color=PALETTE["accent"],
+            ls="--",
+            lw=2.0,
+            label="ideal (calibrated)",
+            zorder=1,
+        )
+        ax.fill_between(
+            sig_centres,
+            lo,
+            hi,
+            color=PALETTE["navy_light"],
+            alpha=0.30,
+            zorder=2,
+            label="1σ bootstrap",
+        )
+        ax.plot(
+            sig_centres,
+            rmse_emp,
+            "o-",
+            color=PALETTE["navy"],
+            lw=2.2,
+            ms=8,
+            mec="white",
+            mew=1.3,
+            label="empirical",
+            zorder=3,
+        )
         ax.set_xlim(0, smax)
         ax.set_ylim(0, smax)
         ax.set_aspect("equal")
@@ -92,17 +110,19 @@ def main() -> int:
         ax.legend(loc="upper left", fontsize=9.5)
 
         # Mean ratio annotation.
-        ratio = float(np.mean(rmse_emp / np.where(sig_centres > 0,
-                                                   sig_centres, np.nan)))
-        verdict_color = (PALETTE["tier1"] if 0.8 <= ratio <= 1.2
-                         else PALETTE["tier2"])
+        ratio = float(np.mean(rmse_emp / np.where(sig_centres > 0, sig_centres, np.nan)))
+        verdict_color = PALETTE["tier1"] if 0.8 <= ratio <= 1.2 else PALETTE["tier2"]
         ax.text(
-            0.97, 0.04,
+            0.97,
+            0.04,
             f"⟨RMSE/σ⟩ = {ratio:.2f}",
-            transform=ax.transAxes, ha="right", va="bottom",
-            fontsize=11, fontweight="bold", color="white",
-            bbox=dict(boxstyle="round,pad=0.35", facecolor=verdict_color,
-                      edgecolor="none"),
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=11,
+            fontweight="bold",
+            color="white",
+            bbox=dict(boxstyle="round,pad=0.35", facecolor=verdict_color, edgecolor="none"),
         )
 
     headline(

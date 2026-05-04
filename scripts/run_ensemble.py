@@ -232,17 +232,23 @@ def main() -> None:
     parser.add_argument("--beta-nll", type=float, default=1.0)
     parser.add_argument("--beta", type=float, default=0.0, help="β-NLL temperature (0=plain NLL)")
     parser.add_argument(
-        "--ari", type=float, default=0.0,
+        "--ari",
+        type=float,
+        default=0.0,
         help="Soft-ARI chemistry-cluster contamination loss weight. >0 penalises "
         "disc-bimodality misclassification of [α/M] across the threshold. "
         "Default 0 = disabled. Recommended 0.1 alongside SupCon.",
     )
     parser.add_argument(
-        "--ari-alpha-threshold", type=float, default=0.15,
+        "--ari-alpha-threshold",
+        type=float,
+        default=0.15,
         help="[α/M] dex threshold for soft K=2 disc/thick split (default 0.15).",
     )
     parser.add_argument(
-        "--ari-kernel-sigma", type=float, default=0.03,
+        "--ari-kernel-sigma",
+        type=float,
+        default=0.03,
         help="Sigmoid steepness around the [α/M] threshold (default 0.03 dex).",
     )
     parser.add_argument(

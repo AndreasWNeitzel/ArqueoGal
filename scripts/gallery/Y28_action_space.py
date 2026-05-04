@@ -34,13 +34,28 @@ from _y_kinematics import load_kin_chem  # noqa: E402
 
 
 def _panel(ax, x, y, c, *, x_extent, y_extent, x_lab, y_lab, c_lab, title):
-    ok = (np.isfinite(x) & np.isfinite(y) & np.isfinite(c)
-          & (x > x_extent[0]) & (x < x_extent[1])
-          & (y > y_extent[0]) & (y < y_extent[1]))
+    ok = (
+        np.isfinite(x)
+        & np.isfinite(y)
+        & np.isfinite(c)
+        & (x > x_extent[0])
+        & (x < x_extent[1])
+        & (y > y_extent[0])
+        & (y < y_extent[1])
+    )
     hb = ax.hexbin(
-        x[ok], y[ok], C=c[ok], reduce_C_function=np.median,
-        gridsize=80, extent=(*x_extent, *y_extent),
-        mincnt=4, vmin=-0.05, vmax=0.32, cmap="viridis", edgecolors="none")
+        x[ok],
+        y[ok],
+        C=c[ok],
+        reduce_C_function=np.median,
+        gridsize=80,
+        extent=(*x_extent, *y_extent),
+        mincnt=4,
+        vmin=-0.05,
+        vmax=0.32,
+        cmap="viridis",
+        edgecolors="none",
+    )
     ax.set_xlim(x_extent)
     ax.set_ylim(y_extent)
     ax.set_xlabel(x_lab)
@@ -61,27 +76,39 @@ def main() -> int:
     am = df["alpha_m_pred"].to_numpy()
 
     fig, axes = plt.subplots(1, 2, figsize=(18, 8.5))
-    plt.subplots_adjust(wspace=0.30, top=0.84, bottom=0.10,
-                        left=0.06, right=0.97)
-    _panel(axes[0], lz, jr, am,
-           x_extent=(-3.0, 3.5), y_extent=(0.0, 8.0),
-           x_lab=r"$L_z$  ($10^{3}$ kpc km s$^{-1}$)",
-           y_lab=r"$J_R$  ($10^{2}$ kpc km s$^{-1}$)",
-           c_lab=r"median [$\alpha$/M] (dex)",
-           title=r"$J_R$ vs $L_z$ ,  radial action")
-    _panel(axes[1], lz, jz, am,
-           x_extent=(-3.0, 3.5), y_extent=(0.0, 5.0),
-           x_lab=r"$L_z$  ($10^{3}$ kpc km s$^{-1}$)",
-           y_lab=r"$J_z$  ($10^{2}$ kpc km s$^{-1}$)",
-           c_lab=r"median [$\alpha$/M] (dex)",
-           title=r"$J_z$ vs $L_z$ ,  vertical action")
+    plt.subplots_adjust(wspace=0.30, top=0.84, bottom=0.10, left=0.06, right=0.97)
+    _panel(
+        axes[0],
+        lz,
+        jr,
+        am,
+        x_extent=(-3.0, 3.5),
+        y_extent=(0.0, 8.0),
+        x_lab=r"$L_z$  ($10^{3}$ kpc km s$^{-1}$)",
+        y_lab=r"$J_R$  ($10^{2}$ kpc km s$^{-1}$)",
+        c_lab=r"median [$\alpha$/M] (dex)",
+        title=r"$J_R$ vs $L_z$ ,  radial action",
+    )
+    _panel(
+        axes[1],
+        lz,
+        jz,
+        am,
+        x_extent=(-3.0, 3.5),
+        y_extent=(0.0, 5.0),
+        x_lab=r"$L_z$  ($10^{3}$ kpc km s$^{-1}$)",
+        y_lab=r"$J_z$  ($10^{2}$ kpc km s$^{-1}$)",
+        c_lab=r"median [$\alpha$/M] (dex)",
+        title=r"$J_z$ vs $L_z$ ,  vertical action",
+    )
 
     headline(
         fig,
         "Action space, integrals of motion versus chemistry",
         f"Stream 3 Tier 1, n = {n:,}.  Cool dynamic disc bottom-right; "
         "hot/halo populations top-left.  Colour reads off the chemo-dynamic decoupling.",
-        top=0.84)
+        top=0.84,
+    )
     save(fig, "Y28_action_space")
     return 0
 

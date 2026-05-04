@@ -29,6 +29,7 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import apply_style, save_fig
+
 from arqueogal.xp_abundances.main.data import FeatureLayout, FeatureScaler
 
 OUT = REPO / "reports/gallery/B_preprocessing"
@@ -59,9 +60,11 @@ def main() -> int:
         log10_mask=np.asarray(fs_blob["log10_mask"], dtype=bool),
         apply_mask=np.asarray(fs_blob["apply_mask"], dtype=bool),
     )
-    print(f"[B17] FeatureScaler: {int(fs.apply_mask.sum())} scaled columns "
-          f"({int(fs.log10_mask.sum())} log10), "
-          f"{int((~fs.apply_mask).sum())} passthrough")
+    print(
+        f"[B17] FeatureScaler: {int(fs.apply_mask.sum())} scaled columns "
+        f"({int(fs.log10_mask.sum())} log10), "
+        f"{int((~fs.apply_mask).sum())} passthrough"
+    )
 
     cols = list(layout.all_required_columns)
     df = pd.read_parquet(parquet, columns=cols)
@@ -78,15 +81,14 @@ def main() -> int:
     rp_cols = list(layout.rp_coef_cols)
 
     # --- Row 0: XP block (passthrough — same as B11) ---
-    bp_arr = X_scaled[:, :len(bp_cols)].astype(np.float64)
-    rp_arr = X_scaled[:, len(bp_cols):len(bp_cols) + len(rp_cols)].astype(np.float64)
+    bp_arr = X_scaled[:, : len(bp_cols)].astype(np.float64)
+    rp_arr = X_scaled[:, len(bp_cols) : len(bp_cols) + len(rp_cols)].astype(np.float64)
 
     ax = fig.add_subplot(gs[0, 0])
     bp_med = np.nanmedian(bp_arr, axis=0)
     bp_p16 = np.nanpercentile(bp_arr, 16, axis=0)
     bp_p84 = np.nanpercentile(bp_arr, 84, axis=0)
-    ax.fill_between(bp_idx, bp_p16, bp_p84, color="#1f77b4", alpha=0.25,
-                    label="16-84 percentile")
+    ax.fill_between(bp_idx, bp_p16, bp_p84, color="#1f77b4", alpha=0.25, label="16-84 percentile")
     ax.plot(bp_idx, bp_med, "-", color="#1f77b4", lw=1.4, label="median")
     ax.axhline(0, color="k", lw=0.5, ls=":", alpha=0.5)
     ax.set_xlabel("Hermite index i (BP)")
@@ -99,8 +101,7 @@ def main() -> int:
     rp_med = np.nanmedian(rp_arr, axis=0)
     rp_p16 = np.nanpercentile(rp_arr, 16, axis=0)
     rp_p84 = np.nanpercentile(rp_arr, 84, axis=0)
-    ax.fill_between(rp_idx, rp_p16, rp_p84, color="#d62728", alpha=0.25,
-                    label="16-84 percentile")
+    ax.fill_between(rp_idx, rp_p16, rp_p84, color="#d62728", alpha=0.25, label="16-84 percentile")
     ax.plot(rp_idx, rp_med, "-", color="#d62728", lw=1.4, label="median")
     ax.axhline(0, color="k", lw=0.5, ls=":", alpha=0.5)
     ax.set_xlabel("Hermite index i (RP)")
@@ -113,23 +114,19 @@ def main() -> int:
     ax = fig.add_subplot(gs[0, 2])
     v = X_scaled[:, bp_c0z_idx].astype(np.float64)
     finite = np.isfinite(v)
-    ax.hist(v[finite], bins=60, color="#1f77b4", alpha=0.8,
-            edgecolor="#1f77b4", lw=0.4)
+    ax.hist(v[finite], bins=60, color="#1f77b4", alpha=0.8, edgecolor="#1f77b4", lw=0.4)
     ax.set_xlabel("bp_c0_z (post-scaling, passthrough)")
     ax.set_ylabel("count")
-    ax.set_title(f"BP c0 (z) passthrough\n"
-                 f"med {np.nanmedian(v):+.2f}, sd {np.nanstd(v):.2f}")
+    ax.set_title(f"BP c0 (z) passthrough\nmed {np.nanmedian(v):+.2f}, sd {np.nanstd(v):.2f}")
     ax.grid(axis="y", alpha=0.25)
 
     ax = fig.add_subplot(gs[0, 3])
     v = X_scaled[:, bp_c0z_idx + 1].astype(np.float64)
     finite = np.isfinite(v)
-    ax.hist(v[finite], bins=60, color="#d62728", alpha=0.8,
-            edgecolor="#d62728", lw=0.4)
+    ax.hist(v[finite], bins=60, color="#d62728", alpha=0.8, edgecolor="#d62728", lw=0.4)
     ax.set_xlabel("rp_c0_z (post-scaling, passthrough)")
     ax.set_ylabel("count")
-    ax.set_title(f"RP c0 (z) passthrough\n"
-                 f"med {np.nanmedian(v):+.2f}, sd {np.nanstd(v):.2f}")
+    ax.set_title(f"RP c0 (z) passthrough\nmed {np.nanmedian(v):+.2f}, sd {np.nanstd(v):.2f}")
     ax.grid(axis="y", alpha=0.25)
 
     # Per-feature sanity bar: post-scaling mean and std for the SCALED columns.
@@ -159,10 +156,10 @@ def main() -> int:
         # may carry NaN from non-positive raw residuals — drop them.
         finite = np.isfinite(v)
         if int(finite.sum()) > 0:
-            ax.hist(v[finite], bins=60, color=res_colors[i], alpha=0.8,
-                    edgecolor=res_colors[i], lw=0.4)
-            ax.axvline(0, color="k", lw=0.5, ls=":", alpha=0.5,
-                       label="z=0 (mean)")
+            ax.hist(
+                v[finite], bins=60, color=res_colors[i], alpha=0.8, edgecolor=res_colors[i], lw=0.4
+            )
+            ax.axvline(0, color="k", lw=0.5, ls=":", alpha=0.5, label="z=0 (mean)")
             ax.legend(fontsize=8)
         ax.set_xlabel(f"log10({res_titles[i]}) z-scored")
         ax.set_ylabel("count")
@@ -172,18 +169,19 @@ def main() -> int:
     aux_cols = list(layout.aux_cols)
     ax = fig.add_subplot(gs[1, 3])
     aux_offset = res_offset + 3  # aux block starts after the 3 residual cols
-    aux_imputed_count = np.array([
-        int((X_scaled[:, aux_offset + j] == 0.0).sum())
-        - int((np.abs(X_scaled[:, aux_offset + j] - 0.0) < 1e-9).sum() == 0)
-        for j in range(len(aux_cols))
-    ])
+    np.array(
+        [
+            int((X_scaled[:, aux_offset + j] == 0.0).sum())
+            - int((np.abs(X_scaled[:, aux_offset + j] - 0.0) < 1e-9).sum() == 0)
+            for j in range(len(aux_cols))
+        ]
+    )
     # The clearer thing to plot: NaN fraction in the *raw* columns vs the
     # post-scaling distribution at exactly z=0. nan_to_num maps every NaN
     # to 0 *before* training but in B17 we transform without imputing,
     # so NaN survive and we can show the fraction transparently.
     raw_nan_frac = np.array([float(df[c].isna().mean()) for c in aux_cols])
-    ax.bar(np.arange(len(aux_cols)), raw_nan_frac,
-           color="#9467bd", width=0.85)
+    ax.bar(np.arange(len(aux_cols)), raw_nan_frac, color="#9467bd", width=0.85)
     ax.set_xticks(np.arange(len(aux_cols)))
     ax.set_xticklabels(aux_cols, rotation=90, fontsize=6)
     ax.set_ylabel("raw NaN fraction")
@@ -192,7 +190,7 @@ def main() -> int:
 
     # Pairwise aux correlation post-scaling, NaN-pairwise.
     ax = fig.add_subplot(gs[1, 4])
-    aux_arr = X_scaled[:, aux_offset:aux_offset + len(aux_cols)].astype(np.float64)
+    aux_arr = X_scaled[:, aux_offset : aux_offset + len(aux_cols)].astype(np.float64)
     n_aux = len(aux_cols)
     corr = np.full((n_aux, n_aux), np.nan)
     for ii in range(n_aux):
@@ -222,8 +220,14 @@ def main() -> int:
         v = X_scaled[:, col_idx].astype(np.float64)
         finite = np.isfinite(v)
         if finite.any():
-            ax.hist(v[finite], bins=60, color=photom_colors[i], alpha=0.75,
-                    edgecolor=photom_colors[i], lw=0.4)
+            ax.hist(
+                v[finite],
+                bins=60,
+                color=photom_colors[i],
+                alpha=0.75,
+                edgecolor=photom_colors[i],
+                lw=0.4,
+            )
             ax.axvline(0, color="k", lw=0.5, ls=":", alpha=0.5)
         ax.set_xlabel(f"{col} (z-scored)")
         ax.set_ylabel("count")
@@ -232,8 +236,13 @@ def main() -> int:
 
     # --- Row 3: astrometry + extinction post-scaling ---
     diag_pos = ["parallax", "ruwe", "r_med_photogeo", "av_los", "ag_gspphot"]
-    diag_titles = ["parallax", "RUWE", "BJ21 distance",
-                   r"$A_V^\mathrm{LOS}$", r"$A_G^\mathrm{GSP-Phot}$"]
+    diag_titles = [
+        "parallax",
+        "RUWE",
+        "BJ21 distance",
+        r"$A_V^\mathrm{LOS}$",
+        r"$A_G^\mathrm{GSP-Phot}$",
+    ]
     diag_colors = ["#2ca02c", "#444444", "#1f77b4", "#9467bd", "#9467bd"]
     for i, col in enumerate(diag_pos):
         col_idx = aux_offset + aux_cols.index(col)
@@ -241,8 +250,14 @@ def main() -> int:
         v = X_scaled[:, col_idx].astype(np.float64)
         finite = np.isfinite(v)
         if finite.any():
-            ax.hist(v[finite], bins=60, color=diag_colors[i], alpha=0.8,
-                    edgecolor=diag_colors[i], lw=0.4)
+            ax.hist(
+                v[finite],
+                bins=60,
+                color=diag_colors[i],
+                alpha=0.8,
+                edgecolor=diag_colors[i],
+                lw=0.4,
+            )
             ax.axvline(0, color="k", lw=0.5, ls=":", alpha=0.5)
         ax.set_xlabel(f"{col} (z-scored)")
         ax.set_ylabel("count")
@@ -255,11 +270,12 @@ def main() -> int:
         f"110 XP cols passthrough, 30 aux+residual cols z-scored "
         f"(3 with log10 first).\n"
         f"Stats loaded from canonical checkpoint cfg 26312a4.",
-        fontsize=11, fontweight="semibold", y=0.995,
+        fontsize=11,
+        fontweight="semibold",
+        y=0.995,
     )
     OUT.mkdir(parents=True, exist_ok=True)
-    save_fig(fig, OUT / "B17_feature_overview_post_scaling",
-             formats=("pdf", "png"))
+    save_fig(fig, OUT / "B17_feature_overview_post_scaling", formats=("pdf", "png"))
     return 0
 
 

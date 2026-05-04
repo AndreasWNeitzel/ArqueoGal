@@ -40,9 +40,7 @@ def main() -> None:
     # normalisation". The previously-used bp_coef_norm_* columns are
     # z-scored (mean 0, std 1) and contain exact zeros → log scale crash.
     cols = (
-        ["g_mag"]
-        + [f"bp_coef_{i}" for i in range(0, 55)]
-        + [f"rp_coef_{i}" for i in range(0, 55)]
+        ["g_mag"] + [f"bp_coef_{i}" for i in range(0, 55)] + [f"rp_coef_{i}" for i in range(0, 55)]
     )
     df_all = pd.read_parquet(parquet, columns=cols)
 
@@ -78,9 +76,14 @@ def main() -> None:
 
             ax.fill_between(coef_idx, p16, p84, alpha=0.2, color=colors_bin[bin_idx])
             ax.plot(
-                coef_idx, median,
-                linestyle=linestyles[bin_idx], marker="o", markersize=3,
-                color=colors_bin[bin_idx], alpha=0.85, linewidth=1.2,
+                coef_idx,
+                median,
+                linestyle=linestyles[bin_idx],
+                marker="o",
+                markersize=3,
+                color=colors_bin[bin_idx],
+                alpha=0.85,
+                linewidth=1.2,
                 label=f"{bin_labels[bin_idx]} (n={int(ok.sum()):,})",
             )
 
@@ -97,7 +100,9 @@ def main() -> None:
         fontsize=11,
         fontweight="semibold",
     )
-    save_fig(fig, REPO / "reports/gallery/B_preprocessing" / "B6_gaia_xp_raw", formats=("pdf", "png"))
+    save_fig(
+        fig, REPO / "reports/gallery/B_preprocessing" / "B6_gaia_xp_raw", formats=("pdf", "png")
+    )
 
 
 if __name__ == "__main__":

@@ -101,7 +101,8 @@ _PRED_COLS: Final = (
     "cr_h_pred",
     "mn_h_pred",
     "ni_h_pred",
-    "ce_h_pred")
+    "ce_h_pred",
+)
 """All 21 predicted elements, ordered to match LabelTiers.all_labels."""
 
 
@@ -189,7 +190,8 @@ _ABUNDANCE_ELEMENTS: Final[tuple[str, ...]] = (
     "cr_h",
     "mn_h",
     "ni_h",
-    "ce_h")
+    "ce_h",
+)
 """All 21 atmospheric parameters and abundance labels released per-star.
 
 Ordered to match LabelTiers tier1 + tier2 + tier3 sequence as of 2026-04-28
@@ -425,7 +427,8 @@ def assign_xp_abundance_type(df: pd.DataFrame) -> dict[str, pd.Series]:
             "cr_h",
             "mn_h",
             "ni_h",
-            "ce_h"):
+            "ce_h",
+        ):
             result[elem] = pd.Series("spectrum_dominant", index=df.index, dtype="string")
         else:
             result[elem] = pd.Series("unknown", index=df.index, dtype="string")
@@ -455,9 +458,8 @@ def assign_kin_ood_flag(df: pd.DataFrame) -> pd.Series:
 
 
 def assign_dist_prior_dominated(
-    df: pd.DataFrame,
-    *,
-    parallax_snr_threshold: float = 5.0) -> pd.Series:
+    df: pd.DataFrame, *, parallax_snr_threshold: float = 5.0
+) -> pd.Series:
     """Per-star boolean: True where the Bailer-Jones distance is prior-dominated.
 
     The Phase A2 catalog schema reserved a `dist_prior_dominated` column but did not
@@ -753,32 +755,31 @@ def tier_counts(df: pd.DataFrame, tier_col: str = "release_tier") -> dict[int, i
 def annotate_parquet(path: Path) -> dict[str, int | dict[int, int]]:
     """Add or refresh release-catalog columns in a prediction parquet in place.
 
-    Adds or refreshes:
-    - ``release_tier`` ∈ {1, 2, 3}
-    - ``release_tier__<element>`` (per-element tier) for all 21 elements
-    - ``xp_abundance_type__<element>`` ∈ {"spectrum_dominant", "aux_assisted"}
-      for all 21 elements (Teff, logg, [M/H], [Fe/H], [α/M], [Mg/H], and 16 others)
-    - ``prediction_sigma_inflated__<element>`` (per-element σ-tail flag,
-      diagnostic-only as of v6 / 2026-05-03; not a tier driver)
-    - ``kin_ood_flag`` (placeholder, False; diagnostic-only as of v6, not a tier driver)
-    - ``g_mag_bin`` ∈ {"bright", "mid", "faint"}
-    - ``dist_prior_dominated`` (Bailer-Jones parallax-SNR boundary)
-    - ``prediction_sigma_inflated_any`` (convenience: any element flag)
+     Adds or refreshes:
+     - ``release_tier`` ∈ {1, 2, 3}
+     - ``release_tier__<element>`` (per-element tier) for all 21 elements
+     - ``xp_abundance_type__<element>`` ∈ {"spectrum_dominant", "aux_assisted"}
+       for all 21 elements (Teff, logg, [M/H], [Fe/H], [α/M], [Mg/H], and 16 others)
+     - ``prediction_sigma_inflated__<element>`` (per-element σ-tail flag,
+       diagnostic-only as of v6 / 2026-05-03; not a tier driver)
+     - ``kin_ood_flag`` (placeholder, False; diagnostic-only as of v6, not a tier driver)
+     - ``g_mag_bin`` ∈ {"bright", "mid", "faint"}
+     - ``dist_prior_dominated`` (Bailer-Jones parallax-SNR boundary)
+     - ``prediction_sigma_inflated_any`` (convenience: any element flag)
 
-    Emits / refreshes the ``*.release_tier.json`` sidecar next to the parquet
-    capturing counts, flag-column provenance, and catalog schema version.
-    The parquet's main provenance sidecar (``*.provenance.json``) is not touched
-   , that records upstream inference, not this annotation step.
+     Emits / refreshes the ``*.release_tier.json`` sidecar next to the parquet
+     capturing counts, flag-column provenance, and catalog schema version.
+     The parquet's main provenance sidecar (``*.provenance.json``) is not touched
+    , that records upstream inference, not this annotation step.
 
-    Returns
-    -------
-    dict
-        ``{"n_rows": N, "counts": {1: ..., 2: ..., 3: ...}}``.
+     Returns
+     -------
+     dict
+         ``{"n_rows": N, "counts": {1: ..., 2: ..., 3: ...}}``.
     """
     _logger.info(
-        "annotate_parquet: reading %s (catalog schema v%d)",
-        path,
-        _CATALOGUE_SCHEMA_VERSION)
+        "annotate_parquet: reading %s (catalog schema v%d)", path, _CATALOGUE_SCHEMA_VERSION
+    )
     df = pd.read_parquet(path)
     _logger.info("annotate_parquet: loaded %d rows from %s", len(df), path.name)
 
@@ -832,7 +833,8 @@ def annotate_parquet(path: Path) -> dict[str, int | dict[int, int]]:
         counts.get(2, 0),
         100.0 * counts.get(2, 0) / max(len(df), 1),
         counts.get(3, 0),
-        100.0 * counts.get(3, 0) / max(len(df), 1))
+        100.0 * counts.get(3, 0) / max(len(df), 1),
+    )
     summary: dict[str, int | dict[int, int]] = {
         "n_rows": int(len(df)),
         "counts": counts,
@@ -885,8 +887,8 @@ def annotate_parquet(path: Path) -> dict[str, int | dict[int, int]]:
             #
             # Retired 2026-05-03 (v6 redesign):
             "prediction_sigma_inflated__<element>",  # σ-tail flag, was T2 demoter
-            "kin_ood_flag",                          # disc-kinematics envelope, was aux-T2
-            "mode_ambiguous_flag",                   # disc-bimodality boundary, was α/M T2
+            "kin_ood_flag",  # disc-kinematics envelope, was aux-T2
+            "mode_ambiguous_flag",  # disc-bimodality boundary, was α/M T2
             # Retired 2026-04-26 (v5 ablation):
             "ood_aux_mahalanobis_flag",
             "latent_support_flag",

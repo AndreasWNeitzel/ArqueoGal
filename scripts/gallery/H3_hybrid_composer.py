@@ -67,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         # ArrowExtensionArray for .values; cast to a numpy int64 array so
         # downstream .sum()/.tolist() are guaranteed.
         import numpy as np
+
         sizes = np.asarray(counts.to_numpy(), dtype=np.int64)
         colors = [palette.get(label, "#1f77b4") for label in labels]
 

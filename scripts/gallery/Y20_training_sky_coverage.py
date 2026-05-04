@@ -30,7 +30,9 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import (  # noqa: E402
-    galactic_mollweide, radec_to_galactic, style_galactic_mollweide,
+    galactic_mollweide,
+    radec_to_galactic,
+    style_galactic_mollweide,
 )
 from _presentation import PALETTE, apply_style, headline, save  # noqa: E402
 
@@ -64,15 +66,20 @@ def _draw(ax, df, title, vmin, vmax):
     have = np.where(np.isfinite(counts))[0]
     lon, lat = _pix_to_lonlat(have)
     sc = ax.scatter(
-        lon, lat, c=np.log10(counts[have]),
-        cmap="viridis", vmin=vmin, vmax=vmax,
-        s=24.0, marker="s", edgecolors="none", alpha=0.95,
+        lon,
+        lat,
+        c=np.log10(counts[have]),
+        cmap="viridis",
+        vmin=vmin,
+        vmax=vmax,
+        s=24.0,
+        marker="s",
+        edgecolors="none",
+        alpha=0.95,
     )
     style_galactic_mollweide(ax)
-    ax.set_title(f"{title}    n = {len(df):,}", fontsize=14,
-                 color=PALETTE["navy"])
-    cb = plt.colorbar(sc, ax=ax, fraction=0.030, pad=0.04,
-                      orientation="horizontal")
+    ax.set_title(f"{title}    n = {len(df):,}", fontsize=14, color=PALETTE["navy"])
+    cb = plt.colorbar(sc, ax=ax, fraction=0.030, pad=0.04, orientation="horizontal")
     cb.set_label(r"$\log_{10}$ N per HEALPix pixel", fontsize=11)
     cb.ax.tick_params(labelsize=10)
 
@@ -87,10 +94,8 @@ def main() -> int:
     fig = plt.figure(figsize=(14, 10))
     ax1 = fig.add_axes([0.04, 0.55, 0.92, 0.35], projection="mollweide")
     ax2 = fig.add_axes([0.04, 0.10, 0.92, 0.35], projection="mollweide")
-    _draw(ax1, df1, "Stream 1 — training cohort (APOGEE × Gaia DR3)",
-          vmin=0.0, vmax=2.5)
-    _draw(ax2, df3, "Stream 3 — inference cohort (Andrae+2023 RGB)",
-          vmin=0.0, vmax=2.5)
+    _draw(ax1, df1, "Stream 1 — training cohort (APOGEE × Gaia DR3)", vmin=0.0, vmax=2.5)
+    _draw(ax2, df3, "Stream 3 — inference cohort (Andrae+2023 RGB)", vmin=0.0, vmax=2.5)
 
     headline(
         fig,

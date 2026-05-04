@@ -170,12 +170,14 @@ def join_predictions_with_features(
     # consumers fall back to ``parallax_corr`` when ``parallax_raw`` is
     # absent.
     import pyarrow.parquet as _pq
+
     feat_schema_cols = set(_pq.read_schema(features_path).names)
     requested = [c for c in feature_columns if c]
     available_cols = [c for c in requested if c in feat_schema_cols]
     missing_cols = [c for c in requested if c not in feat_schema_cols]
     if missing_cols:
         import logging as _logging
+
         _logging.getLogger(__name__).warning(
             "join_predictions_with_features: features parquet %s missing "
             "columns %s; release pipeline will fall back to default values",

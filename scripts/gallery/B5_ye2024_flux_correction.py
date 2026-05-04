@@ -64,17 +64,16 @@ def main() -> None:
         candidates = s1.loc[bin_mask, "source_id"].to_numpy()
         n_bin_total = int(len(candidates))
         if n_bin_total == 0:
-            ax.text(0.5, 0.5, "no stars in bin", ha="center", va="center",
-                    transform=ax.transAxes)
+            ax.text(0.5, 0.5, "no stars in bin", ha="center", va="center", transform=ax.transAxes)
             continue
-        target = rng.choice(candidates,
-                            size=min(SAMPLE_PER_BIN, n_bin_total),
-                            replace=False)
+        target = rng.choice(candidates, size=min(SAMPLE_PER_BIN, n_bin_total), replace=False)
         target_arr = pa.array(sorted(int(x) for x in target.tolist()))
         opts = pc.SetLookupOptions(value_set=target_arr)
         kept = []
         for rg_idx in range(xp_pf.metadata.num_row_groups):
-            rg = xp_pf.read_row_group(rg_idx, columns=["source_id", "corrected_flux", "ye2024_flag"])
+            rg = xp_pf.read_row_group(
+                rg_idx, columns=["source_id", "corrected_flux", "ye2024_flag"]
+            )
             mask = pc.is_in(rg.column("source_id"), options=opts)
             chunk = rg.filter(mask)
             if chunk.num_rows:
@@ -83,16 +82,16 @@ def main() -> None:
                 if chunk_ok.num_rows:
                     kept.append(chunk_ok)
         if not kept:
-            ax.text(0.5, 0.5, "no Ye-OK XP for bin", ha="center", va="center",
-                    transform=ax.transAxes)
+            ax.text(
+                0.5, 0.5, "no Ye-OK XP for bin", ha="center", va="center", transform=ax.transAxes
+            )
             continue
         kept_table = pa.concat_tables(kept)
         flux_list = kept_table.column("corrected_flux").to_pylist()
         flux = np.asarray(flux_list, dtype=np.float32)
         n_kept = flux.shape[0]
         if flux.size == 0:
-            ax.text(0.5, 0.5, "no flux", ha="center", va="center",
-                    transform=ax.transAxes)
+            ax.text(0.5, 0.5, "no flux", ha="center", va="center", transform=ax.transAxes)
             continue
         median = np.median(flux, axis=0)
         p16 = np.percentile(flux, 16, axis=0)
@@ -102,8 +101,7 @@ def main() -> None:
         ax.set_xlabel("wavelength [nm]")
         ax.set_ylabel("Ye-corrected flux (Gaia internal units)")
         ax.set_title(
-            f"{label}\n"
-            f"bin total: {n_bin_total:,} stars  ·  SED sample: {n_kept:,}",
+            f"{label}\nbin total: {n_bin_total:,} stars  ·  SED sample: {n_kept:,}",
             fontsize=10,
         )
         ax.grid(True, alpha=0.25)
@@ -111,10 +109,14 @@ def main() -> None:
     fig.suptitle(
         "B5 — Stream 1: Ye+2024 NN-corrected XP sampled flux at three G-magnitude bins.\n"
         "Median ± 16-84 percentile; 330-point geometric grid 360-990 nm.",
-        fontsize=10, fontweight="semibold",
+        fontsize=10,
+        fontweight="semibold",
     )
-    save_fig(fig, REPO / "reports/gallery/B_preprocessing" / "B5_ye2024_flux_correction",
-             formats=("pdf", "png"))
+    save_fig(
+        fig,
+        REPO / "reports/gallery/B_preprocessing" / "B5_ye2024_flux_correction",
+        formats=("pdf", "png"),
+    )
 
 
 if __name__ == "__main__":

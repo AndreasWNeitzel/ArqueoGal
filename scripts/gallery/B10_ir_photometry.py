@@ -65,8 +65,14 @@ def main(max_per_stream: int | None = None) -> None:
                 completeness.append(np.nan)
             else:
                 completeness.append(df.loc[mask, "k_mag"].notna().mean())
-        axes[0].plot(centres, completeness, "-o", color=PALETTE[sid],
-                     label=f"Stream {sid} (n={len(df):,})", lw=1.5)
+        axes[0].plot(
+            centres,
+            completeness,
+            "-o",
+            color=PALETTE[sid],
+            label=f"Stream {sid} (n={len(df):,})",
+            lw=1.5,
+        )
     axes[0].set_xlabel("G magnitude")
     axes[0].set_ylabel("2MASS Ks-band detection fraction")
     axes[0].set_title("IR completeness vs G")
@@ -83,7 +89,9 @@ def main(max_per_stream: int | None = None) -> None:
         axes[1].scatter(
             sub["j_mag"] - sub["k_mag"],
             sub["w1_mag"] - sub["w2_mag"],
-            s=2, alpha=0.30, color=PALETTE[sid],
+            s=2,
+            alpha=0.30,
+            color=PALETTE[sid],
             label=f"Stream {sid}",
             rasterized=True,
         )
@@ -104,8 +112,7 @@ def main(max_per_stream: int | None = None) -> None:
     for i, sid in enumerate(STREAMS):
         df = streams[sid]
         medians = [df[b].median() for b in bands]
-        axes[2].bar(x + (i - 1) * width, medians, width,
-                    color=PALETTE[sid], label=f"Stream {sid}")
+        axes[2].bar(x + (i - 1) * width, medians, width, color=PALETTE[sid], label=f"Stream {sid}")
     axes[2].set_xticks(x)
     axes[2].set_xticklabels(band_labels)
     axes[2].set_ylabel("median magnitude")
@@ -115,7 +122,8 @@ def main(max_per_stream: int | None = None) -> None:
 
     fig.suptitle(
         "B10 — Streams 1, 2, 3: real 2MASS + AllWISE IR photometry",
-        fontsize=11, fontweight="semibold",
+        fontsize=11,
+        fontweight="semibold",
     )
     save_fig(fig, OUT / "B10_ir_photometry", formats=("pdf", "png"))
 
@@ -123,7 +131,9 @@ def main(max_per_stream: int | None = None) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot B10: IR photometry coverage (real data).")
     parser.add_argument(
-        "--max-per-stream", type=int, default=50000,
+        "--max-per-stream",
+        type=int,
+        default=50000,
         help="Optional: per-stream scatter cap for panel 2 (default 50000)",
     )
     args = parser.parse_args()

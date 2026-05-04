@@ -183,7 +183,7 @@ def test_build_dataloaders_shapes(tmp_path: Path) -> None:
     df.to_parquet(parquet, index=False)
 
     cfg = replace(_tiny_cfg(tmp_path), train_parquet=parquet)
-    tr, va, ids, scaler = build_dataloaders(cfg, layout, tiers, seed=0)
+    tr, va, ids, scaler, _feat_scaler = build_dataloaders(cfg, layout, tiers, seed=0)
     x, y, _s = next(iter(tr))
     assert x.shape[1] == layout.input_dim
     assert y.shape[1] == tiers.n_labels
@@ -915,7 +915,7 @@ def test_build_dataloaders_yields_weights_when_enabled(tmp_path: Path) -> None:
         inverse_freq_bin_edges=(-0.5, 0.0),  # cheap 3-bin on synthetic range
         inverse_freq_clip=5.0,
     )
-    tr, _va, _ids, _scaler = build_dataloaders(cfg, layout, tiers, seed=0)
+    tr, _va, _ids, _scaler, _feat_scaler = build_dataloaders(cfg, layout, tiers, seed=0)
     batch = next(iter(tr))
     assert len(batch) == 3, f"expected (x, y, w), got {len(batch)}-tuple"
     x, y, w = batch
@@ -935,7 +935,7 @@ def test_build_dataloaders_yields_sigma_when_weighting_disabled(tmp_path: Path) 
     df.to_parquet(parquet, index=False)
 
     cfg = replace(_tiny_cfg(tmp_path), train_parquet=parquet)
-    tr, _va, _ids, _scaler = build_dataloaders(cfg, layout, tiers, seed=0)
+    tr, _va, _ids, _scaler, _feat_scaler = build_dataloaders(cfg, layout, tiers, seed=0)
     batch = next(iter(tr))
     assert len(batch) == 3, "legacy contract still yields (x, y, sigma_Y)"
     x, y, s = batch

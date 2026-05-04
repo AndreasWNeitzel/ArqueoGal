@@ -33,23 +33,29 @@ OUT = REPO / "reports/gallery/G_extinction"
 
 ZONE_EDGES = (0.0, 1.25, 3.0, 12.0)  # kpc
 SOURCE_COLOR = {
-    "av_edenhofer":   "#1f77b4",
-    "av_lallement":   "#2ca02c",
-    "av_sfd":         "#d62728",
+    "av_edenhofer": "#1f77b4",
+    "av_lallement": "#2ca02c",
+    "av_sfd": "#d62728",
     "av_nbhd_median": "#7d3c98",
 }
 SOURCE_LABEL = {
-    "av_edenhofer":   "Edenhofer+2024",
-    "av_lallement":   "Lallement+2022",
-    "av_sfd":         "SFD/SF2011",
+    "av_edenhofer": "Edenhofer+2024",
+    "av_lallement": "Lallement+2022",
+    "av_sfd": "SFD/SF2011",
     "av_nbhd_median": "nbhd-median composite",
 }
 
 
 def main() -> int:
     apply_style()
-    cols = ["source_id", "r_med_photogeo",
-             "av_edenhofer", "av_lallement", "av_sfd", "av_nbhd_median"]
+    cols = [
+        "source_id",
+        "r_med_photogeo",
+        "av_edenhofer",
+        "av_lallement",
+        "av_sfd",
+        "av_nbhd_median",
+    ]
     df = pd.read_parquet(FEAT, columns=cols).drop_duplicates("source_id")
     df = df.dropna(subset=["r_med_photogeo"])
     df["d_kpc"] = df["r_med_photogeo"] / 1000.0
@@ -57,8 +63,9 @@ def main() -> int:
     n = len(df)
 
     fig = plt.figure(figsize=(20, 14))
-    gs = fig.add_gridspec(2, 3, hspace=0.35, wspace=0.30,
-                          top=0.92, bottom=0.06, left=0.05, right=0.97)
+    gs = fig.add_gridspec(
+        2, 3, hspace=0.35, wspace=0.30, top=0.92, bottom=0.06, left=0.05, right=0.97
+    )
 
     # (a) Av vs distance per source — one subpanel per source for clarity.
     ax = fig.add_subplot(gs[0, :])
@@ -70,24 +77,57 @@ def main() -> int:
             continue
         # Median curve in distance bins.
         bins = np.linspace(0, 12, 60)
-        med = np.array([
-            np.median(v[ok & (d >= bins[k]) & (d < bins[k + 1])])
-            if int(((d >= bins[k]) & (d < bins[k + 1]) & ok).sum()) > 50
-            else np.nan
-            for k in range(len(bins) - 1)
-        ])
+        med = np.array(
+            [
+                np.median(v[ok & (d >= bins[k]) & (d < bins[k + 1])])
+                if int(((d >= bins[k]) & (d < bins[k + 1]) & ok).sum()) > 50
+                else np.nan
+                for k in range(len(bins) - 1)
+            ]
+        )
         x = 0.5 * (bins[:-1] + bins[1:])
-        ax.plot(x, med, "-", color=color, lw=2.2,
-                label=f"{SOURCE_LABEL[src]}  (n_star = {int(ok.sum()):,})")
+        ax.plot(
+            x,
+            med,
+            "-",
+            color=color,
+            lw=2.2,
+            label=f"{SOURCE_LABEL[src]}  (n_star = {int(ok.sum()):,})",
+        )
     for ze in ZONE_EDGES[1:-1]:
         ax.axvline(ze, color="0.4", ls=":", lw=1.2)
-    ax.text(0.625, 0.95, "Edenhofer\nzone", transform=ax.transAxes,
-            ha="center", va="top", fontsize=9, color="0.4")
-    ax.text(2.125 / 12, 0.95, "Lallement zone", transform=ax.transAxes,
-            ha="left", va="top", fontsize=9, color="0.4")
-    ax.text(7.5 / 12, 0.95, "SFD zone", transform=ax.transAxes,
-            ha="left", va="top", fontsize=9, color="0.4")
-    ax.set_xlim(0, 12); ax.set_ylim(0, 5)
+    ax.text(
+        0.625,
+        0.95,
+        "Edenhofer\nzone",
+        transform=ax.transAxes,
+        ha="center",
+        va="top",
+        fontsize=9,
+        color="0.4",
+    )
+    ax.text(
+        2.125 / 12,
+        0.95,
+        "Lallement zone",
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=9,
+        color="0.4",
+    )
+    ax.text(
+        7.5 / 12,
+        0.95,
+        "SFD zone",
+        transform=ax.transAxes,
+        ha="left",
+        va="top",
+        fontsize=9,
+        color="0.4",
+    )
+    ax.set_xlim(0, 12)
+    ax.set_ylim(0, 5)
     ax.set_xlabel("BJ21 distance (kpc)")
     ax.set_ylabel(r"median $A_V$ in 0.2-kpc bin (mag)")
     ax.set_title("(a) $A_V$ vs distance per source")
@@ -97,17 +137,25 @@ def main() -> int:
     # (b) per-zone Av histograms (using the nbhd-median composite).
     ax = fig.add_subplot(gs[1, 0])
     bins_av = np.linspace(0, 6, 60)
-    for k, (lo, hi, color, name) in enumerate([
-        (0.0, 1.25, "#1f77b4", "Edenhofer (≤1.25 kpc)"),
-        (1.25, 3.0, "#2ca02c", "Lallement (1.25-3 kpc)"),
-        (3.0, 12.0, "#d62728", "SFD (>3 kpc)"),
-    ]):
+    for _k, (lo, hi, color, name) in enumerate(
+        [
+            (0.0, 1.25, "#1f77b4", "Edenhofer (≤1.25 kpc)"),
+            (1.25, 3.0, "#2ca02c", "Lallement (1.25-3 kpc)"),
+            (3.0, 12.0, "#d62728", "SFD (>3 kpc)"),
+        ]
+    ):
         m = (df["d_kpc"] >= lo) & (df["d_kpc"] < hi)
         v = df.loc[m, "av_nbhd_median"].dropna()
         if not len(v):
             continue
-        ax.hist(v[v < 6], bins=bins_av, histtype="step", color=color,
-                lw=2.0, label=f"{name}  n={len(v):,}  med={v.median():.2f}")
+        ax.hist(
+            v[v < 6],
+            bins=bins_av,
+            histtype="step",
+            color=color,
+            lw=2.0,
+            label=f"{name}  n={len(v):,}  med={v.median():.2f}",
+        )
     ax.set_xlim(0, 6)
     ax.set_xlabel("nbhd-median $A_V$ (mag)")
     ax.set_ylabel("count")
@@ -127,9 +175,15 @@ def main() -> int:
             continue
         delta = v_src[ok] - v_nbhd[ok]
         med = float(np.median(delta))
-        ax.hist(delta, bins=80, range=(-2, 2), histtype="step",
-                color=color, lw=2.0,
-                label=f"{SOURCE_LABEL[src]}  med={med:+.2f}  n={int(ok.sum()):,}")
+        ax.hist(
+            delta,
+            bins=80,
+            range=(-2, 2),
+            histtype="step",
+            color=color,
+            lw=2.0,
+            label=f"{SOURCE_LABEL[src]}  med={med:+.2f}  n={int(ok.sum()):,}",
+        )
     ax.axvline(0, color="0.3", ls="-", lw=0.8, alpha=0.7)
     ax.set_xlim(-2, 2)
     ax.set_xlabel(r"$A_V^{\rm src} - A_V^{\rm nbhd}$ (mag)")
@@ -140,16 +194,15 @@ def main() -> int:
 
     # (d) Av_nbhd_std vs distance (uncertainty proxy).
     ax = fig.add_subplot(gs[1, 2])
-    df2 = pd.read_parquet(FEAT,
-                          columns=["source_id", "r_med_photogeo", "av_nbhd_std"])
+    df2 = pd.read_parquet(FEAT, columns=["source_id", "r_med_photogeo", "av_nbhd_std"])
     df2 = df2.drop_duplicates("source_id").dropna()
     df2["d_kpc"] = df2["r_med_photogeo"] / 1000.0
     d = df2["d_kpc"].to_numpy()
     s = df2["av_nbhd_std"].to_numpy()
     ok = np.isfinite(d) & np.isfinite(s) & (d > 0) & (d < 12) & (s < 2)
-    ax.hexbin(d[ok], s[ok], gridsize=80, extent=(0, 12, 0, 2),
-              mincnt=1, bins="log", cmap="viridis")
-    ax.set_xlim(0, 12); ax.set_ylim(0, 2)
+    ax.hexbin(d[ok], s[ok], gridsize=80, extent=(0, 12, 0, 2), mincnt=1, bins="log", cmap="viridis")
+    ax.set_xlim(0, 12)
+    ax.set_ylim(0, 2)
     ax.set_xlabel("BJ21 distance (kpc)")
     ax.set_ylabel(r"$\sigma(A_V)$ from nbhd-median (mag)")
     ax.set_title("(d) Composite uncertainty vs distance")
@@ -159,7 +212,9 @@ def main() -> int:
         f"G2. $A_V$ vs distance per source  (Stream 1, n = {n:,})\n"
         "Three dust-map zones: Edenhofer ≤ 1.25 kpc, Lallement 1.25-3 kpc, "
         "SFD > 3 kpc.  The pipeline uses the nbhd-median composite.",
-        fontsize=12, fontweight="semibold", y=0.985,
+        fontsize=12,
+        fontweight="semibold",
+        y=0.985,
     )
     save_fig(fig, OUT / "G2_extinction_vs_distance", tight=False)
     return 0

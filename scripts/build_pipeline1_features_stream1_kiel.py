@@ -39,7 +39,6 @@ import json
 import logging
 from pathlib import Path
 
-import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -76,10 +75,14 @@ def main() -> None:
     )
     n_keep = int(mask.sum())
     _LOG.info(
-        "kiel bbox: Teff [%.0f, %.0f] K, log g [%.2f, %.2f] dex; "
-        "keep %d / %d rows (%.1f%%)",
-        args.teff_min, args.teff_max, args.logg_min, args.logg_max,
-        n_keep, n_total, 100.0 * n_keep / max(n_total, 1),
+        "kiel bbox: Teff [%.0f, %.0f] K, log g [%.2f, %.2f] dex; keep %d / %d rows (%.1f%%)",
+        args.teff_min,
+        args.teff_max,
+        args.logg_min,
+        args.logg_max,
+        n_keep,
+        n_total,
+        100.0 * n_keep / max(n_total, 1),
     )
     if n_keep == 0:
         raise RuntimeError("Kiel mask kept zero rows — check teff/logg columns")
@@ -87,9 +90,12 @@ def main() -> None:
     table_kiel = table.filter(pa.array(mask))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(table_kiel, args.output, compression="zstd")
-    _LOG.info("wrote %s (%d rows, %.1f MB)",
-              args.output, table_kiel.num_rows,
-              args.output.stat().st_size / 1e6)
+    _LOG.info(
+        "wrote %s (%d rows, %.1f MB)",
+        args.output,
+        table_kiel.num_rows,
+        args.output.stat().st_size / 1e6,
+    )
 
     # Provenance: copy frozen-stats payload, append kiel_mask block.
     prov_path = args.output.with_suffix("").with_suffix(".provenance.json")

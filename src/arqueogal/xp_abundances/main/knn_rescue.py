@@ -303,7 +303,7 @@ def summarize_neighbors(
     if finite:
         sorted_neighbors = np.sort(neighbors, axis=1)  # (N, k, 5)
         # Quantile positions: linear interpolation between adjacent sorted ranks
-        n_k = sorted_neighbors.shape[1]
+        sorted_neighbors.shape[1]
         for j, elem in enumerate(LABEL_NAMES):
             col = sorted_neighbors[:, :, j]
             qs = np.quantile(col, [0.25, 0.5, 0.75], axis=1)

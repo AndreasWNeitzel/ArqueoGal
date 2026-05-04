@@ -103,12 +103,12 @@ def build_finetune_config(
         checkpoint_every_n_epochs=1,
         output_prefix=output_prefix,
         loss_weights=LossWeights(
-            supcon=1.0,        # canonical
-            beta_nll=1.0,      # canonical
-            barlow=0.5,        # canonical
-            ari=0.0,           # OFF — sigmoid-hard split at [α/M]=0.15 was
-                               # creating a "barbell" prediction pattern at
-                               # any weight; user disabled 2026-05-03.
+            supcon=1.0,  # canonical
+            beta_nll=1.0,  # canonical
+            barlow=0.5,  # canonical
+            ari=0.0,  # OFF — sigmoid-hard split at [α/M]=0.15 was
+            # creating a "barbell" prediction pattern at
+            # any weight; user disabled 2026-05-03.
             beta=beta,
             supcon_sigma=0.10,
             supcon_label_n_first=None,

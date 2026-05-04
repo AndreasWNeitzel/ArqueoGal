@@ -24,7 +24,7 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 
-from _common import apply_style, load_real_stream, save_fig
+from _common import apply_style, save_fig
 
 OUT = REPO / "reports/gallery/H_hybrid_release"
 
@@ -77,16 +77,22 @@ def main(argv: list[str] | None = None) -> int:
     KIEL_EXTENT = (3500, 6500, 0.5, 4.0)
     CHEM_EXTENT = (-2.5, 0.6, -0.20, 0.55)
 
-    streams = [(s1, "Stream 1", "#1f77b4"),
-               (s2, "Stream 2", "#d62728"),
-               (s3, "Stream 3", "#ff7f0e")]
+    streams = [
+        (s1, "Stream 1", "#1f77b4"),
+        (s2, "Stream 2", "#d62728"),
+        (s3, "Stream 3", "#ff7f0e"),
+    ]
 
     # Row 0: Kiel diagram — hex density per stream.
     for col, (df, name, _color) in enumerate(streams):
         ax = axes[0, col]
         hb = ax.hexbin(
-            df["teff_pred"], df["logg_pred"],
-            gridsize=KIEL_GRID, cmap="viridis", mincnt=1, bins="log",
+            df["teff_pred"],
+            df["logg_pred"],
+            gridsize=KIEL_GRID,
+            cmap="viridis",
+            mincnt=1,
+            bins="log",
             extent=KIEL_EXTENT,
         )
         plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N per cell")
@@ -101,8 +107,12 @@ def main(argv: list[str] | None = None) -> int:
     for col, (df, name, _color) in enumerate(streams):
         ax = axes[1, col]
         hb = ax.hexbin(
-            df["mh_pred"], df["alpha_m_pred"],
-            gridsize=CHEM_GRID, cmap="viridis", mincnt=1, bins="log",
+            df["mh_pred"],
+            df["alpha_m_pred"],
+            gridsize=CHEM_GRID,
+            cmap="viridis",
+            mincnt=1,
+            bins="log",
             extent=CHEM_EXTENT,
         )
         plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N per cell")

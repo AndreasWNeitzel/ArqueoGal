@@ -31,8 +31,7 @@ MIN_PER_CELL = 30
 
 
 def _vmax(key: str) -> float:
-    return {"teff": 100.0, "logg": 0.18, "mh": 0.12,
-            "alpha_m": 0.06, "mg_h": 0.12}[key]
+    return {"teff": 100.0, "logg": 0.18, "mh": 0.12, "alpha_m": 0.06, "mg_h": 0.12}[key]
 
 
 def main() -> int:
@@ -42,10 +41,8 @@ def main() -> int:
 
     teff = df["teff_apogee"].to_numpy()
     logg = df["logg_apogee"].to_numpy()
-    teff_idx = np.clip(np.searchsorted(TEFF_EDGES, teff, side="right") - 1,
-                       0, len(TEFF_EDGES) - 2)
-    logg_idx = np.clip(np.searchsorted(LOGG_EDGES, logg, side="right") - 1,
-                       0, len(LOGG_EDGES) - 2)
+    teff_idx = np.clip(np.searchsorted(TEFF_EDGES, teff, side="right") - 1, 0, len(TEFF_EDGES) - 2)
+    logg_idx = np.clip(np.searchsorted(LOGG_EDGES, logg, side="right") - 1, 0, len(LOGG_EDGES) - 2)
 
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
     plt.subplots_adjust(wspace=0.40, hspace=0.42)
@@ -67,10 +64,13 @@ def main() -> int:
                     cnt[j, i] = int(m.sum())
 
         im = ax.imshow(
-            rmse, origin="lower", cmap="viridis",
-            extent=(TEFF_EDGES[0], TEFF_EDGES[-1],
-                    LOGG_EDGES[0], LOGG_EDGES[-1]),
-            aspect="auto", vmin=0, vmax=_vmax(k),
+            rmse,
+            origin="lower",
+            cmap="viridis",
+            extent=(TEFF_EDGES[0], TEFF_EDGES[-1], LOGG_EDGES[0], LOGG_EDGES[-1]),
+            aspect="auto",
+            vmin=0,
+            vmax=_vmax(k),
         )
         ax.set_xlim(TEFF_EDGES[-1], TEFF_EDGES[0])
         ax.set_ylim(LOGG_EDGES[-1], LOGG_EDGES[0])
@@ -85,9 +85,16 @@ def main() -> int:
                 if cnt[j, i] >= MIN_PER_CELL:
                     cx = 0.5 * (TEFF_EDGES[i] + TEFF_EDGES[i + 1])
                     cy = 0.5 * (LOGG_EDGES[j] + LOGG_EDGES[j + 1])
-                    ax.text(cx, cy, f"{cnt[j, i]:,}",
-                            ha="center", va="center",
-                            fontsize=7, color="white", alpha=0.85)
+                    ax.text(
+                        cx,
+                        cy,
+                        f"{cnt[j, i]:,}",
+                        ha="center",
+                        va="center",
+                        fontsize=7,
+                        color="white",
+                        alpha=0.85,
+                    )
 
     headline(
         fig,

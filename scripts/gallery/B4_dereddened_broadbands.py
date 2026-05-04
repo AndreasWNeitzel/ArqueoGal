@@ -42,8 +42,13 @@ def main() -> None:
         "w2_mag_dered",
     ]
     import pyarrow.parquet as pq
-    schema_cols = {f.name for f in pq.ParquetFile(
-        REPO / "data/processed/pipeline1_features_stream1_kiel.parquet").schema_arrow}
+
+    schema_cols = {
+        f.name
+        for f in pq.ParquetFile(
+            REPO / "data/processed/pipeline1_features_stream1_kiel.parquet"
+        ).schema_arrow
+    }
     cols = [c for c in cols if c in schema_cols]
     if "av_los" in schema_cols:
         cols = list(set(cols + ["av_los"]))
@@ -83,9 +88,12 @@ def main() -> None:
         # for missing detections. Filter to physically reasonable magnitudes
         # before hexbinning so the colour scale isn't dominated by sentinels.
         m = (
-            np.isfinite(mag_raw) & np.isfinite(mag_dered)
-            & (mag_raw > -5) & (mag_raw < 25)
-            & (mag_dered > -5) & (mag_dered < 25)
+            np.isfinite(mag_raw)
+            & np.isfinite(mag_dered)
+            & (mag_raw > -5)
+            & (mag_raw < 25)
+            & (mag_dered > -5)
+            & (mag_dered < 25)
         )
 
         if m.sum() > 100:
@@ -105,7 +113,11 @@ def main() -> None:
     fig.suptitle(
         "B4 — Stream 1: Raw vs dereddened broadband IR photometry (J/H/K/W1/W2)", fontsize=11
     )
-    save_fig(fig, REPO / "reports/gallery/B_preprocessing" / "B4_dereddened_broadbands", formats=("pdf", "png"))
+    save_fig(
+        fig,
+        REPO / "reports/gallery/B_preprocessing" / "B4_dereddened_broadbands",
+        formats=("pdf", "png"),
+    )
 
 
 if __name__ == "__main__":

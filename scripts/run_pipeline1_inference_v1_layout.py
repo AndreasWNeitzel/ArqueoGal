@@ -22,6 +22,8 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 sys.path.insert(0, str(REPO / "scripts"))
 
+import run_pipeline1_inference as drv  # type: ignore
+
 from arqueogal.xp_abundances.main.data import (
     DEFAULT_AUX_COLS,
     DEFAULT_RESIDUAL_COLS,
@@ -29,8 +31,6 @@ from arqueogal.xp_abundances.main.data import (
     DEFAULT_XP_SCALAR_COLS,
     FeatureLayout,
 )
-
-import run_pipeline1_inference as drv  # type: ignore
 
 V1_AUX_COLS = tuple(c for c in DEFAULT_AUX_COLS if c != "av_los")
 assert len(V1_AUX_COLS) == len(DEFAULT_AUX_COLS) - 1

@@ -34,10 +34,18 @@ NSIDE = 64
 
 
 def _load() -> pd.DataFrame:
-    pcols = ["source_id", "mh_pred", "alpha_m_pred",
-             "teff_sigma", "logg_sigma", "mh_sigma",
-             "alpha_m_sigma", "mg_h_sigma", "ood_joint_flag",
-             "label_extrapolation_flag"]
+    pcols = [
+        "source_id",
+        "mh_pred",
+        "alpha_m_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+        "ood_joint_flag",
+        "label_extrapolation_flag",
+    ]
     pred = pd.read_parquet(PRED_S3, columns=pcols).drop_duplicates("source_id")
     feat = pd.read_parquet(FEAT_S3, columns=["source_id", "ra_deg", "dec_deg"])
     feat = feat.drop_duplicates("source_id")
@@ -83,9 +91,9 @@ def main() -> int:
     fig = plt.figure(figsize=(18, 11))
     ax = fig.add_axes([0.05, 0.10, 0.90, 0.72], projection="mollweide")
 
-    pix_med = _pix_median(df["ra_deg"].to_numpy(),
-                          df["dec_deg"].to_numpy(),
-                          df["mh_pred"].to_numpy())
+    pix_med = _pix_median(
+        df["ra_deg"].to_numpy(), df["dec_deg"].to_numpy(), df["mh_pred"].to_numpy()
+    )
     have = np.where(np.isfinite(pix_med))[0]
     lon, lat = _pix_to_lonlat(have)
 
@@ -95,13 +103,20 @@ def main() -> int:
     vmin, vmax = vmed - 2 * vsig, vmed + 2 * vsig
 
     sc = ax.scatter(
-        lon, lat, c=pix_med[have], cmap="cividis",
-        vmin=vmin, vmax=vmax, s=12.0, marker="s",
-        edgecolors="none", alpha=0.95)
+        lon,
+        lat,
+        c=pix_med[have],
+        cmap="cividis",
+        vmin=vmin,
+        vmax=vmax,
+        s=12.0,
+        marker="s",
+        edgecolors="none",
+        alpha=0.95,
+    )
     style_galactic_mollweide(ax)
 
-    cb = plt.colorbar(sc, ax=ax, fraction=0.025, pad=0.05,
-                      orientation="horizontal")
+    cb = plt.colorbar(sc, ax=ax, fraction=0.025, pad=0.05, orientation="horizontal")
     cb.set_label("[M/H]  (dex)", fontsize=14)
     cb.ax.tick_params(labelsize=12)
 
@@ -110,7 +125,8 @@ def main() -> int:
         "All-sky [M/H] from Gaia XP",
         f"Stream 3 Tier 1, n = {n:,}.  HEALPix NSIDE={NSIDE}, median per pixel.  "
         f"Color clipped at vmed ± 2σ for slide legibility.",
-        top=0.88)
+        top=0.88,
+    )
     save(fig, "Y09_skymap_mh_headline")
     return 0
 

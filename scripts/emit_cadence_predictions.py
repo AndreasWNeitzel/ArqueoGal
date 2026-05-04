@@ -30,7 +30,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -43,13 +42,16 @@ sys.path.insert(0, str(REPO / "src"))
 from torch.utils.data import DataLoader
 
 from arqueogal.xp_abundances.main.data import (
-    FeatureLayout, FeatureScaler, LabelTiers, XpAbundanceDataset,
-    load_arrays, stratified_split_ids,
+    FeatureLayout,
+    FeatureScaler,
+    LabelTiers,
+    XpAbundanceDataset,
+    load_arrays,
+    stratified_split_ids,
 )
 from arqueogal.xp_abundances.main.inference import load_ensemble, predict_ensemble
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("emit_cadence_predictions")
 
 
@@ -94,15 +96,12 @@ def _load_run_feature_scaler(run_dir: Path) -> FeatureScaler:
     """Pick the run's _best.pt and pull the FeatureScaler from it."""
     best = sorted(run_dir.glob("*_best.pt"))
     if not best:
-        raise FileNotFoundError(
-            f"no _best.pt in {run_dir} — needed to recover the FeatureScaler"
-        )
+        raise FileNotFoundError(f"no _best.pt in {run_dir} — needed to recover the FeatureScaler")
     blob = torch.load(best[0], map_location="cpu", weights_only=False)
     return _scaler_from_blob(blob)
 
 
-def _refit_feature_scaler(parquet: Path, layout: FeatureLayout,
-                            tiers: LabelTiers) -> FeatureScaler:
+def _refit_feature_scaler(parquet: Path, layout: FeatureLayout, tiers: LabelTiers) -> FeatureScaler:
     """Re-fit the FeatureScaler from the training parquet's seed=0 partition.
 
     Mirrors the recipe in ``training.build_dataloaders`` exactly so the
@@ -112,16 +111,15 @@ def _refit_feature_scaler(parquet: Path, layout: FeatureLayout,
     (the supervised finetune driver omits ``feature_scaler=`` from
     ``save_checkpoint``; see scripts/run_supervised_finetune.py:222-238).
     """
-    df = pd.read_parquet(parquet,
-                         columns=["source_id", "fe_h_apogee",
-                                  "teff_apogee", "b_deg"])
+    df = pd.read_parquet(parquet, columns=["source_id", "fe_h_apogee", "teff_apogee", "b_deg"])
     df = df.drop_duplicates("source_id", keep="first").reset_index(drop=True)
     split = stratified_split_ids(df, seed=0)
-    arrs = load_arrays(parquet, layout, tiers,
-                       include_label_errors=False, include_source_id=True)
+    arrs = load_arrays(parquet, layout, tiers, include_label_errors=False, include_source_id=True)
     train_mask = np.isin(arrs["source_id"], split["train"])
     xp_passthrough_cols = (
-        *layout.bp_coef_cols, *layout.rp_coef_cols, *layout.xp_scalar_cols,
+        *layout.bp_coef_cols,
+        *layout.rp_coef_cols,
+        *layout.xp_scalar_cols,
     )
     return FeatureScaler.fit(
         arrs["X"][train_mask],
@@ -131,8 +129,9 @@ def _refit_feature_scaler(parquet: Path, layout: FeatureLayout,
     )
 
 
-def _build_eval_loader(parquet: Path, blob: dict, feature_scaler: FeatureScaler,
-                       batch_size: int = 1024):
+def _build_eval_loader(
+    parquet: Path, blob: dict, feature_scaler: FeatureScaler, batch_size: int = 1024
+):
     """Build a deterministic val + test loader on the Stream-1 parquet.
 
     Uses ``stratified_split_ids(seed=0)`` — the same split the training
@@ -143,8 +142,7 @@ def _build_eval_loader(parquet: Path, blob: dict, feature_scaler: FeatureScaler,
     """
     layout, tiers = _layout_and_tiers(blob)
 
-    df = pd.read_parquet(parquet, columns=["source_id", "fe_h_apogee",
-                                            "teff_apogee", "b_deg"])
+    df = pd.read_parquet(parquet, columns=["source_id", "fe_h_apogee", "teff_apogee", "b_deg"])
     df = df.drop_duplicates("source_id", keep="first").reset_index(drop=True)
     split = stratified_split_ids(df, seed=0)
     keep_ids = set(np.concatenate([split["val"], split["test"]]).tolist())
@@ -153,8 +151,7 @@ def _build_eval_loader(parquet: Path, blob: dict, feature_scaler: FeatureScaler,
     # source_id keeping the first occurrence. Match the convention used by
     # build_dataloaders in training.py — first-row-wins is deterministic on
     # the parquet's stored order.
-    arrs = load_arrays(parquet, layout, tiers,
-                       include_label_errors=False, include_source_id=True)
+    arrs = load_arrays(parquet, layout, tiers, include_label_errors=False, include_source_id=True)
     src_all = arrs["source_id"]
     _, first_idx = np.unique(src_all, return_index=True)
     first_idx = np.sort(first_idx)  # preserve original parquet ordering
@@ -193,16 +190,25 @@ def _epoch_from_path(p: Path) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--run-dir", type=Path, required=True,
-                    help="Run directory containing a cadence/ subdir of *.pt files.")
-    ap.add_argument("--features-parquet", type=Path,
-                    default=REPO / "data/processed/pipeline1_features_stream1_kiel.parquet")
-    ap.add_argument("--output-root", type=Path,
-                    default=REPO / "data/processed/cadence_predictions")
+    ap.add_argument(
+        "--run-dir",
+        type=Path,
+        required=True,
+        help="Run directory containing a cadence/ subdir of *.pt files.",
+    )
+    ap.add_argument(
+        "--features-parquet",
+        type=Path,
+        default=REPO / "data/processed/pipeline1_features_stream1_kiel.parquet",
+    )
+    ap.add_argument("--output-root", type=Path, default=REPO / "data/processed/cadence_predictions")
     ap.add_argument("--batch-size", type=int, default=1024)
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
-    ap.add_argument("--overwrite", action="store_true",
-                    help="Re-emit even if the per-epoch parquet already exists.")
+    ap.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Re-emit even if the per-epoch parquet already exists.",
+    )
     args = ap.parse_args()
 
     cadence_dir = args.run_dir / "cadence"
@@ -230,21 +236,28 @@ def main() -> int:
         feature_scaler = _load_run_feature_scaler(args.run_dir)
         logger.info("feature scaler loaded from _best.pt")
     except (FileNotFoundError, KeyError):
-        logger.warning("no feature_scaler in _best.pt; re-fitting from "
-                       "training parquet (driver omitted feature_scaler=)")
-        feature_scaler = _refit_feature_scaler(args.features_parquet,
-                                                layout, _tiers)
-    logger.info("scaler: %d aux/residual columns scaled, %d passthrough",
-                int(feature_scaler.apply_mask.sum()),
-                int((~feature_scaler.apply_mask).sum()))
+        logger.warning(
+            "no feature_scaler in _best.pt; re-fitting from "
+            "training parquet (driver omitted feature_scaler=)"
+        )
+        feature_scaler = _refit_feature_scaler(args.features_parquet, layout, _tiers)
+    logger.info(
+        "scaler: %d aux/residual columns scaled, %d passthrough",
+        int(feature_scaler.apply_mask.sum()),
+        int((~feature_scaler.apply_mask).sum()),
+    )
 
-    loader, src_ids, tiers = _build_eval_loader(args.features_parquet, first,
-                                                  feature_scaler,
-                                                  batch_size=args.batch_size)
+    loader, src_ids, tiers = _build_eval_loader(
+        args.features_parquet, first, feature_scaler, batch_size=args.batch_size
+    )
     label_names = list(tiers.all_labels)
     label_keys = [n.replace("_apogee", "") for n in label_names]
-    logger.info("eval cohort: %d stars × %d labels (%s)",
-                len(src_ids), len(label_names), ",".join(label_keys))
+    logger.info(
+        "eval cohort: %d stars × %d labels (%s)",
+        len(src_ids),
+        len(label_names),
+        ",".join(label_keys),
+    )
 
     n_done = 0
     for ckpt in ckpts:
@@ -256,9 +269,12 @@ def main() -> int:
             continue
 
         members = load_ensemble([ckpt], device=device)
-        pred = predict_ensemble(members, loader, device=device,
-                                amp_dtype=torch.bfloat16
-                                if device.type == "cuda" else None)
+        pred = predict_ensemble(
+            members,
+            loader,
+            device=device,
+            amp_dtype=torch.bfloat16 if device.type == "cuda" else None,
+        )
 
         # CRITICAL: pred.mu / pred.sigma_total are in BLOCK order (the
         # Cholesky block layout's slot order), but label_scaler_mean and
@@ -268,8 +284,7 @@ def main() -> int:
         bl = ckpt_blob["block_layout"]  # stored as dict
         block_order = list(bl["label_order_block"])
         human_order = list(bl["label_order_human"])
-        perm = np.asarray([block_order.index(n) for n in human_order],
-                          dtype=np.int64)
+        perm = np.asarray([block_order.index(n) for n in human_order], dtype=np.int64)
         ls_mean = np.asarray(ckpt_blob["label_scaler_mean"], dtype=np.float64)
         ls_scale = np.asarray(ckpt_blob["label_scaler_scale"], dtype=np.float64)
         mu_raw = pred.mu[:, perm] * ls_scale[None, :] + ls_mean[None, :]
@@ -278,21 +293,22 @@ def main() -> int:
         # Map human-order labels (e.g. "teff_apogee") to short keys ("teff").
         human_keys = [n.replace("_apogee", "") for n in human_order]
 
-        cols: dict[str, np.ndarray] = {"source_id": src_ids,
-                                       "epoch": np.full(len(src_ids), epoch,
-                                                        dtype=np.int32)}
+        cols: dict[str, np.ndarray] = {
+            "source_id": src_ids,
+            "epoch": np.full(len(src_ids), epoch, dtype=np.int32),
+        }
         for j, k in enumerate(human_keys):
             cols[f"{k}_pred"] = mu_raw[:, j].astype(np.float32)
             cols[f"{k}_sigma"] = sigma_raw[:, j].astype(np.float32)
         df = pd.DataFrame(cols)
         df.to_parquet(out, index=False)
         size_kb = out.stat().st_size / 1024.0
-        logger.info("epoch %04d → %s  (%.0f KB, n=%d)",
-                    epoch, out.relative_to(REPO), size_kb, len(df))
+        logger.info(
+            "epoch %04d → %s  (%.0f KB, n=%d)", epoch, out.relative_to(REPO), size_kb, len(df)
+        )
         n_done += 1
 
-    logger.info("emitted %d / %d epochs into %s",
-                n_done, len(ckpts), out_dir.relative_to(REPO))
+    logger.info("emitted %d / %d epochs into %s", n_done, len(ckpts), out_dir.relative_to(REPO))
     return 0
 
 

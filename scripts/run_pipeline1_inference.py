@@ -122,6 +122,7 @@ CLI
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import gc
 import hashlib
@@ -135,11 +136,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import torch
-from torch.utils.data import DataLoader
-
 import pyarrow as pa
 import pyarrow.parquet as pq
+import torch
+from torch.utils.data import DataLoader
 
 from arqueogal.data.frozen_stats import (
     FrozenZScoreStats,
@@ -197,11 +197,27 @@ DEFAULT_MODE_AMBIGUOUS_GRID = REPO_ROOT / "data/processed/mode_ambiguous_grid.np
 
 LABEL_SHORT_NAMES_5: tuple[str, ...] = ("teff", "logg", "mh", "alpha_m", "mg_h")
 LABEL_SHORT_NAMES_21: tuple[str, ...] = (
-    "teff", "logg", "mh",
-    "fe_h", "alpha_m", "mg_h", "c_h", "n_h",
-    "o_h", "na_h", "al_h", "si_h", "s_h",
-    "k_h", "ca_h", "ti_h", "v_h", "cr_h",
-    "mn_h", "ni_h", "ce_h",
+    "teff",
+    "logg",
+    "mh",
+    "fe_h",
+    "alpha_m",
+    "mg_h",
+    "c_h",
+    "n_h",
+    "o_h",
+    "na_h",
+    "al_h",
+    "si_h",
+    "s_h",
+    "k_h",
+    "ca_h",
+    "ti_h",
+    "v_h",
+    "cr_h",
+    "mn_h",
+    "ni_h",
+    "ce_h",
 )
 # Default kept as 5-label for backwards-compat with code that imports the
 # constant; the 21-label flow rebinds this at runtime in main().
@@ -376,7 +392,9 @@ class _StreamingParquetWriter:
         dest.parent.mkdir(parents=True, exist_ok=True)
         self._dest = dest
         fd, self._tmp_name = tempfile.mkstemp(
-            prefix=dest.name + ".", suffix=".parquet.tmp", dir=dest.parent,
+            prefix=dest.name + ".",
+            suffix=".parquet.tmp",
+            dir=dest.parent,
         )
         os.close(fd)
         self._writer: pq.ParquetWriter | None = None
@@ -393,7 +411,9 @@ class _StreamingParquetWriter:
             self._writer = pq.ParquetWriter(self._tmp_name, self._schema)
         else:
             table = pa.Table.from_pandas(
-                df, schema=self._schema, preserve_index=False,
+                df,
+                schema=self._schema,
+                preserve_index=False,
             )
         self._writer.write_table(table)  # type: ignore[union-attr]
         self._n_rows += table.num_rows
@@ -416,10 +436,8 @@ class _StreamingParquetWriter:
 
     def abort(self) -> None:
         if self._writer is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._writer.close()
-            except Exception:
-                pass
         if Path(self._tmp_name).exists():
             Path(self._tmp_name).unlink()
 
@@ -737,7 +755,8 @@ def _unscale_ensemble_output(
     # ``perm[i_human] = block_index_of(label_human[i_human])`` so that
     # ``pred.mu[:, perm]`` is in human order.
     perm = np.asarray(
-        [block_order.index(name) for name in human_order], dtype=np.int64,
+        [block_order.index(name) for name in human_order],
+        dtype=np.int64,
     )
 
     # Use the scaler in HUMAN order directly (it was constructed from the
@@ -752,8 +771,7 @@ def _unscale_ensemble_output(
     n_rows = int(pred.mu.shape[0])
     if n_labels != len(human_order):
         raise RuntimeError(
-            f"pred.mu has {n_labels} columns but block_layout describes "
-            f"{len(human_order)} labels",
+            f"pred.mu has {n_labels} columns but block_layout describes {len(human_order)} labels",
         )
 
     # μ in physical units (B, n) fp32, in human order.
@@ -780,9 +798,7 @@ def _unscale_ensemble_output(
     # Σ_epistemic, then permute to human order, then multiply by ``s²``.
     epi_diag_block = np.einsum("bii->bi", pred.Sigma_epistemic)
     epi_diag_human = epi_diag_block[:, perm]
-    epistemic_var_diag = np.clip(
-        epi_diag_human * (s32**2)[None, :], 0.0, None
-    ).astype(np.float32)
+    epistemic_var_diag = np.clip(epi_diag_human * (s32**2)[None, :], 0.0, None).astype(np.float32)
 
     # Free the (B, n, n) encoder-space tensors and the per-member μ — the
     # downstream code uses only the (B, n) marginals from ``pred`` and the
@@ -824,8 +840,11 @@ def _fit_training_ood_bundle(
 
 
 _LABEL_TRUTH_COLS_5: tuple[str, ...] = (
-    "teff_apogee", "logg_apogee", "mh_apogee",
-    "alpha_m_apogee", "mg_h_apogee",
+    "teff_apogee",
+    "logg_apogee",
+    "mh_apogee",
+    "alpha_m_apogee",
+    "mg_h_apogee",
 )
 
 
@@ -851,8 +870,11 @@ def _fit_label_mahalanobis_bundle(
     try:
         df = pd.read_parquet(training_parquet, columns=list(_LABEL_TRUTH_COLS_5))
     except (KeyError, ValueError) as e:
-        _LOG.warning("label-Mahalanobis bundle: training parquet lacks APOGEE truth (%s); "
-                     "label_extrapolation_flag will be False everywhere", e)
+        _LOG.warning(
+            "label-Mahalanobis bundle: training parquet lacks APOGEE truth (%s); "
+            "label_extrapolation_flag will be False everywhere",
+            e,
+        )
         return None
     Y = df.to_numpy(dtype=np.float64)
     Y = Y[np.isfinite(Y).all(axis=1)]
@@ -860,9 +882,12 @@ def _fit_label_mahalanobis_bundle(
         _LOG.warning("label-Mahalanobis bundle: only %d finite truth rows; skipping", Y.shape[0])
         return None
     bundle = fit_mahalanobis_ood(Y, p_threshold=p_threshold, regularization=1e-8)
-    _LOG.info("label-Mahalanobis bundle fit on %d APOGEE-truth rows; "
-              "threshold=%.3f at p=%.3f",
-              bundle.n_training, bundle.threshold, bundle.p_threshold)
+    _LOG.info(
+        "label-Mahalanobis bundle fit on %d APOGEE-truth rows; threshold=%.3f at p=%.3f",
+        bundle.n_training,
+        bundle.threshold,
+        bundle.p_threshold,
+    )
     return bundle
 
 
@@ -882,15 +907,34 @@ def _verify_ensemble_label_set(members: list[EnsembleMember]) -> tuple[str, ...]
     label_names = tuple(blob["label_names"])
 
     expected_5 = (
-        "teff_apogee", "logg_apogee", "mh_apogee",
-        "alpha_m_apogee", "mg_h_apogee",
+        "teff_apogee",
+        "logg_apogee",
+        "mh_apogee",
+        "alpha_m_apogee",
+        "mg_h_apogee",
     )
     expected_21 = (
-        "teff_apogee", "logg_apogee", "mh_apogee",
-        "fe_h_apogee", "alpha_m_apogee", "mg_h_apogee", "c_h_apogee", "n_h_apogee",
-        "o_h_apogee", "na_h_apogee", "al_h_apogee", "si_h_apogee", "s_h_apogee",
-        "k_h_apogee", "ca_h_apogee", "ti_h_apogee", "v_h_apogee", "cr_h_apogee",
-        "mn_h_apogee", "ni_h_apogee", "ce_h_apogee",
+        "teff_apogee",
+        "logg_apogee",
+        "mh_apogee",
+        "fe_h_apogee",
+        "alpha_m_apogee",
+        "mg_h_apogee",
+        "c_h_apogee",
+        "n_h_apogee",
+        "o_h_apogee",
+        "na_h_apogee",
+        "al_h_apogee",
+        "si_h_apogee",
+        "s_h_apogee",
+        "k_h_apogee",
+        "ca_h_apogee",
+        "ti_h_apogee",
+        "v_h_apogee",
+        "cr_h_apogee",
+        "mn_h_apogee",
+        "ni_h_apogee",
+        "ce_h_apogee",
     )
     if label_names == expected_5:
         short = LABEL_SHORT_NAMES_5
@@ -1280,6 +1324,7 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     fs_blob = first_blob.get("feature_scaler")
     if fs_blob is not None:
         from arqueogal.xp_abundances.main.data import FeatureScaler
+
         feature_scaler = FeatureScaler(
             mean=np.asarray(fs_blob["mean"], dtype=np.float32),
             scale=np.asarray(fs_blob["scale"], dtype=np.float32),
@@ -1331,7 +1376,11 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     schema_inferred = _detect_input_schema(set(keep))
     _LOG.info(
         "input %s: schema=%s, n=%d, reading %d/%d cols",
-        input_parquet, schema_inferred, n_rows, len(keep), len(schema_cols),
+        input_parquet,
+        schema_inferred,
+        n_rows,
+        len(keep),
+        len(schema_cols),
     )
 
     # --- one-time setup of OOD bundle, regime-B envelope, ambiguity grid -
@@ -1386,7 +1435,10 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
             chunk_n = len(chunk_df)
             _LOG.info(
                 "chunk %d: rows=%d (cumulative %d/%d)",
-                chunk_idx, chunk_n, accumulators["n_rows"] + chunk_n, n_rows,
+                chunk_idx,
+                chunk_n,
+                accumulators["n_rows"] + chunk_n,
+                n_rows,
             )
             chunk_out = _process_chunk(
                 chunk_df,
@@ -1432,7 +1484,11 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     schema = schema_inferred
     _LOG.info(
         "wrote %s (%d rows, %d cols) via %d chunks of size %d",
-        output_parquet, n_rows_written, n_cols_written, chunk_idx, chunk_size,
+        output_parquet,
+        n_rows_written,
+        n_cols_written,
+        chunk_idx,
+        chunk_size,
     )
     _LOG.info(
         "OOD: mahalanobis_rate=%.4f ensemble_rate=%.4f joint_rate=%.4f",
@@ -1442,12 +1498,14 @@ def run_inference(  # noqa: PLR0913, PLR0915 — CLI driver entrypoint; all knob
     )
     _LOG.info(
         "Regime B: %d/%d (%.3f%%) inside envelope",
-        accumulators["regime_b_count"], n_rows,
+        accumulators["regime_b_count"],
+        n_rows,
         100.0 * accumulators["regime_b_count"] / max(n_rows, 1),
     )
     _LOG.info(
         "mode-ambiguous: %d/%d (%.3f%%) flagged",
-        accumulators["mode_ambiguous_count"], n_rows,
+        accumulators["mode_ambiguous_count"],
+        n_rows,
         100.0 * accumulators["mode_ambiguous_count"] / max(n_rows, 1),
     )
     _LOG.info(

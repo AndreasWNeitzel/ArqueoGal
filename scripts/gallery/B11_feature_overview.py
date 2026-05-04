@@ -44,6 +44,7 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import apply_style, save_fig
+
 from arqueogal.xp_abundances.main.data import FeatureLayout
 
 OUT = REPO / "reports/gallery/B_preprocessing"
@@ -76,13 +77,14 @@ def main() -> int:
     bp_med = np.nanmedian(bp_arr, axis=0)
     bp_p16 = np.nanpercentile(bp_arr, 16, axis=0)
     bp_p84 = np.nanpercentile(bp_arr, 84, axis=0)
-    ax.fill_between(bp_idx, bp_p16, bp_p84, color="#1f77b4", alpha=0.25,
-                    label="16-84 percentile")
+    ax.fill_between(bp_idx, bp_p16, bp_p84, color="#1f77b4", alpha=0.25, label="16-84 percentile")
     ax.plot(bp_idx, bp_med, "-", color="#1f77b4", lw=1.4, label="median")
     ax.axhline(0, color="k", lw=0.5, ls=":", alpha=0.5)
     ax.set_xlabel("Hermite index i (BP)")
     ax.set_ylabel(r"$bp\_coef\_norm_i$  (z-score)")
-    ax.set_title(f"BP shape coefs (54-D)\nn={int(np.isfinite(bp_arr).all(axis=1).sum()):,} finite-row")
+    ax.set_title(
+        f"BP shape coefs (54-D)\nn={int(np.isfinite(bp_arr).all(axis=1).sum()):,} finite-row"
+    )
     ax.legend(fontsize=8)
     ax.grid(alpha=0.25)
 
@@ -91,50 +93,54 @@ def main() -> int:
     rp_med = np.nanmedian(rp_arr, axis=0)
     rp_p16 = np.nanpercentile(rp_arr, 16, axis=0)
     rp_p84 = np.nanpercentile(rp_arr, 84, axis=0)
-    ax.fill_between(rp_idx, rp_p16, rp_p84, color="#d62728", alpha=0.25,
-                    label="16-84 percentile")
+    ax.fill_between(rp_idx, rp_p16, rp_p84, color="#d62728", alpha=0.25, label="16-84 percentile")
     ax.plot(rp_idx, rp_med, "-", color="#d62728", lw=1.4, label="median")
     ax.axhline(0, color="k", lw=0.5, ls=":", alpha=0.5)
     ax.set_xlabel("Hermite index i (RP)")
     ax.set_ylabel(r"$rp\_coef\_norm_i$  (z-score)")
-    ax.set_title(f"RP shape coefs (54-D)\nn={int(np.isfinite(rp_arr).all(axis=1).sum()):,} finite-row")
+    ax.set_title(
+        f"RP shape coefs (54-D)\nn={int(np.isfinite(rp_arr).all(axis=1).sum()):,} finite-row"
+    )
     ax.legend(fontsize=8)
     ax.grid(alpha=0.25)
 
     ax = fig.add_subplot(gs[0, 2])
     bp_c0z = df["bp_c0_z"].to_numpy(dtype=np.float64)
     finite = np.isfinite(bp_c0z)
-    ax.hist(bp_c0z[finite], bins=60, color="#1f77b4", alpha=0.8,
-            edgecolor="#1f77b4", lw=0.4)
+    ax.hist(bp_c0z[finite], bins=60, color="#1f77b4", alpha=0.8, edgecolor="#1f77b4", lw=0.4)
     ax.set_xlabel("bp_c0_z (z-scored log10 c0)")
     ax.set_ylabel("count")
-    ax.set_title(f"BP c0 (z)\nn={int(finite.sum()):,}, "
-                 f"med {np.nanmedian(bp_c0z):+.2f}, sd {np.nanstd(bp_c0z):.2f}")
+    ax.set_title(
+        f"BP c0 (z)\nn={int(finite.sum()):,}, "
+        f"med {np.nanmedian(bp_c0z):+.2f}, sd {np.nanstd(bp_c0z):.2f}"
+    )
     ax.grid(axis="y", alpha=0.25)
 
     ax = fig.add_subplot(gs[0, 3])
     rp_c0z = df["rp_c0_z"].to_numpy(dtype=np.float64)
     finite = np.isfinite(rp_c0z)
-    ax.hist(rp_c0z[finite], bins=60, color="#d62728", alpha=0.8,
-            edgecolor="#d62728", lw=0.4)
+    ax.hist(rp_c0z[finite], bins=60, color="#d62728", alpha=0.8, edgecolor="#d62728", lw=0.4)
     ax.set_xlabel("rp_c0_z (z-scored log10 c0)")
     ax.set_ylabel("count")
-    ax.set_title(f"RP c0 (z)\nn={int(finite.sum()):,}, "
-                 f"med {np.nanmedian(rp_c0z):+.2f}, sd {np.nanstd(rp_c0z):.2f}")
+    ax.set_title(
+        f"RP c0 (z)\nn={int(finite.sum()):,}, "
+        f"med {np.nanmedian(rp_c0z):+.2f}, sd {np.nanstd(rp_c0z):.2f}"
+    )
     ax.grid(axis="y", alpha=0.25)
 
     # NaN fraction per XP feature (108 + 2 = 110)
     ax = fig.add_subplot(gs[0, 4])
     xp_cols = bp_cols + rp_cols + list(layout.xp_scalar_cols)
-    nan_frac_xp = np.array([
-        float(df[c].isna().mean()) for c in xp_cols
-    ])
-    ax.bar(np.arange(len(xp_cols)), nan_frac_xp,
-           color=["#1f77b4"] * 54 + ["#d62728"] * 54 + ["#2ca02c"] * 2,
-           width=1.0)
+    nan_frac_xp = np.array([float(df[c].isna().mean()) for c in xp_cols])
+    ax.bar(
+        np.arange(len(xp_cols)),
+        nan_frac_xp,
+        color=["#1f77b4"] * 54 + ["#d62728"] * 54 + ["#2ca02c"] * 2,
+        width=1.0,
+    )
     ax.set_xlabel("XP feature index (BP1..BP54, RP1..RP54, bp_c0_z, rp_c0_z)")
     ax.set_ylabel("NaN fraction")
-    ax.set_title(f"XP NaN coverage\n(max {nan_frac_xp.max()*100:.2f}%)")
+    ax.set_title(f"XP NaN coverage\n(max {nan_frac_xp.max() * 100:.2f}%)")
     ax.set_ylim(0, max(0.05, float(nan_frac_xp.max()) * 1.1 + 1e-3))
     ax.grid(axis="y", alpha=0.25)
 
@@ -151,11 +157,11 @@ def main() -> int:
         if finite.any():
             logv = np.log10(v[finite])
             bins = np.linspace(logv.min(), logv.max(), 60)
-            ax.hist(logv, bins=bins, color=res_colors[i], alpha=0.8,
-                    edgecolor=res_colors[i], lw=0.4)
+            ax.hist(
+                logv, bins=bins, color=res_colors[i], alpha=0.8, edgecolor=res_colors[i], lw=0.4
+            )
             med_log = float(np.median(logv))
-            ax.axvline(med_log, color="k", lw=0.8, ls="--",
-                       label=f"log10 median = {med_log:.2f}")
+            ax.axvline(med_log, color="k", lw=0.8, ls="--", label=f"log10 median = {med_log:.2f}")
             ax.legend(fontsize=8)
         ax.set_xlabel(f"log10({col})")
         ax.set_ylabel("count")
@@ -180,7 +186,7 @@ def main() -> int:
     ax.set_xticklabels(aux_cols, rotation=90, fontsize=6)
     ax.set_ylabel("NaN fraction")
     ax.set_ylim(0, max(0.05, float(nan_frac_aux.max()) * 1.1 + 1e-3))
-    ax.set_title(f"Aux NaN coverage\n(max {nan_frac_aux.max()*100:.2f}%)")
+    ax.set_title(f"Aux NaN coverage\n(max {nan_frac_aux.max() * 100:.2f}%)")
     ax.grid(axis="y", alpha=0.25)
 
     ax = fig.add_subplot(gs[1, 4])
@@ -212,15 +218,20 @@ def main() -> int:
 
     # --- Row 2: aux photometry distributions ---
     photom = ["g_mag", "bp_mag", "rp_mag", "bp_rp", "bp_g", "g_rp"]
-    photom_colors = ["#1f77b4", "#1f77b4", "#d62728", "#9467bd",
-                     "#9467bd", "#9467bd"]
+    photom_colors = ["#1f77b4", "#1f77b4", "#d62728", "#9467bd", "#9467bd", "#9467bd"]
     for i, col in enumerate(photom[:5]):
         ax = fig.add_subplot(gs[2, i])
         v = df[col].to_numpy(dtype=np.float64)
         finite = np.isfinite(v)
         if finite.any():
-            ax.hist(v[finite], bins=60, color=photom_colors[i], alpha=0.75,
-                    edgecolor=photom_colors[i], lw=0.4)
+            ax.hist(
+                v[finite],
+                bins=60,
+                color=photom_colors[i],
+                alpha=0.75,
+                edgecolor=photom_colors[i],
+                lw=0.4,
+            )
         ax.set_xlabel(col)
         ax.set_ylabel("count")
         ax.set_title(f"{col} - n={int(finite.sum()):,}")
@@ -229,15 +240,19 @@ def main() -> int:
     # --- Row 3: astrometry + IR + extinction summaries ---
     plx = df["parallax"].to_numpy(dtype=np.float64)
     plx_err = df["parallax_error"].to_numpy(dtype=np.float64)
-    plx_snr = np.where(np.isfinite(plx_err) & (plx_err > 0),
-                       np.abs(plx) / plx_err, np.nan)
+    plx_snr = np.where(np.isfinite(plx_err) & (plx_err > 0), np.abs(plx) / plx_err, np.nan)
     ax = fig.add_subplot(gs[3, 0])
     finite = np.isfinite(plx_snr) & (plx_snr > 0)
     if finite.any():
-        ax.hist(np.log10(plx_snr[finite]), bins=60, color="#2ca02c",
-                alpha=0.8, edgecolor="#2ca02c", lw=0.4)
-        ax.axvline(np.log10(5), color="r", lw=0.8, ls="--",
-                   label="log10 SNR = log10(5)")
+        ax.hist(
+            np.log10(plx_snr[finite]),
+            bins=60,
+            color="#2ca02c",
+            alpha=0.8,
+            edgecolor="#2ca02c",
+            lw=0.4,
+        )
+        ax.axvline(np.log10(5), color="r", lw=0.8, ls="--", label="log10 SNR = log10(5)")
         ax.legend(fontsize=8)
     ax.set_xlabel(r"$\log_{10}\, |\varpi|/\sigma_\varpi$")
     ax.set_ylabel("count")
@@ -249,8 +264,14 @@ def main() -> int:
     finite = np.isfinite(ruwe) & (ruwe > 0)
     if finite.any():
         p995 = float(np.nanpercentile(ruwe, 99.5))
-        ax.hist(np.clip(ruwe[finite], 0, p995), bins=60, color="#444444",
-                alpha=0.8, edgecolor="#444444", lw=0.4)
+        ax.hist(
+            np.clip(ruwe[finite], 0, p995),
+            bins=60,
+            color="#444444",
+            alpha=0.8,
+            edgecolor="#444444",
+            lw=0.4,
+        )
         ax.axvline(1.4, color="r", lw=0.8, ls="--", label="ruwe=1.4")
         ax.legend(fontsize=8)
     ax.set_xlabel("ruwe")
@@ -263,8 +284,14 @@ def main() -> int:
     finite = np.isfinite(rmed)
     if finite.any():
         p995 = float(np.nanpercentile(rmed, 99.5))
-        ax.hist(rmed[finite], bins=np.linspace(0, max(p995, 0.5), 60),
-                color="#1f77b4", alpha=0.8, edgecolor="#1f77b4", lw=0.4)
+        ax.hist(
+            rmed[finite],
+            bins=np.linspace(0, max(p995, 0.5), 60),
+            color="#1f77b4",
+            alpha=0.8,
+            edgecolor="#1f77b4",
+            lw=0.4,
+        )
     ax.set_xlabel(r"$r_\mathrm{med, photogeo}$ [kpc]")
     ax.set_ylabel("count")
     ax.set_title(f"BJ21 distance (n={int(finite.sum()):,})")
@@ -275,10 +302,17 @@ def main() -> int:
     finite = np.isfinite(av)
     if finite.any():
         p995 = float(np.nanpercentile(av, 99.5))
-        ax.hist(np.clip(av[finite], 0, p995), bins=60, color="#9467bd",
-                alpha=0.8, edgecolor="#9467bd", lw=0.4)
-        ax.axvline(np.nanmedian(av), color="k", lw=0.8, ls="--",
-                   label=f"median {np.nanmedian(av):.3f}")
+        ax.hist(
+            np.clip(av[finite], 0, p995),
+            bins=60,
+            color="#9467bd",
+            alpha=0.8,
+            edgecolor="#9467bd",
+            lw=0.4,
+        )
+        ax.axvline(
+            np.nanmedian(av), color="k", lw=0.8, ls="--", label=f"median {np.nanmedian(av):.3f}"
+        )
         ax.legend(fontsize=8)
     ax.set_xlabel(r"$A_V^\mathrm{LOS}$ [mag]")
     ax.set_ylabel("count")
@@ -290,8 +324,14 @@ def main() -> int:
     finite = np.isfinite(ag)
     if finite.any():
         p995 = float(np.nanpercentile(ag, 99.5))
-        ax.hist(np.clip(ag[finite], 0, p995), bins=60, color="#9467bd",
-                alpha=0.8, edgecolor="#9467bd", lw=0.4)
+        ax.hist(
+            np.clip(ag[finite], 0, p995),
+            bins=60,
+            color="#9467bd",
+            alpha=0.8,
+            edgecolor="#9467bd",
+            lw=0.4,
+        )
     ax.set_xlabel(r"$A_G^\mathrm{GSP-Phot}$ [mag]")
     ax.set_ylabel("count")
     ax.set_title(f"GSP-Phot $A_G$ (n={int(finite.sum()):,})")
@@ -303,7 +343,9 @@ def main() -> int:
         f"{len(bp_cols)} BP + {len(rp_cols)} RP Hermite shape coefs + "
         f"2 c0 scalars + 3 residual RMS + {len(aux_cols)} aux features). "
         f"Source: pipeline1_features_stream1_kiel.parquet.",
-        fontsize=11, fontweight="semibold", y=0.995,
+        fontsize=11,
+        fontweight="semibold",
+        y=0.995,
     )
     OUT.mkdir(parents=True, exist_ok=True)
     save_fig(fig, OUT / "B11_feature_overview", formats=("pdf", "png"))

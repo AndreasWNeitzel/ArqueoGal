@@ -29,31 +29,59 @@ from _presentation import PALETTE, apply_style, headline, save  # noqa: E402
 
 def _box(ax, x, y, w, h, *, title, body, fc, edge=PALETTE["ash"], tc=None):
     rect = mpatches.FancyBboxPatch(
-        (x, y), w, h,
+        (x, y),
+        w,
+        h,
         boxstyle="round,pad=0.02,rounding_size=0.04",
-        linewidth=2.0, facecolor=fc, edgecolor=edge,
+        linewidth=2.0,
+        facecolor=fc,
+        edgecolor=edge,
     )
     ax.add_patch(rect)
-    ax.text(x + w / 2, y + h * 0.70, title,
-            ha="center", va="center", fontsize=13, fontweight="bold",
-            color=tc or PALETTE["ink"])
+    ax.text(
+        x + w / 2,
+        y + h * 0.70,
+        title,
+        ha="center",
+        va="center",
+        fontsize=13,
+        fontweight="bold",
+        color=tc or PALETTE["ink"],
+    )
     if body:
-        ax.text(x + w / 2, y + h * 0.32, body,
-                ha="center", va="center", fontsize=10.5,
-                color=tc or PALETTE["ash"])
+        ax.text(
+            x + w / 2,
+            y + h * 0.32,
+            body,
+            ha="center",
+            va="center",
+            fontsize=10.5,
+            color=tc or PALETTE["ash"],
+        )
 
 
 def _arrow(ax, x0, y0, x1, y1, color, label=None, label_offset=(0, 0.08)):
-    ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
-                arrowprops=dict(arrowstyle="-|>", color=color, lw=2.0,
-                                shrinkA=4, shrinkB=4, mutation_scale=18))
+    ax.annotate(
+        "",
+        xy=(x1, y1),
+        xytext=(x0, y0),
+        arrowprops=dict(
+            arrowstyle="-|>", color=color, lw=2.0, shrinkA=4, shrinkB=4, mutation_scale=18
+        ),
+    )
     if label:
         mx, my = (x0 + x1) / 2, (y0 + y1) / 2
-        ax.text(mx + label_offset[0], my + label_offset[1], label,
-                ha="center", va="center", fontsize=10,
-                color=color, fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.2", facecolor="white",
-                          edgecolor="none", alpha=0.95))
+        ax.text(
+            mx + label_offset[0],
+            my + label_offset[1],
+            label,
+            ha="center",
+            va="center",
+            fontsize=10,
+            color=color,
+            fontweight="bold",
+            bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.95),
+        )
 
 
 def main() -> int:
@@ -65,39 +93,85 @@ def main() -> int:
     ax.axis("off")
 
     # Input.
-    _box(ax, 0.4, 4.0, 2.2, 1.2,
-         title="INPUT", body="x ∈ ℝ¹⁴⁰\n(113 XP + 27 aux)",
-         fc=PALETTE["paper"], tc=PALETTE["ink"])
+    _box(
+        ax,
+        0.4,
+        4.0,
+        2.2,
+        1.2,
+        title="INPUT",
+        body="x ∈ ℝ¹⁴⁰\n(113 XP + 27 aux)",
+        fc=PALETTE["paper"],
+        tc=PALETTE["ink"],
+    )
 
     # Trunk.
-    _box(ax, 3.4, 4.0, 2.4, 1.2,
-         title="TRUNK", body="MLP 256 → 128\nReLU + dropout 0.05",
-         fc="#dfe7f1", edge=PALETTE["navy"])
+    _box(
+        ax,
+        3.4,
+        4.0,
+        2.4,
+        1.2,
+        title="TRUNK",
+        body="MLP 256 → 128\nReLU + dropout 0.05",
+        fc="#dfe7f1",
+        edge=PALETTE["navy"],
+    )
 
     # Branching point.
     ax.plot([6.1, 6.4], [4.6, 4.6], color=PALETTE["navy"], lw=2.0)
 
     # Projection head (top).
-    _box(ax, 6.6, 6.6, 3.0, 1.4,
-         title="PROJECTION HEAD",
-         body="2-layer MLP\n→ L2-normalised z",
-         fc="#fff4e0", edge=PALETTE["accent"])
+    _box(
+        ax,
+        6.6,
+        6.6,
+        3.0,
+        1.4,
+        title="PROJECTION HEAD",
+        body="2-layer MLP\n→ L2-normalised z",
+        fc="#fff4e0",
+        edge=PALETTE["accent"],
+    )
 
     # Supervised head (bottom).
-    _box(ax, 6.6, 1.6, 3.0, 1.4,
-         title="SUPERVISED HEAD",
-         body="single MLP\n→ (μ, L_chol)",
-         fc="#cce3d4", edge=PALETTE["tier1"])
+    _box(
+        ax,
+        6.6,
+        1.6,
+        3.0,
+        1.4,
+        title="SUPERVISED HEAD",
+        body="single MLP\n→ (μ, L_chol)",
+        fc="#cce3d4",
+        edge=PALETTE["tier1"],
+    )
 
     # Outputs and losses.
-    _box(ax, 10.4, 6.6, 3.2, 1.4,
-         title="z  (contrastive)",
-         body="SupCon-soft loss\n(pretraining only)",
-         fc="white", edge=PALETTE["accent"], tc=PALETTE["accent"])
-    _box(ax, 10.4, 1.6, 3.2, 1.4,
-         title="(μ, L)  →  N(μ, L Lᵀ)",
-         body="β-NLL loss\n(every star, every epoch)",
-         fc="white", edge=PALETTE["tier1"], tc=PALETTE["tier1"])
+    _box(
+        ax,
+        10.4,
+        6.6,
+        3.2,
+        1.4,
+        title="z  (contrastive)",
+        body="SupCon-soft loss\n(pretraining only)",
+        fc="white",
+        edge=PALETTE["accent"],
+        tc=PALETTE["accent"],
+    )
+    _box(
+        ax,
+        10.4,
+        1.6,
+        3.2,
+        1.4,
+        title="(μ, L)  →  N(μ, L Lᵀ)",
+        body="β-NLL loss\n(every star, every epoch)",
+        fc="white",
+        edge=PALETTE["tier1"],
+        tc=PALETTE["tier1"],
+    )
 
     # Arrows.
     _arrow(ax, 2.6, 4.6, 3.4, 4.6, PALETTE["navy"])
@@ -112,17 +186,21 @@ def main() -> int:
     _arrow(ax, 9.6, 2.3, 10.4, 2.3, PALETTE["tier1"], label="μ + L_chol")
 
     # Annotation strip at bottom.
-    ax.text(7.0, 0.3,
-            "Pretraining: trunk + projection head learn under SupCon (encoder unlocks).  "
-            "Fine-tune: supervised head trains under β-NLL with the trunk warm-started.",
-            ha="center", va="center", fontsize=11, fontstyle="italic",
-            color=PALETTE["ash"],
-            bbox=dict(boxstyle="round,pad=0.4", facecolor=PALETTE["paper"],
-                      edgecolor=PALETTE["mist"]))
+    ax.text(
+        7.0,
+        0.3,
+        "Pretraining: trunk + projection head learn under SupCon (encoder unlocks).  "
+        "Fine-tune: supervised head trains under β-NLL with the trunk warm-started.",
+        ha="center",
+        va="center",
+        fontsize=11,
+        fontstyle="italic",
+        color=PALETTE["ash"],
+        bbox=dict(boxstyle="round,pad=0.4", facecolor=PALETTE["paper"], edgecolor=PALETTE["mist"]),
+    )
 
     # h-vs-z annotation between trunk and branch.
-    ax.text(6.4, 5.4, "h", color=PALETTE["navy"], fontsize=14,
-            fontweight="bold")
+    ax.text(6.4, 5.4, "h", color=PALETTE["navy"], fontsize=14, fontweight="bold")
 
     headline(
         fig,

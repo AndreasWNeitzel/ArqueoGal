@@ -361,13 +361,23 @@ def run_ablation(
     return summary
 
 
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--baseline", type=Path, required=True, help="Baseline predictions parquet (Av-as-feature recipe)")
-    parser.add_argument("--hybrid", type=Path, required=True, help="Hybrid-D predictions parquet (dereddened recipe)")
-    parser.add_argument("--truth", type=Path, required=True, help="Stream 1 holdout truth parquet (APOGEE labels)")
+    parser.add_argument(
+        "--baseline",
+        type=Path,
+        required=True,
+        help="Baseline predictions parquet (Av-as-feature recipe)",
+    )
+    parser.add_argument(
+        "--hybrid",
+        type=Path,
+        required=True,
+        help="Hybrid-D predictions parquet (dereddened recipe)",
+    )
+    parser.add_argument(
+        "--truth", type=Path, required=True, help="Stream 1 holdout truth parquet (APOGEE labels)"
+    )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)

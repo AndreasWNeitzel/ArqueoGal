@@ -33,6 +33,7 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import apply_style, save_fig
+
 from arqueogal.xp_abundances.main.data import FeatureLayout
 
 OUT = REPO / "reports/gallery/B_preprocessing"
@@ -54,7 +55,7 @@ def main() -> int:
     interesting.sort(key=lambda kv: kv[1], reverse=True)
     print(f"[B14] {len(interesting)} aux features with NaN fraction >= 1%:")
     for c, f in interesting:
-        print(f"  {c:30s}  NaN frac = {f*100:5.2f}%")
+        print(f"  {c:30s}  NaN frac = {f * 100:5.2f}%")
 
     if not interesting:
         print("[B14] No aux features with NaN fraction >= 1%; nothing to render.")
@@ -81,9 +82,15 @@ def main() -> int:
         bins = np.linspace(lo, hi, 80)
 
         # Raw distribution (NaNs dropped).
-        ax.hist(v_finite, bins=bins, color="#1f77b4", alpha=0.55,
-                edgecolor="#1f77b4", lw=0.4,
-                label=f"raw (NaN dropped, n={len(v_finite):,})")
+        ax.hist(
+            v_finite,
+            bins=bins,
+            color="#1f77b4",
+            alpha=0.55,
+            edgecolor="#1f77b4",
+            lw=0.4,
+            label=f"raw (NaN dropped, n={len(v_finite):,})",
+        )
 
         # Post-imputation distribution: NaNs replaced with 0.0 by
         # training.py's np.nan_to_num call. Plot the imputed spike
@@ -93,14 +100,23 @@ def main() -> int:
             # Place the imputation spike at exactly x=0 with bar width
             # matching one bin in the raw histogram.
             bar_w = bins[1] - bins[0]
-            ax.bar([0.0], [n_nan], width=bar_w * 0.9, color="#d62728",
-                   alpha=0.85, edgecolor="#d62728", lw=0.6,
-                   label=f"imputed spike at x=0  (n={n_nan:,})")
+            ax.bar(
+                [0.0],
+                [n_nan],
+                width=bar_w * 0.9,
+                color="#d62728",
+                alpha=0.85,
+                edgecolor="#d62728",
+                lw=0.6,
+                label=f"imputed spike at x=0  (n={n_nan:,})",
+            )
         ax.axvline(0.0, color="r", lw=1.0, ls="--", alpha=0.6)
         ax.set_xlabel(col)
         ax.set_ylabel("count")
-        ax.set_title(f"{col}\nNaN fraction = {frac*100:.2f}%  -> "
-                     f"{n_nan:,} stars imputed to x=0", fontsize=10)
+        ax.set_title(
+            f"{col}\nNaN fraction = {frac * 100:.2f}%  -> {n_nan:,} stars imputed to x=0",
+            fontsize=10,
+        )
         ax.legend(fontsize=7, loc="upper right")
         ax.grid(axis="y", alpha=0.25)
 
@@ -112,7 +128,9 @@ def main() -> int:
         "training.py:155 replaces NaN with 0.0 for aux features.\n"
         "Red dashed line marks x = 0; the histogram spike there is the\n"
         "artificial in-distribution mass introduced by imputation.",
-        fontsize=11, fontweight="semibold", y=0.995,
+        fontsize=11,
+        fontweight="semibold",
+        y=0.995,
     )
     fig.tight_layout(rect=(0, 0, 1, 0.95))
 

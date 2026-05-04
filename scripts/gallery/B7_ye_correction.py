@@ -52,6 +52,7 @@ def main() -> None:
         raise FileNotFoundError(f"{parquet} not found")
 
     import pyarrow.parquet as pq
+
     schema = pq.ParquetFile(parquet).schema_arrow
     schema_df = pd.DataFrame({c.name: pd.Series(dtype="float64") for c in schema}).head(0)
     flag_col = _resolve_flag_column(schema_df)
@@ -87,16 +88,27 @@ def main() -> None:
     ax_hist.set_yscale("log")
     ax_hist.set_title(f"Ye+2024 flag distribution (Stream 1, n={len(df):,})")
     for bar, count in zip(bars, bar_y):
-        ax_hist.text(bar.get_x() + bar.get_width() / 2, count,
-                     f"{int(count):,}", ha="center", va="bottom", fontsize=8)
+        ax_hist.text(
+            bar.get_x() + bar.get_width() / 2,
+            count,
+            f"{int(count):,}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
 
     # Panel 2: per-flag G-mag distribution
     bins_g = np.linspace(df["g_mag"].min(), df["g_mag"].max(), 40)
     for f in sorted(counts.index):
         sub = df.loc[df["flag"] == f, "g_mag"]
-        ax_g.hist(sub, bins=bins_g, alpha=0.55, density=True,
-                  color=flag_colors.get(f, "#1f77b4"),
-                  label=f"{flag_labels.get(f, str(f))} (n={len(sub):,})")
+        ax_g.hist(
+            sub,
+            bins=bins_g,
+            alpha=0.55,
+            density=True,
+            color=flag_colors.get(f, "#1f77b4"),
+            label=f"{flag_labels.get(f, str(f))} (n={len(sub):,})",
+        )
     ax_g.set_xlabel(r"$G$ [mag]")
     ax_g.set_ylabel("density")
     ax_g.set_title("Per-flag G distribution")
@@ -118,7 +130,13 @@ def main() -> None:
         "and is NOT an extinction correction."
     )
     ax_legend.text(
-        0.0, 1.0, legend_text, ha="left", va="top", fontsize=9, family="monospace",
+        0.0,
+        1.0,
+        legend_text,
+        ha="left",
+        va="top",
+        fontsize=9,
+        family="monospace",
         bbox=dict(boxstyle="round,pad=0.5", facecolor="wheat", alpha=0.85),
     )
 
@@ -127,7 +145,9 @@ def main() -> None:
         fontsize=11,
         fontweight="semibold",
     )
-    save_fig(fig, REPO / "reports/gallery/B_preprocessing" / "B7_ye_correction", formats=("pdf", "png"))
+    save_fig(
+        fig, REPO / "reports/gallery/B_preprocessing" / "B7_ye_correction", formats=("pdf", "png")
+    )
 
 
 if __name__ == "__main__":

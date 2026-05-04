@@ -111,11 +111,18 @@ def main() -> None:
 
     # BP panel — per-coefficient σ(c_i/c_0) on log scale
     ax = axes[0]
-    ax.semilogy(coef_idx, bp_sigma, "-o", color="tab:blue", lw=1.5, ms=4,
-                label=r"$\sigma(c_i/c_0)$")
+    ax.semilogy(
+        coef_idx, bp_sigma, "-o", color="tab:blue", lw=1.5, ms=4, label=r"$\sigma(c_i/c_0)$"
+    )
     if floor_in_view:
-        ax.axhline(sigma_floor, color="red", lw=0.8, ls="--", alpha=0.5,
-                   label=f"sigma floor ({sigma_floor:.0e})")
+        ax.axhline(
+            sigma_floor,
+            color="red",
+            lw=0.8,
+            ls="--",
+            alpha=0.5,
+            label=f"sigma floor ({sigma_floor:.0e})",
+        )
     ax.set_xlabel("BP coefficient index (1-54)")
     ax.set_ylabel(r"$\sigma(c_i / c_0)$ on normal-population subset")
     ax.set_ylim(y_lo, y_hi)
@@ -125,11 +132,18 @@ def main() -> None:
 
     # RP panel
     ax = axes[1]
-    ax.semilogy(coef_idx, rp_sigma, "-o", color="tab:orange", lw=1.5, ms=4,
-                label=r"$\sigma(c_i/c_0)$")
+    ax.semilogy(
+        coef_idx, rp_sigma, "-o", color="tab:orange", lw=1.5, ms=4, label=r"$\sigma(c_i/c_0)$"
+    )
     if floor_in_view:
-        ax.axhline(sigma_floor, color="red", lw=0.8, ls="--", alpha=0.5,
-                   label=f"sigma floor ({sigma_floor:.0e})")
+        ax.axhline(
+            sigma_floor,
+            color="red",
+            lw=0.8,
+            ls="--",
+            alpha=0.5,
+            label=f"sigma floor ({sigma_floor:.0e})",
+        )
     ax.set_xlabel("RP coefficient index (1-54)")
     ax.set_ylabel(r"$\sigma(c_i / c_0)$ on normal-population subset")
     ax.set_ylim(y_lo, y_hi)
@@ -148,15 +162,25 @@ def main() -> None:
         f"fingerprint above is the inference-time contract: any Stream-2/3 inference must apply these exact\n"
         f"per-coefficient stats — divergence breaks the release."
     )
-    fig.text(0.5, -0.02, caption, ha="center", va="top", fontsize=8, color="#333",
-             bbox=dict(boxstyle="round,pad=0.4", facecolor="#fafafa", edgecolor="#bbb"))
+    fig.text(
+        0.5,
+        -0.02,
+        caption,
+        ha="center",
+        va="top",
+        fontsize=8,
+        color="#333",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="#fafafa", edgecolor="#bbb"),
+    )
 
     fig.suptitle(
         f"B8 — Streams 1, 2, 3: Frozen v1 Hermite basis (per-coefficient σ, fingerprint: {fp_short})",
         fontsize=10,
         fontweight="semibold",
     )
-    save_fig(fig, REPO / "reports/gallery/B_preprocessing" / "B8_hermite_zscore", formats=("pdf", "png"))
+    save_fig(
+        fig, REPO / "reports/gallery/B_preprocessing" / "B8_hermite_zscore", formats=("pdf", "png")
+    )
 
 
 if __name__ == "__main__":

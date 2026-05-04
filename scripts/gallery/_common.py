@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
+if TYPE_CHECKING:
+    import pandas as pd  # noqa: F401  (used only in quoted type hints)
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PROCESSED = ROOT / "data" / "processed"
@@ -36,58 +40,60 @@ def apply_style() -> None:
     Updates rcParams to the slide-grade defaults documented in
     docs/STYLE_GUIDE.md. Call once at the top of every plotting script.
     """
-    mpl.rcParams.update({
-        # Color cycle + default cmap.
-        "axes.prop_cycle":   cycler(color=OKABE_ITO),
-        "image.cmap":        "viridis",
-        # Disable usetex (mathtext only — defends against gaiaxpy etc. flipping it on).
-        "text.usetex": False,
-        "mathtext.fontset": "dejavusans",
-        "mathtext.default": "it",
-        # Geometry.
-        "figure.figsize":    (8, 5),
-        "figure.dpi":        150,
-        "savefig.dpi":       300,
-        "savefig.bbox":      "tight",
-        "savefig.pad_inches": 0.05,
-        "savefig.transparent": False,  # gallery PNGs render on white; keep opaque
-        # Typography.
-        "font.family":       "sans-serif",
-        "font.sans-serif":   ["DejaVu Sans", "Arial", "Helvetica"],
-        "font.size":         12.0,
-        "axes.titlesize":    14.0,
-        "axes.titleweight":  "semibold",
-        "axes.labelsize":    12.0,
-        "legend.fontsize":   11.0,
-        "xtick.labelsize":   11.0,
-        "ytick.labelsize":   11.0,
-        "axes.unicode_minus": False,
-        # Axes chrome.
-        "axes.linewidth":    1.0,
-        "axes.edgecolor":    "#2B2D42",
-        "axes.labelcolor":   "#2B2D42",
-        "axes.spines.top":   True,
-        "axes.spines.right": True,
-        "xtick.color":       "#2B2D42",
-        "ytick.color":       "#2B2D42",
-        "xtick.direction":   "in",
-        "ytick.direction":   "in",
-        "xtick.top":         True,
-        "ytick.right":       True,
-        "xtick.minor.visible": True,
-        "ytick.minor.visible": True,
-        # Grid.
-        "axes.grid":         True,
-        "grid.color":        "#D0D3DC",
-        "grid.linewidth":    0.5,
-        "grid.alpha":        0.6,
-        # Legend / lines / markers.
-        "legend.frameon":    False,
-        "lines.linewidth":   1.8,
-        "lines.markersize":  6.0,
-        "scatter.marker":    "o",
-        "figure.autolayout": False,
-    })
+    mpl.rcParams.update(
+        {
+            # Color cycle + default cmap.
+            "axes.prop_cycle": cycler(color=OKABE_ITO),
+            "image.cmap": "viridis",
+            # Disable usetex (mathtext only — defends against gaiaxpy etc. flipping it on).
+            "text.usetex": False,
+            "mathtext.fontset": "dejavusans",
+            "mathtext.default": "it",
+            # Geometry.
+            "figure.figsize": (8, 5),
+            "figure.dpi": 150,
+            "savefig.dpi": 300,
+            "savefig.bbox": "tight",
+            "savefig.pad_inches": 0.05,
+            "savefig.transparent": False,  # gallery PNGs render on white; keep opaque
+            # Typography.
+            "font.family": "sans-serif",
+            "font.sans-serif": ["DejaVu Sans", "Arial", "Helvetica"],
+            "font.size": 12.0,
+            "axes.titlesize": 14.0,
+            "axes.titleweight": "semibold",
+            "axes.labelsize": 12.0,
+            "legend.fontsize": 11.0,
+            "xtick.labelsize": 11.0,
+            "ytick.labelsize": 11.0,
+            "axes.unicode_minus": False,
+            # Axes chrome.
+            "axes.linewidth": 1.0,
+            "axes.edgecolor": "#2B2D42",
+            "axes.labelcolor": "#2B2D42",
+            "axes.spines.top": True,
+            "axes.spines.right": True,
+            "xtick.color": "#2B2D42",
+            "ytick.color": "#2B2D42",
+            "xtick.direction": "in",
+            "ytick.direction": "in",
+            "xtick.top": True,
+            "ytick.right": True,
+            "xtick.minor.visible": True,
+            "ytick.minor.visible": True,
+            # Grid.
+            "axes.grid": True,
+            "grid.color": "#D0D3DC",
+            "grid.linewidth": 0.5,
+            "grid.alpha": 0.6,
+            # Legend / lines / markers.
+            "legend.frameon": False,
+            "lines.linewidth": 1.8,
+            "lines.markersize": 6.0,
+            "scatter.marker": "o",
+            "figure.autolayout": False,
+        }
+    )
 
 
 # Palette aliases. Older callers used semantic names ("ok", "bad", etc.)
@@ -95,29 +101,29 @@ def apply_style() -> None:
 # don't break, but new code should prefer OKABE_ITO[i] directly.
 PALETTE = {
     # Okabe-Ito by index.
-    "ok_blue":      OKABE_ITO[0],
+    "ok_blue": OKABE_ITO[0],
     "ok_vermilion": OKABE_ITO[1],
-    "ok_green":     OKABE_ITO[2],
-    "ok_purple":    OKABE_ITO[3],
-    "ok_orange":    OKABE_ITO[4],
-    "ok_sky":       OKABE_ITO[5],
-    "ok_yellow":    OKABE_ITO[6],
-    "ok_black":     OKABE_ITO[7],
+    "ok_green": OKABE_ITO[2],
+    "ok_purple": OKABE_ITO[3],
+    "ok_orange": OKABE_ITO[4],
+    "ok_sky": OKABE_ITO[5],
+    "ok_yellow": OKABE_ITO[6],
+    "ok_black": OKABE_ITO[7],
     # Legacy semantic aliases — remap to Okabe-Ito.
-    "apogee":         OKABE_ITO[0],
-    "tess":           OKABE_ITO[2],
-    "andrae_volume":  OKABE_ITO[1],
+    "apogee": OKABE_ITO[0],
+    "tess": OKABE_ITO[2],
+    "andrae_volume": OKABE_ITO[1],
     "andrae_uniform": OKABE_ITO[3],
-    "v1":             "#5C6378",
-    "v11":            OKABE_ITO[1],
-    "v12":            OKABE_ITO[0],
-    "edenhofer":      OKABE_ITO[0],
-    "lallement":      OKABE_ITO[2],
-    "sfd":            OKABE_ITO[1],
-    "nbhd":           OKABE_ITO[3],
-    "ok":             OKABE_ITO[2],
-    "bad":            OKABE_ITO[1],
-    "neutral":        "#5C6378",
+    "v1": "#5C6378",
+    "v11": OKABE_ITO[1],
+    "v12": OKABE_ITO[0],
+    "edenhofer": OKABE_ITO[0],
+    "lallement": OKABE_ITO[2],
+    "sfd": OKABE_ITO[1],
+    "nbhd": OKABE_ITO[3],
+    "ok": OKABE_ITO[2],
+    "bad": OKABE_ITO[1],
+    "neutral": "#5C6378",
 }
 
 
@@ -326,9 +332,17 @@ def load_stream1_holdout() -> "pd.DataFrame":  # type: ignore[name-defined]
     """
     cols = [
         "source_id",
-        "teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apogee",
-        "ra_deg", "dec_deg", "b_deg",
-        "g_mag", "bp_rp",
-        "parallax", "parallax_error",
+        "teff_apogee",
+        "logg_apogee",
+        "mh_apogee",
+        "alpha_m_apogee",
+        "mg_h_apogee",
+        "ra_deg",
+        "dec_deg",
+        "b_deg",
+        "g_mag",
+        "bp_rp",
+        "parallax",
+        "parallax_error",
     ]
     return load_real_stream(1, columns=cols)

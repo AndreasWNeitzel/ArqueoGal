@@ -48,9 +48,15 @@ def main() -> int:
         use_c0_scalars=True,
         amp_dtype="none",
         loss_weights=LossWeights(
-            supcon=0.1, beta_nll=1.0, beta=0.5, supcon_sigma=0.10,
-            barlow=1.0, barlow_lam=0.005,
-            ari=0.1, ari_alpha_threshold=0.15, ari_kernel_sigma=0.03,
+            supcon=0.1,
+            beta_nll=1.0,
+            beta=0.5,
+            supcon_sigma=0.10,
+            barlow=1.0,
+            barlow_lam=0.005,
+            ari=0.1,
+            ari_alpha_threshold=0.15,
+            ari_kernel_sigma=0.03,
         ),
         epochs=1,
         batch_size=32,
@@ -65,8 +71,10 @@ def main() -> int:
     label_scale = torch.tensor([200.0, 0.30, 0.30, 0.10, 0.15], dtype=torch.float32)
     model.register_buffer("label_mean_human", label_mean, persistent=False)
     model.register_buffer("label_scale_human", label_scale, persistent=False)
-    print(f"[smoke] model built: input_dim={layout.input_dim}, "
-          f"label_order_human={model.block_layout.label_order_human}")
+    print(
+        f"[smoke] model built: input_dim={layout.input_dim}, "
+        f"label_order_human={model.block_layout.label_order_human}"
+    )
     print(f"[smoke] label_mean_human = {label_mean.tolist()}")
     print(f"[smoke] label_scale_human = {label_scale.tolist()}")
 
@@ -74,30 +82,37 @@ def main() -> int:
     x = torch.randn(B, layout.input_dim, dtype=torch.float32, device=device)
     # Truth in PHYSICAL units; LabelScaler.transform divides out (mean, scale).
     # Spread α/M across the 0.15 dex threshold so soft K=2 has both clusters.
-    y_phys_np = np.column_stack([
-        rng.normal(4500, 200, B).astype(np.float32),
-        rng.normal(2.5,    0.3, B).astype(np.float32),
-        rng.normal(-0.2,   0.3, B).astype(np.float32),
-        rng.normal(0.10,   0.10, B).astype(np.float32),
-        rng.normal(-0.05,  0.15, B).astype(np.float32),
-    ])
+    y_phys_np = np.column_stack(
+        [
+            rng.normal(4500, 200, B).astype(np.float32),
+            rng.normal(2.5, 0.3, B).astype(np.float32),
+            rng.normal(-0.2, 0.3, B).astype(np.float32),
+            rng.normal(0.10, 0.10, B).astype(np.float32),
+            rng.normal(-0.05, 0.15, B).astype(np.float32),
+        ]
+    )
     y_scaled_np = (y_phys_np - label_mean.numpy()) / label_scale.numpy()
     y = torch.tensor(y_scaled_np, device=device, requires_grad=False)
-    print(f"[smoke] y[:,3] (scaled [α/M]) range: "
-          f"{y[:, 3].min().item():+.2f} .. {y[:, 3].max().item():+.2f}")
+    print(
+        f"[smoke] y[:,3] (scaled [α/M]) range: "
+        f"{y[:, 3].min().item():+.2f} .. {y[:, 3].max().item():+.2f}"
+    )
 
     # Direct soft_ari_loss probe with the same conversion logic to confirm the
     # formula on its own.
     from arqueogal.xp_abundances.main.losses import soft_ari_loss
+
     with torch.no_grad():
         mu_dummy_phys = torch.tensor(
-            np.column_stack([
-                rng.normal(4500, 200, B).astype(np.float32),
-                rng.normal(2.5, 0.3, B).astype(np.float32),
-                rng.normal(-0.2, 0.3, B).astype(np.float32),
-                rng.normal(0.05, 0.10, B).astype(np.float32),  # different mean from truth
-                rng.normal(-0.05, 0.15, B).astype(np.float32),
-            ])
+            np.column_stack(
+                [
+                    rng.normal(4500, 200, B).astype(np.float32),
+                    rng.normal(2.5, 0.3, B).astype(np.float32),
+                    rng.normal(-0.2, 0.3, B).astype(np.float32),
+                    rng.normal(0.05, 0.10, B).astype(np.float32),  # different mean from truth
+                    rng.normal(-0.05, 0.15, B).astype(np.float32),
+                ]
+            )
         )
         a_pred_phys = mu_dummy_phys[:, 3]
         a_true_phys = torch.tensor(y_phys_np[:, 3])
@@ -112,8 +127,14 @@ def main() -> int:
 
     print("[smoke] forward + loss …")
     total, parts, _z, _y = _compute_losses(
-        model, log_temp, x, y, cfg, adapter,
-        weights=None, queue=None,
+        model,
+        log_temp,
+        x,
+        y,
+        cfg,
+        adapter,
+        weights=None,
+        queue=None,
     )
     print(f"[smoke] parts = {parts}")
     if any(not np.isfinite(v) for v in parts.values()):
@@ -148,7 +169,14 @@ def main() -> int:
     # Second pass: identical truth → ari should drop sharply
     print("[smoke] second pass with truth==pred mock (set α/M ≈ pred) …")
     total2, parts2, _, _ = _compute_losses(
-        model, log_temp, x, y, cfg, adapter, weights=None, queue=None,
+        model,
+        log_temp,
+        x,
+        y,
+        cfg,
+        adapter,
+        weights=None,
+        queue=None,
     )
     print(f"[smoke] parts2 = {parts2}")
 

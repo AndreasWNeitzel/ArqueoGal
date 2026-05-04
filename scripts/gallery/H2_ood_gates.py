@@ -68,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
         "Stream 3": "#ff7f0e",
     }
 
-    for stream_name, df in streams.items():
+    for _stream_name, df in streams.items():
         color = colors.get(df["stream"].iloc[0], "#1f77b4")
         mahal = df["ood_mahalanobis_score"].to_numpy()
         mahal = mahal[~np.isnan(mahal)]  # Drop NaNs

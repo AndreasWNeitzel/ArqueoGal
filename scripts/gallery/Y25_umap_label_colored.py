@@ -52,9 +52,9 @@ def _build_or_load_embedding() -> pd.DataFrame:
     feat_path = REPO / "data/processed/pipeline1_features_stream1_kiel.parquet"
     bp_cols = [f"bp_coef_{i}" for i in range(55)]
     rp_cols = [f"rp_coef_{i}" for i in range(55)]
-    feat = pd.read_parquet(
-        feat_path, columns=["source_id", *bp_cols, *rp_cols]
-    ).drop_duplicates("source_id")
+    feat = pd.read_parquet(feat_path, columns=["source_id", *bp_cols, *rp_cols]).drop_duplicates(
+        "source_id"
+    )
     sub = df.merge(feat, on="source_id", how="inner")
 
     X = sub[bp_cols + rp_cols].to_numpy(dtype=np.float32)
@@ -63,13 +63,16 @@ def _build_or_load_embedding() -> pd.DataFrame:
 
     print(f"[Y25] running UMAP on {len(sub):,} stars × {X.shape[1]} features")
     reducer = umap.UMAP(
-        n_components=2, n_neighbors=30, min_dist=0.1,
-        metric="euclidean", random_state=0, verbose=False,
+        n_components=2,
+        n_neighbors=30,
+        min_dist=0.1,
+        metric="euclidean",
+        random_state=0,
+        verbose=False,
     )
     emb = reducer.fit_transform(X)
 
-    out = sub[["source_id", "teff_apogee", "logg_apogee",
-               "mh_apogee", "alpha_m_apogee"]].copy()
+    out = sub[["source_id", "teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee"]].copy()
     out["umap_x"] = emb[:, 0].astype(np.float32)
     out["umap_y"] = emb[:, 1].astype(np.float32)
     CACHE.parent.mkdir(parents=True, exist_ok=True)
@@ -85,9 +88,17 @@ def _panel(ax, df, color_col, *, label, cmap, vlim=None):
         vmax = float(np.nanpercentile(c, 99.0))
     else:
         vmin, vmax = vlim
-    sc = ax.scatter(df["umap_x"].to_numpy()[ok], df["umap_y"].to_numpy()[ok],
-                    c=c[ok], cmap=cmap, s=2.4, vmin=vmin, vmax=vmax,
-                    alpha=0.85, edgecolor="none")
+    sc = ax.scatter(
+        df["umap_x"].to_numpy()[ok],
+        df["umap_y"].to_numpy()[ok],
+        c=c[ok],
+        cmap=cmap,
+        s=2.4,
+        vmin=vmin,
+        vmax=vmax,
+        alpha=0.85,
+        edgecolor="none",
+    )
     ax.set_xlabel("UMAP-1")
     ax.set_ylabel("UMAP-2")
     ax.set_title(label, color=PALETTE["navy"])
@@ -102,15 +113,11 @@ def main() -> int:
     n = len(df)
 
     fig, axes = plt.subplots(2, 2, figsize=(15, 13))
-    plt.subplots_adjust(wspace=0.30, hspace=0.30, top=0.88,
-                        left=0.06, right=0.97, bottom=0.06)
-    _panel(axes[0, 0], df, "teff_apogee",  label=r"$T_{\rm eff}$  (K)",
-           cmap="plasma_r")
-    _panel(axes[0, 1], df, "logg_apogee",  label=r"$\log g$  (dex)",
-           cmap="viridis")
-    _panel(axes[1, 0], df, "mh_apogee",    label="[M/H]  (dex)", cmap="cividis")
-    _panel(axes[1, 1], df, "alpha_m_apogee", label=r"[$\alpha$/M]  (dex)",
-           cmap="magma")
+    plt.subplots_adjust(wspace=0.30, hspace=0.30, top=0.88, left=0.06, right=0.97, bottom=0.06)
+    _panel(axes[0, 0], df, "teff_apogee", label=r"$T_{\rm eff}$  (K)", cmap="plasma_r")
+    _panel(axes[0, 1], df, "logg_apogee", label=r"$\log g$  (dex)", cmap="viridis")
+    _panel(axes[1, 0], df, "mh_apogee", label="[M/H]  (dex)", cmap="cividis")
+    _panel(axes[1, 1], df, "alpha_m_apogee", label=r"[$\alpha$/M]  (dex)", cmap="magma")
 
     headline(
         fig,

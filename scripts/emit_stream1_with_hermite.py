@@ -207,9 +207,11 @@ def main() -> None:
     # only.
     if "corrected_flux" not in df.columns:
         import gc
+
         import pyarrow as pa
         import pyarrow.compute as pc
         import pyarrow.parquet as _pq
+
         xp_path = repo / "data" / "interim" / "xp_sampled_corrected.parquet"
         logger.info("streaming corrected_flux from %s", xp_path)
         wanted = pa.array(df["source_id"].to_numpy())

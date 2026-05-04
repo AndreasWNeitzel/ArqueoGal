@@ -64,9 +64,12 @@ def main() -> None:
         # BJ21 distances are reported in pc; convert to kpc for readable axis.
         d_kpc = d / 1000.0
         bins = np.linspace(0, np.nanpercentile(d_kpc, 99), 60)
-        ax.hist(d_kpc, bins=bins, color=STREAM_COLOR[sid], alpha=0.85, edgecolor="black", linewidth=0.3)
-        ax.axvline(d_kpc.median(), color="black", lw=1.2, ls="--",
-                   label=f"median {d_kpc.median():.2f} kpc")
+        ax.hist(
+            d_kpc, bins=bins, color=STREAM_COLOR[sid], alpha=0.85, edgecolor="black", linewidth=0.3
+        )
+        ax.axvline(
+            d_kpc.median(), color="black", lw=1.2, ls="--", label=f"median {d_kpc.median():.2f} kpc"
+        )
         ax.set_xlabel(r"$r_\mathrm{med, photogeo}$ [kpc] (Bailer-Jones+2021)")
         ax.set_ylabel("count")
         ax.set_title(f"{STREAM_LABEL[sid]}: distance (n={int(d.size):,})")
@@ -81,9 +84,12 @@ def main() -> None:
         # collapsed into the rightmost bin.
         av_p995 = float(np.nanpercentile(av, 99.5))
         bins = np.linspace(0, max(av_p995, 0.5), 60)
-        ax.hist(av, bins=bins, color=STREAM_COLOR[sid], alpha=0.85, edgecolor="black", linewidth=0.3)
-        ax.axvline(av.median(), color="black", lw=1.2, ls="--",
-                   label=f"median {av.median():.3f} mag")
+        ax.hist(
+            av, bins=bins, color=STREAM_COLOR[sid], alpha=0.85, edgecolor="black", linewidth=0.3
+        )
+        ax.axvline(
+            av.median(), color="black", lw=1.2, ls="--", label=f"median {av.median():.3f} mag"
+        )
         ax.set_xlabel(r"$A_V^\mathrm{LOS}$ [mag] (fused dust map)")
         ax.set_ylabel("count (log)")
         ax.set_yscale("log")
@@ -93,7 +99,8 @@ def main() -> None:
 
     fig.suptitle(
         "B9 — Distance (Bailer-Jones+2021) and fused $A_V$ per stream (real data)",
-        fontsize=11, fontweight="semibold",
+        fontsize=11,
+        fontweight="semibold",
     )
     save_fig(fig, OUT / "B9_distance_extinction", formats=("pdf", "png"))
 

@@ -313,9 +313,9 @@ def soft_ari_loss(
     # NOT normalised by B — normalisation collapses both the numerator and
     # denominator of the ARI ratio because rows of soft pred / true already
     # sum to 1, so the marginals saturate and the formula returns ±∞ → 0.
-    n_ij = y_pred.T @ y_true            # (2, 2) soft counts; sums to B
-    a = n_ij.sum(dim=1)                 # row sums (per pred component)
-    b = n_ij.sum(dim=0)                 # col sums (per truth component)
+    n_ij = y_pred.T @ y_true  # (2, 2) soft counts; sums to B
+    a = n_ij.sum(dim=1)  # row sums (per pred component)
+    b = n_ij.sum(dim=0)  # col sums (per truth component)
 
     def comb2(x: torch.Tensor) -> torch.Tensor:
         # Continuous extension of n*(n-1)/2 valid for soft (real-valued) counts.

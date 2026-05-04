@@ -43,7 +43,8 @@ from arqueogal.xp_abundances.main.release import (
         (pd.Series([1, 0, 1]), [True, False, True]),
         # Float series with NaN, NaN should map to False.
         (pd.Series([1.0, np.nan, 0.0]), [True, False, False]),
-    ])
+    ],
+)
 def test_coerce_flag_series_handles_every_upstream_dtype(series, expected):
     """The release pipeline receives flag columns under several dtypes; they
     must all collapse to a clean ``bool`` Series. Regression guard against the
@@ -63,7 +64,8 @@ def _row(
     ood_disagreement=False,
     aux_missing=False,
     pred_nan=False,
-    label_extrap=False):
+    label_extrap=False,
+):
     return {
         "source_id": 0,
         "label_extrapolation_flag": label_extrap,
@@ -126,7 +128,8 @@ def test_mode_ambiguous_is_diagnostic_only_in_v6():
         {"ood_disagreement": True},
         {"aux_missing": True},
         {"latent_support": True},
-    ])
+    ],
+)
 def test_diagnostic_only_flags_do_not_change_tier(diagnostic_kw):
     """v5 (2026-04-26): regime_b_flag, ood_disagreement_flag, aux_missing_any,
     latent_support_flag, ood_aux_mahalanobis_flag, dist_prior_dominated are
@@ -146,7 +149,8 @@ def test_diagnostic_only_flags_do_not_change_tier(diagnostic_kw):
     [
         {"ood_joint": True},
         {"pred_nan": True},
-    ])
+    ],
+)
 def test_single_hard_kill_demotes_to_tier_3(kill_kw):
     df = pd.DataFrame([_row(**kill_kw)])
     tier = assign_release_tier(df)
@@ -169,7 +173,8 @@ def test_missing_diagnostic_flag_columns_are_treated_as_false():
         "mode_ambiguous_flag",
         "ood_disagreement_flag",
         "aux_missing_any",
-        "latent_support_flag"):
+        "latent_support_flag",
+    ):
         row.pop(key)
     df = pd.DataFrame([row])
     tier = assign_release_tier(df)
@@ -194,9 +199,7 @@ def test_label_extrapolation_flag_demotes_to_tier_2_globally():
     df = pd.DataFrame([_row(label_extrap=True)])
     per_element = assign_per_element_release_tier(df)
     for elem, series in per_element.items():
-        assert series.iloc[0] == 2, (
-            f"{elem} should be Tier 2 when label_extrapolation_flag fires"
-        )
+        assert series.iloc[0] == 2, f"{elem} should be Tier 2 when label_extrapolation_flag fires"
     composite = assign_release_tier(df)
     assert composite.iloc[0] == 2
 
@@ -406,7 +409,8 @@ def test_annotate_parquet_adds_all_release_columns(tmp_path: Path):
         "dist_prior_dominated",
         "prediction_sigma_inflated__teff",
         "prediction_sigma_inflated__alpha_m",
-        "prediction_sigma_inflated_any"):
+        "prediction_sigma_inflated_any",
+    ):
         assert new_col in payload["release_columns_added"], (
             f"{new_col} missing from sidecar manifest"
         )
@@ -500,10 +504,7 @@ def test_per_element_tier_diagnostic_flags_do_not_demote():
     ood_disagreement) are diagnostic-only, they must not change any per-element
     tier. Replaces the v3 ``test_per_element_tier_global_caveat_demotes_all``
     which asserted the opposite."""
-    for flag_kw in (
-        {"regime_b": True},
-        {"aux_missing": True},
-        {"ood_disagreement": True}):
+    for flag_kw in ({"regime_b": True}, {"aux_missing": True}, {"ood_disagreement": True}):
         row = _row(**flag_kw)
         df = pd.DataFrame([row])
         per_element = assign_per_element_release_tier(df)
@@ -833,7 +834,8 @@ def test_assign_prediction_sigma_inflated_below_threshold_is_false():
         ("fe_h", "fe_h_sigma", 0.20),  # > 0.15 dex (v1.1 placeholder)
         ("ca_h", "ca_h_sigma", 0.20),  # > 0.15 dex (v1.1 placeholder)
         ("ce_h", "ce_h_sigma", 0.20),  # > 0.15 dex (v1.1 placeholder)
-    ])
+    ],
+)
 def test_assign_prediction_sigma_inflated_above_threshold_is_true(elem, sigma_col, inflated_value):
     """A single element above its threshold lights only that element's flag (21 elements)."""
     df = pd.DataFrame([_row_with_sigma(**{sigma_col: inflated_value})])

@@ -80,8 +80,6 @@ def _kiel_panel(
     ax.set_title(f"{title}\nn = {n:,}", fontsize=9, color=color)
 
 
-
-
 def main() -> None:
     apply_style()
 
@@ -109,12 +107,12 @@ def main() -> None:
         s2 = None
 
     # Pre-cut reference teff/logg arrays (stub for now; full FITS load omitted for speed)
-    raw_apogee_teff = np.array([])
-    raw_apogee_logg = np.array([])
-    n_apogee_raw = len(s1)
-    raw_andrae_teff = np.array([])
-    raw_andrae_logg = np.array([])
-    n_andrae_raw = len(s3)
+    np.array([])
+    np.array([])
+    len(s1)
+    np.array([])
+    np.array([])
+    len(s3)
 
     rng = np.random.default_rng(0)
 
@@ -254,10 +252,10 @@ def main() -> None:
     n3 = len(s3)
     fig.suptitle(
         f"A1 — Raw data coverage per stream. "
-        f"Stream 1 = Kiel-masked training pool ({n1//1000}k, "
+        f"Stream 1 = Kiel-masked training pool ({n1 // 1000}k, "
         f"logg ∈ [1.0, 3.5], Teff ∈ [4000, 5500] K).  "
-        f"Stream 2 = asteroseismic ({n2//1000}k post-cut).  "
-        f"Stream 3 = inference ({n3//1000}k post-cut).",
+        f"Stream 2 = asteroseismic ({n2 // 1000}k post-cut).  "
+        f"Stream 3 = inference ({n3 // 1000}k post-cut).",
         fontsize=10,
         y=0.98,
     )

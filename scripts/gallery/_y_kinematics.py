@@ -27,11 +27,21 @@ V_LSR_KMS = 233.1
 
 
 def load_kin_chem() -> pd.DataFrame:
-    pred_cols = ["source_id", "teff_pred", "logg_pred", "mh_pred",
-                 "alpha_m_pred", "mg_h_pred",
-                 "teff_sigma", "logg_sigma", "mh_sigma",
-                 "alpha_m_sigma", "mg_h_sigma", "ood_joint_flag",
-                 "label_extrapolation_flag"]
+    pred_cols = [
+        "source_id",
+        "teff_pred",
+        "logg_pred",
+        "mh_pred",
+        "alpha_m_pred",
+        "mg_h_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+        "ood_joint_flag",
+        "label_extrapolation_flag",
+    ]
     pred = pd.read_parquet(PRED_S3, columns=pred_cols).drop_duplicates("source_id")
     pred["kin_ood_flag"] = False
     if HYBRID_S3.exists():

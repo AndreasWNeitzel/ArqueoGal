@@ -23,32 +23,63 @@ from _presentation import PALETTE, apply_style, headline, save  # noqa: E402
 
 
 def _box(
-    ax, x, y, w, h, *, title, body, fc, tc=PALETTE["ink"],
+    ax,
+    x,
+    y,
+    w,
+    h,
+    *,
+    title,
+    body,
+    fc,
+    tc=PALETTE["ink"],
     edge=PALETTE["ash"],
 ):
     """Rounded rectangle with a bold title and a body line."""
     rect = mpatches.FancyBboxPatch(
-        (x, y), w, h,
+        (x, y),
+        w,
+        h,
         boxstyle="round,pad=0.02,rounding_size=0.04",
-        linewidth=1.6, facecolor=fc, edgecolor=edge,
+        linewidth=1.6,
+        facecolor=fc,
+        edgecolor=edge,
     )
     ax.add_patch(rect)
     ax.text(
-        x + w / 2, y + h * 0.66, title,
-        ha="center", va="center", fontsize=15, fontweight="bold", color=tc,
+        x + w / 2,
+        y + h * 0.66,
+        title,
+        ha="center",
+        va="center",
+        fontsize=15,
+        fontweight="bold",
+        color=tc,
     )
     ax.text(
-        x + w / 2, y + h * 0.30, body,
-        ha="center", va="center", fontsize=11, color=tc, alpha=0.9,
+        x + w / 2,
+        y + h * 0.30,
+        body,
+        ha="center",
+        va="center",
+        fontsize=11,
+        color=tc,
+        alpha=0.9,
     )
 
 
 def _arrow(ax, x0, y0, x1, y1, color=PALETTE["ash"]):
     ax.annotate(
-        "", xy=(x1, y1), xytext=(x0, y0),
+        "",
+        xy=(x1, y1),
+        xytext=(x0, y0),
         arrowprops=dict(
-            arrowstyle="-|>", color=color, lw=2.0,
-            shrinkA=4, shrinkB=4, mutation_scale=18,
+            arrowstyle="-|>",
+            color=color,
+            lw=2.0,
+            shrinkA=4,
+            shrinkB=4,
+            mutation_scale=18,
         ),
     )
 
@@ -66,25 +97,42 @@ def main() -> int:
     xs = [0.20, 2.60, 5.00, 7.40]
 
     _box(
-        ax, xs[0], by, bw, bh,
+        ax,
+        xs[0],
+        by,
+        bw,
+        bh,
         title="DATA",
         body="Gaia DR3 XP\n+ APOGEE truth\n+ kinematics",
         fc=PALETTE["paper"],
     )
     _box(
-        ax, xs[1], by, bw, bh,
+        ax,
+        xs[1],
+        by,
+        bw,
+        bh,
         title="PREPROCESS",
         body="Ye+2024 NN\nHermite reproj\nfrozen z-score",
         fc="#dfe7f1",
     )
     _box(
-        ax, xs[2], by, bw, bh,
+        ax,
+        xs[2],
+        by,
+        bw,
+        bh,
         title="MODEL",
         body=r"MLP, $\beta$-NLL" + "\n140-D → 5 labels\n+ per-star σ",
-        fc="#e8d5b4", tc=PALETTE["ink"],
+        fc="#e8d5b4",
+        tc=PALETTE["ink"],
     )
     _box(
-        ax, xs[3], by, bw, bh,
+        ax,
+        xs[3],
+        by,
+        bw,
+        bh,
         title="RELEASE",
         body="Tier 1 / 2 / 3\n(Mahalanobis + σ\n+ kin_ood gates)",
         fc="#cce3d4",
@@ -92,8 +140,7 @@ def main() -> int:
 
     # Arrows between boxes.
     for i in range(3):
-        _arrow(ax, xs[i] + bw, by + bh / 2, xs[i + 1], by + bh / 2,
-               color=PALETTE["navy"])
+        _arrow(ax, xs[i] + bw, by + bh / 2, xs[i + 1], by + bh / 2, color=PALETTE["navy"])
 
     # Stream-fan-out below the model box. Centred horizontally on x=5.0 (the
     # midpoint of the figure) so the row never overflows the right edge.
@@ -104,21 +151,24 @@ def main() -> int:
     sx0 = (10.0 - total_w) / 2.0  # centre on figure midline
     sxs = [sx0 + i * (sw + sgap) for i in range(n_streams)]
     sb_titles = ["Stream 1", "Stream 2", "Stream 3"]
-    sb_bodies = ["APOGEE × XP\nn ≈ 293k",
-                 "TESS × XP\nn ≈ 72k",
-                 "Andrae+23 RGB\nn ≈ 614k"]
+    sb_bodies = ["APOGEE × XP\nn ≈ 293k", "TESS × XP\nn ≈ 72k", "Andrae+23 RGB\nn ≈ 614k"]
     for sx, t, b in zip(sxs, sb_titles, sb_bodies):
         _box(
-            ax, sx, 0.10, sw, sh,
-            title=t, body=b,
-            fc="#fff4e0", edge=PALETTE["accent"],
+            ax,
+            sx,
+            0.10,
+            sw,
+            sh,
+            title=t,
+            body=b,
+            fc="#fff4e0",
+            edge=PALETTE["accent"],
         )
     # Three arrows from the bottom of MODEL box down to each stream-card top.
     src_x = xs[2] + bw / 2
     for sx in sxs:
         target_x = sx + sw / 2
-        _arrow(ax, src_x, by, target_x, 0.10 + sh,
-               color=PALETTE["accent"])
+        _arrow(ax, src_x, by, target_x, 0.10 + sh, color=PALETTE["accent"])
 
     headline(
         fig,

@@ -52,11 +52,15 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import apply_style, save_fig  # noqa: E402
+
 from arqueogal.data.frozen_stats import (  # noqa: E402
-    apply_frozen_zscore, load_frozen_zscore_stats,
+    apply_frozen_zscore,
+    load_frozen_zscore_stats,
 )
 from arqueogal.xp_abundances.main.data import (  # noqa: E402
-    FeatureLayout, FeatureScaler, stratified_split_ids,
+    FeatureLayout,
+    FeatureScaler,
+    stratified_split_ids,
 )
 from arqueogal.xp_abundances.main.release import assign_release_tier  # noqa: E402
 
@@ -100,19 +104,27 @@ def _load_data() -> tuple[pd.DataFrame, np.ndarray, np.ndarray, FeatureScaler]:
     # Stream-1 features parquet stores c0_z directly (already z-scored at
     # build time), so no on-the-fly z-scoring is required for the c0 scalars.
     pred_cols = [
-        "source_id", "ood_joint_flag", "ood_mahalanobis_score",
-        "teff_sigma", "logg_sigma", "mh_sigma", "alpha_m_sigma", "mg_h_sigma",
-        "teff_pred", "logg_pred", "mh_pred", "alpha_m_pred", "mg_h_pred",
+        "source_id",
+        "ood_joint_flag",
+        "ood_mahalanobis_score",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+        "teff_pred",
+        "logg_pred",
+        "mh_pred",
+        "alpha_m_pred",
+        "mg_h_pred",
         "label_extrapolation_flag",
-        "label_mahalanobis_score",         # T2 colour scale
-        "ood_mahalanobis_percentile",      # XP percentile (informational)
-        "label_mahalanobis_percentile",    # label percentile (informational)
+        "label_mahalanobis_score",  # T2 colour scale
+        "ood_mahalanobis_percentile",  # XP percentile (informational)
+        "label_mahalanobis_percentile",  # label percentile (informational)
     ]
     df_p = pd.read_parquet(PREDICTIONS_S1, columns=pred_cols)
     feat_extra = ["fe_h_apogee", "teff_apogee", "b_deg"]
-    df_f = pd.read_parquet(
-        FEATURES_S1, columns=["source_id", *feat_cols_z, *feat_extra]
-    )
+    df_f = pd.read_parquet(FEATURES_S1, columns=["source_id", *feat_cols_z, *feat_extra])
     df_f = df_f.drop_duplicates(subset="source_id", keep="first")
     df = df_f.merge(df_p, on="source_id", how="inner")
     print(f"[H8] joined {len(df):,} stars (stream-1 features x predictions)")
@@ -141,17 +153,14 @@ def _load_data() -> tuple[pd.DataFrame, np.ndarray, np.ndarray, FeatureScaler]:
         idx = np.sort(idx)
         df = df.iloc[idx].reset_index(drop=True)
         print(
-            f"[H8] random subsample to {len(df):,} stars "
-            f"(NOT stratified — preserves true tier mix)"
+            f"[H8] random subsample to {len(df):,} stars (NOT stratified — preserves true tier mix)"
         )
 
     # Stream-1 parquet stores all 140 cols in the schema FeatureLayout expects,
     # so no on-the-fly z-scoring is required (frozen stats were applied at
     # feature-build time).
     _ = (load_frozen_zscore_stats, apply_frozen_zscore)  # kept import for B17 parity
-    X_raw = np.column_stack(
-        [df[c].to_numpy(dtype=np.float32) for c in feat_cols_z]
-    )
+    X_raw = np.column_stack([df[c].to_numpy(dtype=np.float32) for c in feat_cols_z])
     X_feat = fs.transform(X_raw)
     X_feat = np.nan_to_num(X_feat, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
@@ -183,15 +192,33 @@ def _run_umap(X: np.ndarray, *, name: str) -> np.ndarray:
 
 
 def _scatter(
-    ax: plt.Axes, x: np.ndarray, y: np.ndarray, c, *, vmin=None, vmax=None,
-    cmap=None, s: float = 1.5, alpha: float = 0.45, labels=None, edgecolor="none",
+    ax: plt.Axes,
+    x: np.ndarray,
+    y: np.ndarray,
+    c,
+    *,
+    vmin=None,
+    vmax=None,
+    cmap=None,
+    s: float = 1.5,
+    alpha: float = 0.45,
+    labels=None,
+    edgecolor="none",
 ):
     if cmap is None:
         sc = ax.scatter(x, y, c=c, s=s, alpha=alpha, edgecolors=edgecolor, linewidths=0.0)
     else:
         sc = ax.scatter(
-            x, y, c=c, cmap=cmap, vmin=vmin, vmax=vmax,
-            s=s, alpha=alpha, edgecolors=edgecolor, linewidths=0.0,
+            x,
+            y,
+            c=c,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            s=s,
+            alpha=alpha,
+            edgecolors=edgecolor,
+            linewidths=0.0,
         )
     if labels:
         ax.set_xlabel(labels[0])
@@ -208,35 +235,39 @@ def _color_arrays(df: pd.DataFrame) -> dict[str, dict]:
     """
     tier = df["release_tier"].to_numpy(dtype=np.int8)
     # Okabe-Ito tier mapping: green=T1, vermilion=T2, red-purple=T3.
-    tier_color = np.where(tier == 1, "#009E73",
-                  np.where(tier == 2, "#D55E00", "#CC79A7"))
+    tier_color = np.where(tier == 1, "#009E73", np.where(tier == 2, "#D55E00", "#CC79A7"))
     n1 = int((tier == 1).sum())
     n2 = int((tier == 2).sum())
     n3 = int((tier == 3).sum())
 
-    label_pctl = (df["label_mahalanobis_percentile"].to_numpy(dtype=np.float64)
-                  if "label_mahalanobis_percentile" in df.columns
-                  else np.full(len(df), np.nan))
-    xp_pctl = (df["ood_mahalanobis_percentile"].to_numpy(dtype=np.float64)
-               if "ood_mahalanobis_percentile" in df.columns
-               else np.full(len(df), np.nan))
+    label_pctl = (
+        df["label_mahalanobis_percentile"].to_numpy(dtype=np.float64)
+        if "label_mahalanobis_percentile" in df.columns
+        else np.full(len(df), np.nan)
+    )
+    xp_pctl = (
+        df["ood_mahalanobis_percentile"].to_numpy(dtype=np.float64)
+        if "ood_mahalanobis_percentile" in df.columns
+        else np.full(len(df), np.nan)
+    )
     return {
         "tier": {
             "kind": "categorical",
-            "c": tier_color, "mask_red": tier > 1,
-            "title": (f"composite release_tier  "
-                      f"(T1 n={n1:,}, T2 n={n2:,}, T3 n={n3:,})"),
+            "c": tier_color,
+            "mask_red": tier > 1,
+            "title": (f"composite release_tier  (T1 n={n1:,}, T2 n={n2:,}, T3 n={n3:,})"),
             "legend": [
-                ("Tier 1 (science-grade)",     "#009E73"),
-                ("Tier 2 (label-Mahal)",       "#D55E00"),
-                ("Tier 3 (XP-Mahal / NaN)",    "#CC79A7"),
+                ("Tier 1 (science-grade)", "#009E73"),
+                ("Tier 2 (label-Mahal)", "#D55E00"),
+                ("Tier 3 (XP-Mahal / NaN)", "#CC79A7"),
             ],
         },
         "label_mahal": {
             "kind": "continuous",
             "c": label_pctl,
             "cmap": "viridis",
-            "vmin": 0.0, "vmax": 1.0,
+            "vmin": 0.0,
+            "vmax": 1.0,
             "label": r"label-Mahalanobis percentile",
             "title": "T2 score: label-space Mahalanobis percentile",
         },
@@ -244,7 +275,8 @@ def _color_arrays(df: pd.DataFrame) -> dict[str, dict]:
             "kind": "continuous",
             "c": xp_pctl,
             "cmap": "viridis",
-            "vmin": 0.0, "vmax": 1.0,
+            "vmin": 0.0,
+            "vmax": 1.0,
             "label": r"XP-Mahalanobis percentile",
             "title": "T3 score: feature-space Mahalanobis percentile",
         },
@@ -252,9 +284,19 @@ def _color_arrays(df: pd.DataFrame) -> dict[str, dict]:
 
 
 def _legend_proxies(spec: list[tuple[str, str]]):
-    return [plt.Line2D([], [], marker="o", linestyle="", color=c,
-                       markeredgecolor="none", markersize=6, label=lbl)
-            for lbl, c in spec]
+    return [
+        plt.Line2D(
+            [],
+            [],
+            marker="o",
+            linestyle="",
+            color=c,
+            markeredgecolor="none",
+            markersize=6,
+            label=lbl,
+        )
+        for lbl, c in spec
+    ]
 
 
 def _plot_scatter_panel(ax, x, y, info, *, xlabel, ylabel):
@@ -263,21 +305,49 @@ def _plot_scatter_panel(ax, x, y, info, *, xlabel, ylabel):
         ok = np.isfinite(c)
         # Order high-c on top so OOD-ish points dominate the visual.
         order = np.argsort(c[ok])
-        sc = ax.scatter(x[ok][order], y[ok][order], c=c[ok][order],
-                        cmap=info["cmap"], vmin=info["vmin"], vmax=info["vmax"],
-                        s=1.6, alpha=0.55, edgecolors="none", rasterized=True)
+        sc = ax.scatter(
+            x[ok][order],
+            y[ok][order],
+            c=c[ok][order],
+            cmap=info["cmap"],
+            vmin=info["vmin"],
+            vmax=info["vmax"],
+            s=1.6,
+            alpha=0.55,
+            edgecolors="none",
+            rasterized=True,
+        )
         cb = plt.colorbar(sc, ax=ax, fraction=0.046, pad=0.02)
         cb.set_label(info["label"], fontsize=8)
     else:
         mask_red = info["mask_red"]
         grey_idx = np.where(~mask_red)[0]
         red_idx = np.where(mask_red)[0]
-        ax.scatter(x[grey_idx], y[grey_idx], c=info["c"][grey_idx],
-                   s=1.2, alpha=0.30, edgecolors="none", linewidths=0.0)
-        ax.scatter(x[red_idx], y[red_idx], c=info["c"][red_idx],
-                   s=2.0, alpha=0.65, edgecolors="none", linewidths=0.0)
-        ax.legend(handles=_legend_proxies(info["legend"]),
-                  loc="upper right", fontsize=7, frameon=False, markerscale=0.9)
+        ax.scatter(
+            x[grey_idx],
+            y[grey_idx],
+            c=info["c"][grey_idx],
+            s=1.2,
+            alpha=0.30,
+            edgecolors="none",
+            linewidths=0.0,
+        )
+        ax.scatter(
+            x[red_idx],
+            y[red_idx],
+            c=info["c"][red_idx],
+            s=2.0,
+            alpha=0.65,
+            edgecolors="none",
+            linewidths=0.0,
+        )
+        ax.legend(
+            handles=_legend_proxies(info["legend"]),
+            loc="upper right",
+            fontsize=7,
+            frameon=False,
+            markerscale=0.9,
+        )
     ax.set_title(info["title"], fontsize=9)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -302,21 +372,28 @@ def main() -> int:
     for j, key in enumerate(col_keys):
         info = colors[key]
         ax = fig.add_subplot(gs[0, j])
-        _plot_scatter_panel(ax, Z_feat[:, 0], Z_feat[:, 1], info,
-                            xlabel="UMAP-1 (features)", ylabel="UMAP-2 (features)")
+        _plot_scatter_panel(
+            ax,
+            Z_feat[:, 0],
+            Z_feat[:, 1],
+            info,
+            xlabel="UMAP-1 (features)",
+            ylabel="UMAP-2 (features)",
+        )
         if j == 0:
             ax.set_ylabel("UMAP-2 (features)\n[140-D post-scaling]")
 
         ax = fig.add_subplot(gs[1, j])
-        _plot_scatter_panel(ax, Z_lab[:, 0], Z_lab[:, 1], info,
-                            xlabel="UMAP-1 (labels)", ylabel="UMAP-2 (labels)")
+        _plot_scatter_panel(
+            ax, Z_lab[:, 0], Z_lab[:, 1], info, xlabel="UMAP-1 (labels)", ylabel="UMAP-2 (labels)"
+        )
         if j == 0:
             ax.set_ylabel("UMAP-2 (labels)\n[5-D z-scored predictions]")
 
         ax = fig.add_subplot(gs[2, j])
-        _plot_scatter_panel(ax, mh, am, info,
-                            xlabel="[M/H]_pred  (dex)",
-                            ylabel=r"$[\alpha/M]_{\rm pred}$  (dex)")
+        _plot_scatter_panel(
+            ax, mh, am, info, xlabel="[M/H]_pred  (dex)", ylabel=r"$[\alpha/M]_{\rm pred}$  (dex)"
+        )
         if j == 0:
             ax.set_ylabel(r"$[\alpha/M]_{\rm pred}$  (dex)" + "\n[chemistry plane]")
         ax.set_xlim(-2.0, 0.6)

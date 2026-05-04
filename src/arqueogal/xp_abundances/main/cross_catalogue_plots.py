@@ -80,7 +80,8 @@ def _residual_arrays_from_release(
     catalogues: dict[str, pd.DataFrame],
     label: str,
     catalogue_name: str,
-    column_for: dict[str, str]) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    column_for: dict[str, str],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Pull aligned (pred, ref, sigma_pipeline, g_mag) arrays.
 
     Used by plot families that need raw arrays (Bland-Altman scatter,
@@ -107,7 +108,8 @@ def plot_bland_altman_per_label(  # noqa: PLR0913, orthogonal scientific knobs
     out_dir: Path,
     *,
     max_points: int = 50_000,
-    rng_seed: int = 0) -> list[Path]:
+    rng_seed: int = 0,
+) -> list[Path]:
     """Per-(label, catalogue) Bland-Altman scatter with mag-bin facets.
 
     Produces ``out_dir/bland_altman/<label>_<catalogue>.pdf``. Each figure
@@ -147,24 +149,14 @@ def plot_bland_altman_per_label(  # noqa: PLR0913, orthogonal scientific knobs
                 mask = (g_mag >= lo) & (g_mag < hi)
                 if mask.sum() == 0:
                     ax.text(
-                        0.5,
-                        0.5,
-                        "(no overlap)",
-                        ha="center",
-                        va="center",
-                        transform=ax.transAxes)
+                        0.5, 0.5, "(no overlap)", ha="center", va="center", transform=ax.transAxes
+                    )
                     ax.set_title(f"{row['mag_bin']} (G ∈ [{lo}, {hi}))")
                     continue
                 idx = np.flatnonzero(mask)
                 if idx.size > max_points:
                     idx = rng.choice(idx, size=max_points, replace=False)
-                ax.scatter(
-                    ref[idx],
-                    residual[idx],
-                    s=2,
-                    alpha=0.25,
-                    rasterized=True,
-                    color="0.3")
+                ax.scatter(ref[idx], residual[idx], s=2, alpha=0.25, rasterized=True, color="0.3")
                 ax.axhline(0.0, color="0.5", lw=0.8, linestyle=":")
                 ax.axhline(row["bias"], color="C3", lw=1.0, label=f"bias = {row['bias']:.3f}")
                 # ±σ_pipeline band: median σ in this bin.
@@ -180,7 +172,8 @@ def plot_bland_altman_per_label(  # noqa: PLR0913, orthogonal scientific knobs
                 axes[0].legend(handles, labels, fontsize=7, loc="upper right")
             fig.suptitle(
                 f"Bland–Altman: {_label_pretty(label)} vs {binding.citation or catalogue_name}",
-                fontsize=10)
+                fontsize=10,
+            )
             written.append(_safe_savefig(fig, out_dir / f"{label}_{catalogue_name}.pdf"))
             plt.close(fig)
     return written
@@ -194,7 +187,8 @@ def plot_residual_histograms(
     release: pd.DataFrame,
     catalogues: dict[str, pd.DataFrame],
     bindings: dict[str, Any],
-    out_dir: Path) -> list[Path]:
+    out_dir: Path,
+) -> list[Path]:
     """One figure per label: histogram of standardised residual
     ``(arqueogal − reference) / σ_pipeline``, every catalogue overlaid,
     with the Standard Normal as reference.
@@ -224,7 +218,8 @@ def plot_residual_histograms(
                 histtype="step",
                 density=True,
                 lw=1.2,
-                label=binding.citation or catalogue_name)
+                label=binding.citation or catalogue_name,
+            )
             any_data = True
         # Overlay N(0, 1).
         x = np.linspace(-5.0, 5.0, 401)
@@ -244,7 +239,8 @@ def plot_residual_histograms(
                 loc="upper left",
                 bbox_to_anchor=(1.02, 1.0),
                 borderaxespad=0.0,
-                frameon=False)
+                frameon=False,
+            )
             fig.tight_layout()
             written.append(_safe_savefig(fig, out_dir / f"{label}.pdf"))
         plt.close(fig)
@@ -254,9 +250,7 @@ def plot_residual_histograms(
 # --- Plot family 3: metallicity-dependent bias trend --------------------------
 
 
-def plot_bias_vs_mh(
-    report: CrossCatalogueReport,
-    out_dir: Path) -> list[Path]:
+def plot_bias_vs_mh(report: CrossCatalogueReport, out_dir: Path) -> list[Path]:
     """Per-element panel of median residual vs ArqueoGal [M/H], all
     catalogues overlaid. 16-84 percentile band per catalogue.
     """
@@ -275,7 +269,7 @@ def plot_bias_vs_mh(
             bias = curves["bias"]
             p16 = curves["p16"]
             p84 = curves["p84"]
-            (line) = ax.plot(x, bias, lw=1.2, label=catalogue)
+            (line,) = ax.plot(x, bias, lw=1.2, label=catalogue)
             ax.fill_between(x, p16, p84, alpha=0.15, color=line.get_color())
         ax.axhline(0.0, color="0.5", lw=0.8, linestyle=":")
         ax.set_xlabel(r"ArqueoGal [M/H] (dex)")
@@ -290,9 +284,7 @@ def plot_bias_vs_mh(
 # --- Plot family 4: Teff-dependent bias trend --------------------------------
 
 
-def plot_bias_vs_teff(
-    report: CrossCatalogueReport,
-    out_dir: Path) -> list[Path]:
+def plot_bias_vs_teff(report: CrossCatalogueReport, out_dir: Path) -> list[Path]:
     """Like :func:`plot_bias_vs_mh` but vs ArqueoGal Teff."""
     out_dir = Path(out_dir) / "bias_vs_teff"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -309,7 +301,7 @@ def plot_bias_vs_teff(
             bias = curves["bias"]
             p16 = curves["p16"]
             p84 = curves["p84"]
-            (line) = ax.plot(x, bias, lw=1.2, label=catalogue)
+            (line,) = ax.plot(x, bias, lw=1.2, label=catalogue)
             ax.fill_between(x, p16, p84, alpha=0.15, color=line.get_color())
         ax.axhline(0.0, color="0.5", lw=0.8, linestyle=":")
         ax.set_xlabel(r"ArqueoGal $T_\mathrm{eff}$ (K)")
@@ -344,13 +336,8 @@ def plot_cell_heatmaps(report: CrossCatalogueReport, out_dir: Path) -> list[Path
         bias_lim = float(LABEL_SCHEMA[label]["bias_limit"])
         vmax_b = max(np.nanmax(np.abs(bias)) if np.isfinite(bias).any() else bias_lim, bias_lim)
         im_b = ax_b.pcolormesh(
-            teff_edges,
-            logg_edges,
-            bias.T,
-            cmap="RdBu_r",
-            shading="auto",
-            vmin=-vmax_b,
-            vmax=vmax_b)
+            teff_edges, logg_edges, bias.T, cmap="RdBu_r", shading="auto", vmin=-vmax_b, vmax=vmax_b
+        )
         ax_b.invert_xaxis()
         ax_b.invert_yaxis()
         ax_b.set_xlabel(r"$T_\mathrm{eff}$ (K)")
@@ -364,13 +351,8 @@ def plot_cell_heatmaps(report: CrossCatalogueReport, out_dir: Path) -> list[Path
         else:
             vmax_s = float(LABEL_SCHEMA[label]["apogee_sigma"])
         im_s = ax_s.pcolormesh(
-            teff_edges,
-            logg_edges,
-            scatter.T,
-            cmap="viridis",
-            shading="auto",
-            vmin=0.0,
-            vmax=vmax_s)
+            teff_edges, logg_edges, scatter.T, cmap="viridis", shading="auto", vmin=0.0, vmax=vmax_s
+        )
         ax_s.invert_xaxis()
         ax_s.invert_yaxis()
         ax_s.set_xlabel(r"$T_\mathrm{eff}$ (K)")
@@ -456,10 +438,8 @@ def plot_rank_summary(report: CrossCatalogueReport, out_dir: Path) -> list[Path]
         ("scatter_rank", "rank_summary_scatter.pdf"),
     ]:
         pivot = long.pivot_table(
-            index="catalogue",
-            columns=["label", "mag_bin"],
-            values=metric,
-            aggfunc="first")
+            index="catalogue", columns=["label", "mag_bin"], values=metric, aggfunc="first"
+        )
         if pivot.empty:
             continue
         fig, ax = plt.subplots(figsize=(8.0, 3.0 + 0.3 * pivot.shape[0]))
@@ -495,7 +475,8 @@ def render_all(  # noqa: PLR0913, orthogonal scientific knobs
     bindings: dict[str, Any],
     out_dir: Path,
     *,
-    apply_aa_style: bool = True) -> dict[str, list[Path]]:
+    apply_aa_style: bool = True,
+) -> dict[str, list[Path]]:
     """Run every plot family. Returns a mapping family→list of output paths."""
     if apply_aa_style:
         set_aa_style()

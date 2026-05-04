@@ -43,12 +43,24 @@ def main(n_stars: int | None = None) -> None:
 
     # Top left: Kiel truth with quality-cut box
     ax = axes[0, 0]
-    hb = ax.hexbin(data["teff_apogee"], data["logg_apogee"],
-                   gridsize=70, mincnt=1, cmap="viridis",
-                   extent=[3900, 5600, 0.8, 3.7], bins="log")
+    hb = ax.hexbin(
+        data["teff_apogee"],
+        data["logg_apogee"],
+        gridsize=70,
+        mincnt=1,
+        cmap="viridis",
+        extent=[3900, 5600, 0.8, 3.7],
+        bins="log",
+    )
     rect = mpatches.Rectangle(
-        (4000, 1.0), 1500, 2.5, linewidth=1.2, edgecolor="red",
-        facecolor="none", linestyle="--", alpha=0.85
+        (4000, 1.0),
+        1500,
+        2.5,
+        linewidth=1.2,
+        edgecolor="red",
+        facecolor="none",
+        linestyle="--",
+        alpha=0.85,
     )
     ax.add_patch(rect)
     ax.set_xlim(5600, 3900)
@@ -60,12 +72,24 @@ def main(n_stars: int | None = None) -> None:
 
     # Top right: Kiel pred
     ax = axes[0, 1]
-    hb = ax.hexbin(data["teff_pred"], data["logg_pred"],
-                   gridsize=70, mincnt=1, cmap="viridis",
-                   extent=[3900, 5600, 0.8, 3.7], bins="log")
+    hb = ax.hexbin(
+        data["teff_pred"],
+        data["logg_pred"],
+        gridsize=70,
+        mincnt=1,
+        cmap="viridis",
+        extent=[3900, 5600, 0.8, 3.7],
+        bins="log",
+    )
     rect = mpatches.Rectangle(
-        (4000, 1.0), 1500, 2.5, linewidth=1.2, edgecolor="red",
-        facecolor="none", linestyle="--", alpha=0.85
+        (4000, 1.0),
+        1500,
+        2.5,
+        linewidth=1.2,
+        edgecolor="red",
+        facecolor="none",
+        linestyle="--",
+        alpha=0.85,
     )
     ax.add_patch(rect)
     ax.set_xlim(5600, 3900)
@@ -81,9 +105,15 @@ def main(n_stars: int | None = None) -> None:
 
     # Bottom left: Chemistry truth (counts)
     ax = axes[1, 0]
-    hb = ax.hexbin(data["mh_apogee"], data["alpha_m_apogee"],
-                   gridsize=70, mincnt=1, cmap="viridis",
-                   extent=[*chem_xlim, *chem_ylim], bins="log")
+    hb = ax.hexbin(
+        data["mh_apogee"],
+        data["alpha_m_apogee"],
+        gridsize=70,
+        mincnt=1,
+        cmap="viridis",
+        extent=[*chem_xlim, *chem_ylim],
+        bins="log",
+    )
     ax.set_xlim(*chem_xlim)
     ax.set_ylim(*chem_ylim)
     ax.set_xlabel("[M/H] [dex]", fontsize=9)
@@ -93,9 +123,15 @@ def main(n_stars: int | None = None) -> None:
 
     # Bottom right: Chemistry pred (counts)
     ax = axes[1, 1]
-    hb = ax.hexbin(data["mh_pred"], data["alpha_m_pred"],
-                   gridsize=70, mincnt=1, cmap="viridis",
-                   extent=[*chem_xlim, *chem_ylim], bins="log")
+    hb = ax.hexbin(
+        data["mh_pred"],
+        data["alpha_m_pred"],
+        gridsize=70,
+        mincnt=1,
+        cmap="viridis",
+        extent=[*chem_xlim, *chem_ylim],
+        bins="log",
+    )
     ax.set_xlim(*chem_xlim)
     ax.set_ylim(*chem_ylim)
     ax.set_xlabel("[M/H] [dex]", fontsize=9)

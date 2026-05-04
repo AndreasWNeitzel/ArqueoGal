@@ -31,6 +31,7 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import apply_style, save_fig
+
 from arqueogal.xp_abundances.main.data import stratified_split_ids
 
 OUT = REPO / "reports/gallery/H_hybrid_release"
@@ -52,12 +53,20 @@ def main() -> int:
         return 1
 
     import pyarrow.parquet as _pq
+
     avail = {f.name for f in _pq.ParquetFile(pred_path).schema_arrow}
     needed = [
         "source_id",
-        "teff_pred", "logg_pred", "mh_pred", "alpha_m_pred", "mg_h_pred",
-        "teff_sigma", "logg_sigma", "mh_sigma",
-        "alpha_m_sigma", "mg_h_sigma",
+        "teff_pred",
+        "logg_pred",
+        "mh_pred",
+        "alpha_m_pred",
+        "mg_h_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
     ]
     if "release_tier" in avail:
         needed.append("release_tier")
@@ -81,8 +90,14 @@ def main() -> int:
     truth = pd.read_parquet(
         truth_path,
         columns=[
-            "source_id", "fe_h_apogee", "teff_apogee", "logg_apogee", "b_deg",
-            "mh_apogee", "alpha_m_apogee", "mg_h_apogee",
+            "source_id",
+            "fe_h_apogee",
+            "teff_apogee",
+            "logg_apogee",
+            "b_deg",
+            "mh_apogee",
+            "alpha_m_apogee",
+            "mg_h_apogee",
         ],
     )
     truth = truth.drop_duplicates("source_id", keep="first")
@@ -94,8 +109,10 @@ def main() -> int:
     splits = stratified_split_ids(df, fracs=FRACS, seed=SPLIT_SEED)
     train_ids = set(splits["train"].tolist())
     df = df[~df["source_id"].isin(train_ids)].reset_index(drop=True)
-    print(f"[H6] held-out (val+test) cohort n={len(df):,}; "
-          f"tier counts {df['tier'].value_counts().to_dict()}")
+    print(
+        f"[H6] held-out (val+test) cohort n={len(df):,}; "
+        f"tier counts {df['tier'].value_counts().to_dict()}"
+    )
 
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -106,23 +123,23 @@ def main() -> int:
     TIERS = [(1, "T1 (science)"), (2, "T2 (caveat)"), (3, "T3 (do-not-trust)")]
 
     fig = plt.figure(figsize=(20, 19))
-    gs = fig.add_gridspec(4, 3, height_ratios=[1.0, 1.0, 1.0, 1.0],
-                          hspace=0.45, wspace=0.30)
+    gs = fig.add_gridspec(4, 3, height_ratios=[1.0, 1.0, 1.0, 1.0], hspace=0.45, wspace=0.30)
 
     # Row 0: TRUTH Kiel hex per tier.
     for col, (tier_val, tier_label) in enumerate(TIERS):
         ax = fig.add_subplot(gs[0, col])
         subset = df[df["tier"] == tier_val]
         n_in = int(len(subset))
-        m = (
-            np.isfinite(subset["teff_apogee"].values)
-            & np.isfinite(subset["logg_apogee"].values)
-        )
+        m = np.isfinite(subset["teff_apogee"].values) & np.isfinite(subset["logg_apogee"].values)
         if int(m.sum()) > 0:
             sub = subset.loc[m]
             hb = ax.hexbin(
-                sub["teff_apogee"], sub["logg_apogee"],
-                gridsize=KIEL_GRID, cmap="viridis", mincnt=1, bins="log",
+                sub["teff_apogee"],
+                sub["logg_apogee"],
+                gridsize=KIEL_GRID,
+                cmap="viridis",
+                mincnt=1,
+                bins="log",
                 extent=KIEL_EXTENT,
             )
             plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N")
@@ -140,8 +157,12 @@ def main() -> int:
         n_in = int(len(subset))
         if n_in > 0:
             hb = ax.hexbin(
-                subset["teff_pred"], subset["logg_pred"],
-                gridsize=KIEL_GRID, cmap="viridis", mincnt=1, bins="log",
+                subset["teff_pred"],
+                subset["logg_pred"],
+                gridsize=KIEL_GRID,
+                cmap="viridis",
+                mincnt=1,
+                bins="log",
                 extent=KIEL_EXTENT,
             )
             plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N")
@@ -157,15 +178,16 @@ def main() -> int:
         ax = fig.add_subplot(gs[2, col])
         subset = df[df["tier"] == tier_val]
         n_in = int(len(subset))
-        m = (
-            np.isfinite(subset["mh_apogee"].values)
-            & np.isfinite(subset["alpha_m_apogee"].values)
-        )
+        m = np.isfinite(subset["mh_apogee"].values) & np.isfinite(subset["alpha_m_apogee"].values)
         if int(m.sum()) > 0:
             sub = subset.loc[m]
             hb = ax.hexbin(
-                sub["mh_apogee"], sub["alpha_m_apogee"],
-                gridsize=CHEM_GRID, cmap="viridis", mincnt=1, bins="log",
+                sub["mh_apogee"],
+                sub["alpha_m_apogee"],
+                gridsize=CHEM_GRID,
+                cmap="viridis",
+                mincnt=1,
+                bins="log",
                 extent=CHEM_EXTENT,
             )
             plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N")
@@ -182,8 +204,12 @@ def main() -> int:
         n_in = int(len(subset))
         if n_in > 0:
             hb = ax.hexbin(
-                subset["mh_pred"], subset["alpha_m_pred"],
-                gridsize=CHEM_GRID, cmap="viridis", mincnt=1, bins="log",
+                subset["mh_pred"],
+                subset["alpha_m_pred"],
+                gridsize=CHEM_GRID,
+                cmap="viridis",
+                mincnt=1,
+                bins="log",
                 extent=CHEM_EXTENT,
             )
             plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N")

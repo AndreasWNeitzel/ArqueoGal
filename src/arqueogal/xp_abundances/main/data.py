@@ -606,8 +606,11 @@ class FeatureScaler:
             scale[j] = np.float32(max(s, eps))
             apply_mask[j] = True
         return cls(
-            mean=mean, scale=scale, feature_names=names,
-            log10_mask=log10_mask, apply_mask=apply_mask,
+            mean=mean,
+            scale=scale,
+            feature_names=names,
+            log10_mask=log10_mask,
+            apply_mask=apply_mask,
         )
 
     def transform(self, x: np.ndarray) -> np.ndarray:
@@ -625,9 +628,11 @@ class FeatureScaler:
             if self.log10_mask[j]:
                 # Replace non-positive / NaN with NaN before log10 so the
                 # downstream nan_to_num path handles them consistently.
-                col = np.where(np.isfinite(col) & (col > 0),
-                               np.log10(col).astype(np.float32),
-                               np.float32(np.nan))
+                col = np.where(
+                    np.isfinite(col) & (col > 0),
+                    np.log10(col).astype(np.float32),
+                    np.float32(np.nan),
+                )
             col = (col - self.mean[j]) / self.scale[j]
             out[:, j] = col
         return out

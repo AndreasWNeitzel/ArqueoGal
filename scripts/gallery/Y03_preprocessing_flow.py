@@ -31,36 +31,62 @@ from _presentation import PALETTE, apply_style, headline, save  # noqa: E402
 
 def _stage(ax, x, y, w, h, idx, title, body, color):
     rect = mpatches.FancyBboxPatch(
-        (x, y), w, h,
+        (x, y),
+        w,
+        h,
         boxstyle="round,pad=0.02,rounding_size=0.04",
-        linewidth=1.6, facecolor="white", edgecolor=color,
+        linewidth=1.6,
+        facecolor="white",
+        edgecolor=color,
     )
     ax.add_patch(rect)
     # Numbered chip top-left.
     chip = mpatches.Circle(
-        (x + 0.18, y + h - 0.18), 0.14,
-        facecolor=color, edgecolor="none",
+        (x + 0.18, y + h - 0.18),
+        0.14,
+        facecolor=color,
+        edgecolor="none",
     )
     ax.add_patch(chip)
-    ax.text(x + 0.18, y + h - 0.18, str(idx),
-            ha="center", va="center", fontsize=12, fontweight="bold",
-            color="white")
     ax.text(
-        x + w / 2, y + h - 0.45, title,
-        ha="center", va="center", fontsize=14, fontweight="bold",
+        x + 0.18,
+        y + h - 0.18,
+        str(idx),
+        ha="center",
+        va="center",
+        fontsize=12,
+        fontweight="bold",
+        color="white",
+    )
+    ax.text(
+        x + w / 2,
+        y + h - 0.45,
+        title,
+        ha="center",
+        va="center",
+        fontsize=14,
+        fontweight="bold",
         color=PALETTE["ink"],
     )
     ax.text(
-        x + w / 2, y + h * 0.30, body,
-        ha="center", va="center", fontsize=10.5, color=PALETTE["ash"],
+        x + w / 2,
+        y + h * 0.30,
+        body,
+        ha="center",
+        va="center",
+        fontsize=10.5,
+        color=PALETTE["ash"],
     )
 
 
 def _arrow(ax, x0, y0, x1, y1, color):
     ax.annotate(
-        "", xy=(x1, y1), xytext=(x0, y0),
-        arrowprops=dict(arrowstyle="-|>", color=color, lw=2.2,
-                        shrinkA=4, shrinkB=4, mutation_scale=18),
+        "",
+        xy=(x1, y1),
+        xytext=(x0, y0),
+        arrowprops=dict(
+            arrowstyle="-|>", color=color, lw=2.2, shrinkA=4, shrinkB=4, mutation_scale=18
+        ),
     )
 
 
@@ -100,18 +126,20 @@ def main() -> int:
         _stage(ax, x, by, bw, bh, i + 1, t, b, c)
 
     for i in range(4):
-        _arrow(ax, xs[i] + bw, by + bh / 2, xs[i + 1], by + bh / 2,
-               color=PALETTE["ash"])
+        _arrow(ax, xs[i] + bw, by + bh / 2, xs[i + 1], by + bh / 2, color=PALETTE["ash"])
 
     # Annotation block under the chain.
     ax.text(
-        7.0, 0.35,
+        7.0,
+        0.35,
         "Frozen contract: Stages 3 + 4 commit to a single bit-exact transform across all streams. "
         "Streams 2 and 3 inherit the Stream 1 fit; nothing is re-estimated at inference time.",
-        ha="center", va="center", fontsize=11, fontstyle="italic",
+        ha="center",
+        va="center",
+        fontsize=11,
+        fontstyle="italic",
         color=PALETTE["navy"],
-        bbox=dict(boxstyle="round,pad=0.4", facecolor=PALETTE["paper"],
-                  edgecolor=PALETTE["mist"]),
+        bbox=dict(boxstyle="round,pad=0.4", facecolor=PALETTE["paper"], edgecolor=PALETTE["mist"]),
     )
 
     headline(

@@ -34,6 +34,7 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import apply_style, save_fig
+
 from arqueogal.xp_abundances.main.data import FeatureLayout
 
 OUT = REPO / "reports/gallery/B_preprocessing"
@@ -68,7 +69,10 @@ def per_feature_mi(
         y = target[idx]
         # mutual_info_regression returns bits; convert to nats by /log2(e)
         mi_bits = mutual_info_regression(
-            x, y, n_neighbors=N_NEIGHBORS, random_state=rng_seed,
+            x,
+            y,
+            n_neighbors=N_NEIGHBORS,
+            random_state=rng_seed,
         )[0]
         out[i] = float(mi_bits) * np.log(2)  # nats
     return out
@@ -106,8 +110,11 @@ def main() -> int:
             family.append("aux")
     family = np.array(family)
     family_color = {
-        "BP": "#1f77b4", "RP": "#d62728", "c0": "#2ca02c",
-        "residual": "#7f7f7f", "aux": "#9467bd",
+        "BP": "#1f77b4",
+        "RP": "#d62728",
+        "c0": "#2ca02c",
+        "residual": "#7f7f7f",
+        "aux": "#9467bd",
     }
 
     print("[B16] computing MI on full Kiel cohort ...")
@@ -132,16 +139,14 @@ def main() -> int:
         f"Full Kiel cohort - MI per encoder feature against truth [alpha/M]\n"
         f"(n={len(df):,}, kNN k={N_NEIGHBORS}, subsample cap {SUBSAMPLE_N:,})"
     )
-    handles = [plt.Rectangle((0, 0), 1, 1, color=c, alpha=0.85)
-               for c in family_color.values()]
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, alpha=0.85) for c in family_color.values()]
     ax.legend(handles, list(family_color.keys()), fontsize=9, loc="upper right")
     ax.grid(axis="y", alpha=0.25)
 
     # Panel 1: top-15 named on full cohort.
     ax = fig.add_subplot(gs[1, 0])
     order = np.argsort(np.where(np.isnan(mi_full), -1, mi_full))[::-1][:15]
-    ax.barh(np.arange(15)[::-1], mi_full[order],
-            color=[family_color[family[i]] for i in order])
+    ax.barh(np.arange(15)[::-1], mi_full[order], color=[family_color[family[i]] for i in order])
     ax.set_yticks(np.arange(15)[::-1])
     ax.set_yticklabels([feature_names[i] for i in order], fontsize=9)
     ax.set_xlabel("MI [nats]")
@@ -164,8 +169,7 @@ def main() -> int:
     # Panel 3: top-15 named on metal-poor subset.
     ax = fig.add_subplot(gs[3, 0])
     order_mp = np.argsort(np.where(np.isnan(mi_mp), -1, mi_mp))[::-1][:15]
-    ax.barh(np.arange(15)[::-1], mi_mp[order_mp],
-            color=[family_color[family[i]] for i in order_mp])
+    ax.barh(np.arange(15)[::-1], mi_mp[order_mp], color=[family_color[family[i]] for i in order_mp])
     ax.set_yticks(np.arange(15)[::-1])
     ax.set_yticklabels([feature_names[i] for i in order_mp], fontsize=9)
     ax.set_xlabel("MI [nats]")
@@ -175,7 +179,9 @@ def main() -> int:
     fig.suptitle(
         "B16 - Per-feature mutual information vs truth [alpha/M]\n"
         "(Kraskov k-NN MI estimator, sklearn.feature_selection.mutual_info_regression)",
-        fontsize=12, fontweight="semibold", y=0.995,
+        fontsize=12,
+        fontweight="semibold",
+        y=0.995,
     )
 
     OUT.mkdir(parents=True, exist_ok=True)

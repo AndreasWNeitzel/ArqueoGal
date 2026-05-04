@@ -43,20 +43,26 @@ def main() -> int:
         delta = df[f"{k}_pred"].to_numpy() - df[f"{k}_apogee"].to_numpy()
         sig = df[f"{k}_sigma"].to_numpy()
         ok = np.isfinite(delta) & np.isfinite(sig) & (sig > 0)
-        z = (delta[ok] / sig[ok])
+        z = delta[ok] / sig[ok]
         # Clip outliers for the plot only (keep stats on the full set).
         z_plot = np.clip(z, -5.0, 5.0)
         mu = float(np.mean(z))
         std = float(np.std(z))
         rsig = float(1.4826 * np.median(np.abs(z - np.median(z))))
 
-        ax.hist(z_plot, bins=80, range=(-5, 5),
-                color=PALETTE["navy_light"], edgecolor="white", linewidth=0.4,
-                density=True, label="pulls")
+        ax.hist(
+            z_plot,
+            bins=80,
+            range=(-5, 5),
+            color=PALETTE["navy_light"],
+            edgecolor="white",
+            linewidth=0.4,
+            density=True,
+            label="pulls",
+        )
         xs = np.linspace(-5, 5, 400)
-        n01 = (1.0 / np.sqrt(2 * np.pi)) * np.exp(-0.5 * xs ** 2)
-        ax.plot(xs, n01, color=PALETTE["accent"], lw=2.4,
-                label=r"$N(0, 1)$ ideal")
+        n01 = (1.0 / np.sqrt(2 * np.pi)) * np.exp(-0.5 * xs**2)
+        ax.plot(xs, n01, color=PALETTE["accent"], lw=2.4, label=r"$N(0, 1)$ ideal")
         ax.axvline(0.0, color=PALETTE["ink"], lw=1.0, ls="-", alpha=0.5)
         ax.axvline(mu, color=PALETTE["accent"], lw=1.4, ls="--")
         ax.set_xlim(-5, 5)
@@ -65,16 +71,19 @@ def main() -> int:
         ax.set_title(spec["name"], color=PALETTE["navy"])
 
         # Verdict colour: green if width within 20% of 1, orange otherwise.
-        width_color = (PALETTE["tier1"] if 0.8 <= rsig <= 1.2
-                       else PALETTE["tier2"])
+        width_color = PALETTE["tier1"] if 0.8 <= rsig <= 1.2 else PALETTE["tier2"]
         ax.text(
-            0.02, 0.97,
+            0.02,
+            0.97,
             f"mean = {mu:+.2f}\nstd = {std:.2f}\n"
             rf"$\sigma_{{\rm MAD}}$ = {rsig:.2f}",
-            transform=ax.transAxes, ha="left", va="top",
-            fontsize=10.5, fontweight="bold", color="white",
-            bbox=dict(boxstyle="round,pad=0.35", facecolor=width_color,
-                      edgecolor="none"),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=10.5,
+            fontweight="bold",
+            color="white",
+            bbox=dict(boxstyle="round,pad=0.35", facecolor=width_color, edgecolor="none"),
         )
         ax.legend(loc="upper right", fontsize=9.5)
 

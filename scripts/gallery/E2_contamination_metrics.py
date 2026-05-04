@@ -38,7 +38,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 from matplotlib.patches import Ellipse
 from sklearn.metrics import (
     adjusted_rand_score,
@@ -57,18 +56,20 @@ from _common import load_stream1_holdout
 
 from arqueogal.utils.plotting import save_figure, set_aa_style
 
-
 N_COMPONENTS = 3
 
 # Physical-prior initial means in ([M/H], [alpha/M]) dex.
 # Order: 0 = low-alpha thin, 1 = high-alpha thick, 2 = metal-poor halo-like.
 # These seed sklearn's GMM via ``means_init`` (in z-standardised space at
 # fit time); the GMM still moves them, but the seeded basin is preserved.
-INIT_MEANS_PHYS = np.array([
-    [+0.25, 0.00],   # low-alpha thin disc
-    [-0.50, 0.20],   # high-alpha thick disc
-    [-1.25, 0.20],   # metal-poor halo / accreted
-], dtype=np.float64)
+INIT_MEANS_PHYS = np.array(
+    [
+        [+0.25, 0.00],  # low-alpha thin disc
+        [-0.50, 0.20],  # high-alpha thick disc
+        [-1.25, 0.20],  # metal-poor halo / accreted
+    ],
+    dtype=np.float64,
+)
 COMPONENT_LABELS = (
     r"low-$\alpha$ (thin)",
     r"high-$\alpha$ (thick)",
@@ -94,8 +95,12 @@ def fit_gmm(data: np.ndarray, n_components: int, seed: int = 42) -> dict:
     seed_means_z = (INIT_MEANS_PHYS - mu_data) / sd_data
 
     gm = GaussianMixture(
-        n_components=n_components, covariance_type="full",
-        random_state=seed, n_init=1, max_iter=400, init_params="k-means++",
+        n_components=n_components,
+        covariance_type="full",
+        random_state=seed,
+        n_init=1,
+        max_iter=400,
+        init_params="k-means++",
         means_init=seed_means_z,
     )
     gm.fit(z)
@@ -129,9 +134,7 @@ def fit_gmm(data: np.ndarray, n_components: int, seed: int = 42) -> dict:
     return {"means": means_data, "labels": labels, "covs": covs_data, "model": gm}
 
 
-def assign_to_components(
-    data: np.ndarray, means: np.ndarray, covs: list[np.ndarray]
-) -> np.ndarray:
+def assign_to_components(data: np.ndarray, means: np.ndarray, covs: list[np.ndarray]) -> np.ndarray:
     """Argmax-posterior assignment under per-component Gaussian likelihoods."""
     K = len(means)
     n = len(data)
@@ -178,18 +181,17 @@ def main(n_stars: int | None = None) -> None:
 
     ari = float(adjusted_rand_score(truth_label, pred_label))
     mcc = float(matthews_corrcoef(truth_label, pred_label))
-    f1_macro = float(f1_score(truth_label, pred_label, average="macro",
-                              labels=list(range(K)), zero_division=0))
+    f1_macro = float(
+        f1_score(truth_label, pred_label, average="macro", labels=list(range(K)), zero_division=0)
+    )
 
-    per_recall = recall_score(truth_label, pred_label,
-                               average=None, labels=list(range(K)),
-                               zero_division=0)
-    per_precision = precision_score(truth_label, pred_label,
-                                     average=None, labels=list(range(K)),
-                                     zero_division=0)
-    per_f1 = f1_score(truth_label, pred_label,
-                      average=None, labels=list(range(K)),
-                      zero_division=0)
+    per_recall = recall_score(
+        truth_label, pred_label, average=None, labels=list(range(K)), zero_division=0
+    )
+    per_precision = precision_score(
+        truth_label, pred_label, average=None, labels=list(range(K)), zero_division=0
+    )
+    per_f1 = f1_score(truth_label, pred_label, average=None, labels=list(range(K)), zero_division=0)
     # Per-component migration rate = 1 - recall_k.
     per_migration = 1.0 - np.asarray(per_recall)
 
@@ -207,19 +209,34 @@ def main(n_stars: int | None = None) -> None:
             angle = float(np.degrees(np.arctan2(major[1], major[0])))
             w = 2.0 * n_sigma * np.sqrt(ev[1])
             h = 2.0 * n_sigma * np.sqrt(ev[0])
-            ax.add_patch(Ellipse(xy=(float(mu[0]), float(mu[1])),
-                                 width=w, height=h, angle=angle,
-                                 facecolor="none", edgecolor=comp_color[k],
-                                 linestyle="--", linewidth=1.4))
-            ax.plot(mu[0], mu[1], marker="*", color=comp_color[k],
-                    markeredgecolor="black", markersize=14, zorder=10)
+            ax.add_patch(
+                Ellipse(
+                    xy=(float(mu[0]), float(mu[1])),
+                    width=w,
+                    height=h,
+                    angle=angle,
+                    facecolor="none",
+                    edgecolor=comp_color[k],
+                    linestyle="--",
+                    linewidth=1.4,
+                )
+            )
+            ax.plot(
+                mu[0],
+                mu[1],
+                marker="*",
+                color=comp_color[k],
+                markeredgecolor="black",
+                markersize=14,
+                zorder=10,
+            )
 
-    from matplotlib.colors import LinearSegmentedColormap as _LSC
+    from matplotlib.colors import LinearSegmentedColormap
 
     def _density(ax, x, y, color, label):
         if len(x) == 0:
             return
-        cmap = _LSC.from_list(f"cm_{color}", ["#ffffff00", color])
+        cmap = LinearSegmentedColormap.from_list(f"cm_{color}", ["#ffffff00", color])
         ax.hexbin(x, y, gridsize=80, cmap=cmap, mincnt=1, bins="log", alpha=0.7)
         ax.plot([], [], "s", color=color, label=label)
 
@@ -227,11 +244,11 @@ def main(n_stars: int | None = None) -> None:
     ax = fig.add_subplot(gs[0, 0])
     for c in range(K):
         m = truth_label == c
-        _density(ax, truth[m, 0], truth[m, 1], comp_color[c],
-                 f"{comp_label[c]} (n={int(m.sum()):,})")
+        _density(
+            ax, truth[m, 0], truth[m, 1], comp_color[c], f"{comp_label[c]} (n={int(m.sum()):,})"
+        )
     _draw_ellipses(ax)
-    ax.axhline(0.15, color="black", lw=0.8, ls=":", alpha=0.7,
-               label=r"$[\alpha/M]=0.15$")
+    ax.axhline(0.15, color="black", lw=0.8, ls=":", alpha=0.7, label=r"$[\alpha/M]=0.15$")
     ax.set_xlabel(r"$[\mathrm{M/H}]$ (truth)")
     ax.set_ylabel(r"$[\alpha/\mathrm{M}]$ (truth)")
     ax.set_ylim(-0.2, 0.4)
@@ -245,22 +262,37 @@ def main(n_stars: int | None = None) -> None:
     migrated = pred_label != truth_label
     for c in range(K):
         m = (truth_label == c) & ~migrated
-        _density(ax, pred[m, 0], pred[m, 1], comp_color[c],
-                 f"{comp_label[c]} stayed (n={int(m.sum()):,})")
+        _density(
+            ax,
+            pred[m, 0],
+            pred[m, 1],
+            comp_color[c],
+            f"{comp_label[c]} stayed (n={int(m.sum()):,})",
+        )
     for c in range(K):
         m = (truth_label == c) & migrated
         if not m.any():
             continue
-        ax.scatter(pred[m, 0], pred[m, 1], s=10, alpha=0.85, color=comp_color[c],
-                   edgecolors="black", linewidths=0.5, rasterized=True,
-                   label=f"{comp_label[c]} migrated (n={int(m.sum()):,})")
+        ax.scatter(
+            pred[m, 0],
+            pred[m, 1],
+            s=10,
+            alpha=0.85,
+            color=comp_color[c],
+            edgecolors="black",
+            linewidths=0.5,
+            rasterized=True,
+            label=f"{comp_label[c]} migrated (n={int(m.sum()):,})",
+        )
     _draw_ellipses(ax)
     ax.axhline(0.15, color="black", lw=0.8, ls=":", alpha=0.7)
     ax.set_xlabel(r"$[\mathrm{M/H}]$ (predicted)")
     ax.set_ylabel(r"$[\alpha/\mathrm{M}]$ (predicted)")
     ax.set_ylim(-0.2, 0.4)
-    ax.set_title("(b) Predicted positions, coloured by TRUTH label "
-                 f"(overall migration {migrated.mean()*100:.1f}%)")
+    ax.set_title(
+        "(b) Predicted positions, coloured by TRUTH label "
+        f"(overall migration {migrated.mean() * 100:.1f}%)"
+    )
     ax.legend(fontsize=6, loc="lower left")
     ax.tick_params(labelsize=8)
     ax.grid(True, alpha=0.2)
@@ -269,8 +301,7 @@ def main(n_stars: int | None = None) -> None:
     ax = fig.add_subplot(gs[0, 2])
     for c in range(K):
         m = pred_label == c
-        _density(ax, pred[m, 0], pred[m, 1], comp_color[c],
-                 f"{comp_label[c]} (n={int(m.sum()):,})")
+        _density(ax, pred[m, 0], pred[m, 1], comp_color[c], f"{comp_label[c]} (n={int(m.sum()):,})")
     _draw_ellipses(ax)
     ax.axhline(0.15, color="black", lw=0.8, ls=":", alpha=0.7)
     ax.set_xlabel(r"$[\mathrm{M/H}]$ (predicted)")
@@ -283,51 +314,59 @@ def main(n_stars: int | None = None) -> None:
 
     # --- Row 1: confusion matrices ---
     def _show_cm(ax, M: np.ndarray, title: str, fmt: str, cbar_label: str):
-        im = ax.imshow(M, cmap="Blues", aspect="equal", vmin=0,
-                       vmax=float(M.max()) if M.size else 1.0)
+        im = ax.imshow(
+            M, cmap="Blues", aspect="equal", vmin=0, vmax=float(M.max()) if M.size else 1.0
+        )
         ax.set_xticks(range(K))
         ax.set_yticks(range(K))
-        ax.set_xticklabels([f"pred {comp_label[c]}" for c in range(K)],
-                           rotation=15, ha="right", fontsize=8)
-        ax.set_yticklabels([f"truth {comp_label[c]}" for c in range(K)],
-                           fontsize=8)
+        ax.set_xticklabels(
+            [f"pred {comp_label[c]}" for c in range(K)], rotation=15, ha="right", fontsize=8
+        )
+        ax.set_yticklabels([f"truth {comp_label[c]}" for c in range(K)], fontsize=8)
         ax.set_title(title)
         plt.colorbar(im, ax=ax, label=cbar_label)
         for i in range(K):
             for j in range(K):
-                ax.text(j, i, format(M[i, j], fmt),
-                        ha="center", va="center",
-                        color="white" if M[i, j] > 0.5 * float(M.max())
-                        else "black",
-                        fontsize=10)
+                ax.text(
+                    j,
+                    i,
+                    format(M[i, j], fmt),
+                    ha="center",
+                    va="center",
+                    color="white" if M[i, j] > 0.5 * float(M.max()) else "black",
+                    fontsize=10,
+                )
 
     ax = fig.add_subplot(gs[1, 0])
-    _show_cm(ax, cm_counts, "(d) Confusion matrix (counts)",
-             ",d", "stars per cell")
+    _show_cm(ax, cm_counts, "(d) Confusion matrix (counts)", ",d", "stars per cell")
 
     ax = fig.add_subplot(gs[1, 1])
-    _show_cm(ax, cm_recall,
-             "(e) Row-normalised: per-truth recall fraction",
-             ".3f", "row fraction")
+    _show_cm(ax, cm_recall, "(e) Row-normalised: per-truth recall fraction", ".3f", "row fraction")
 
     ax = fig.add_subplot(gs[1, 2])
-    _show_cm(ax, cm_precision,
-             "(f) Col-normalised: per-pred precision fraction",
-             ".3f", "col fraction")
+    _show_cm(
+        ax, cm_precision, "(f) Col-normalised: per-pred precision fraction", ".3f", "col fraction"
+    )
 
     # --- Row 2: metrics bar charts ---
     ax = fig.add_subplot(gs[2, 0])
     metrics = [("ARI", ari), ("MCC", mcc), ("macro-F1", f1_macro)]
     xs = np.arange(len(metrics))
-    bars = ax.bar(xs, [m[1] for m in metrics],
-                  color=["#1f77b4", "#ff7f0e", "#2ca02c"], width=0.6)
+    bars = ax.bar(xs, [m[1] for m in metrics], color=["#1f77b4", "#ff7f0e", "#2ca02c"], width=0.6)
     ax.set_xticks(xs)
     ax.set_xticklabels([m[0] for m in metrics], fontsize=10)
-    ax.set_ylim(min(-0.05, min(m[1] for m in metrics) - 0.05),
-                max(0.05, max(m[1] for m in metrics) + 0.05))
+    ax.set_ylim(
+        min(-0.05, min(m[1] for m in metrics) - 0.05), max(0.05, max(m[1] for m in metrics) + 0.05)
+    )
     for b, (_, val) in zip(bars, metrics):
-        ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.02,
-                f"{val:+.3f}", ha="center", va="bottom", fontsize=10)
+        ax.text(
+            b.get_x() + b.get_width() / 2,
+            b.get_height() + 0.02,
+            f"{val:+.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+        )
     ax.axhline(0, color="k", lw=0.6, ls=":", alpha=0.4)
     ax.set_ylabel("score (higher = better)")
     ax.set_title("(g) Scalar agreement metrics")
@@ -336,15 +375,11 @@ def main(n_stars: int | None = None) -> None:
     ax = fig.add_subplot(gs[2, 1])
     width = 0.27
     xs = np.arange(K)
-    ax.bar(xs - width, per_precision, width, label="precision",
-           color="#1f77b4")
-    ax.bar(xs, per_recall, width, label="recall",
-           color="#ff7f0e")
-    ax.bar(xs + width, per_f1, width, label="F1",
-           color="#2ca02c")
+    ax.bar(xs - width, per_precision, width, label="precision", color="#1f77b4")
+    ax.bar(xs, per_recall, width, label="recall", color="#ff7f0e")
+    ax.bar(xs + width, per_f1, width, label="F1", color="#2ca02c")
     ax.set_xticks(xs)
-    ax.set_xticklabels([comp_label[c] for c in range(K)],
-                      rotation=15, ha="right", fontsize=8)
+    ax.set_xticklabels([comp_label[c] for c in range(K)], rotation=15, ha="right", fontsize=8)
     ax.set_ylim(0, 1.05)
     ax.set_ylabel("score")
     ax.set_title("(h) Per-component precision / recall / F1")
@@ -352,49 +387,58 @@ def main(n_stars: int | None = None) -> None:
     ax.grid(axis="y", alpha=0.25)
 
     ax = fig.add_subplot(gs[2, 2])
-    bars = ax.bar(xs, per_migration, color=[comp_color[c] for c in range(K)],
-                  width=0.55)
+    bars = ax.bar(xs, per_migration, color=[comp_color[c] for c in range(K)], width=0.55)
     for b, val in zip(bars, per_migration):
-        ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.01,
-                f"{val*100:.1f}%", ha="center", va="bottom", fontsize=10)
+        ax.text(
+            b.get_x() + b.get_width() / 2,
+            b.get_height() + 0.01,
+            f"{val * 100:.1f}%",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+        )
     ax.set_xticks(xs)
-    ax.set_xticklabels([comp_label[c] for c in range(K)],
-                      rotation=15, ha="right", fontsize=8)
+    ax.set_xticklabels([comp_label[c] for c in range(K)], rotation=15, ha="right", fontsize=8)
     ax.set_ylim(0, max(0.05, float(per_migration.max()) * 1.2))
     ax.set_ylabel("migration rate (1 - recall)")
-    ax.set_title("(i) Per-component migration rate "
-                 "(stars predicted into a wrong component)")
+    ax.set_title("(i) Per-component migration rate (stars predicted into a wrong component)")
     ax.grid(axis="y", alpha=0.25)
 
     fig.suptitle(
         f"E2 - Stream 1 GMM contamination diagnostic with K=3 components "
         f"(n={len(data):,}). "
         f"ARI = {ari:+.3f},  MCC = {mcc:+.3f},  macro-F1 = {f1_macro:.3f},  "
-        f"overall migration = {migrated.mean()*100:.1f}%.",
-        fontsize=11, fontweight="semibold", y=0.995,
+        f"overall migration = {migrated.mean() * 100:.1f}%.",
+        fontsize=11,
+        fontweight="semibold",
+        y=0.995,
     )
 
     out_dir = REPO / "reports/gallery/E_validation"
-    paths = save_figure(fig, out_dir / "E2_contamination_metrics",
-                        formats=("pdf", "png"))
+    paths = save_figure(fig, out_dir / "E2_contamination_metrics", formats=("pdf", "png"))
     for p in paths:
         print(f"[E2] wrote {p.relative_to(REPO)}")
 
     # Console summary.
     print(f"\n=== E2 K=3 GMM contamination summary (n={len(data):,}) ===")
-    print(f"  Scalar: ARI={ari:+.4f}  MCC={mcc:+.4f}  macro-F1={f1_macro:.4f}  "
-          f"overall migration={migrated.mean()*100:.2f}%")
-    print(f"  Per-component (truth → pred):")
+    print(
+        f"  Scalar: ARI={ari:+.4f}  MCC={mcc:+.4f}  macro-F1={f1_macro:.4f}  "
+        f"overall migration={migrated.mean() * 100:.2f}%"
+    )
+    print("  Per-component (truth → pred):")
     for c in range(K):
         n_truth = int((truth_label == c).sum())
-        print(f"    {comp_label[c]:>30s}  n_truth={n_truth:>7,}  "
-              f"recall={per_recall[c]:.3f}  prec={per_precision[c]:.3f}  "
-              f"F1={per_f1[c]:.3f}  migration={per_migration[c]*100:.1f}%")
+        print(
+            f"    {comp_label[c]:>30s}  n_truth={n_truth:>7,}  "
+            f"recall={per_recall[c]:.3f}  prec={per_precision[c]:.3f}  "
+            f"F1={per_f1[c]:.3f}  migration={per_migration[c] * 100:.1f}%"
+        )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--n-stars", type=int, default=None,
-                        help="Optional: downsample to N stars (default: all)")
+    parser.add_argument(
+        "--n-stars", type=int, default=None, help="Optional: downsample to N stars (default: all)"
+    )
     args = parser.parse_args()
     main(n_stars=args.n_stars)

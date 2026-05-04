@@ -130,7 +130,7 @@ Without a working token, every Gaia-backed ingestion script (`scripts/fetch_gaia
 
 ## Quickstart: read a published prediction parquet
 
-The catalogue parquets emitted by `release.py` carry per-element predictions, calibrated covariant uncertainties, and the v5 release-tier columns. To open one and filter to the trustworthy slice (Tier 1 + Tier 2):
+The catalogue parquets emitted by `release.py` carry 21-element predictions, calibrated covariant uncertainties, and the v6 release-tier columns (2026-05-03). To open one and filter to the trustworthy slice (Tier 1 + Tier 2):
 
 ```python
 import pandas as pd
@@ -139,14 +139,14 @@ df = pd.read_parquet("release/D-Cat-b/hybrid_pipeline_run/predictions_with_featu
 trustworthy = df[df["release_tier"] <= 2]
 
 # Per-element columns: <elem>_hybrid_pred / <elem>_hybrid_sigma / <elem>_hybrid_source
-# (regressor or knn-median substitution under v5 σ-inflation rules).
+# (regressor or knn-median substitution).
 print(trustworthy[
     ["source_id", "teff_hybrid_pred", "logg_hybrid_pred",
      "mh_hybrid_pred", "alpha_m_hybrid_pred", "release_tier"]
 ].head())
 ```
 
-The companion `*.release_tier.json` sidecar records the catalogue schema version, tier counts, and which OOD/caveat flags were active at annotation time. See [`docs/CATALOG_SCHEMA.md`](docs/CATALOG_SCHEMA.md) for the full column reference and [`docs/decisions/0015_v5_release_tier_simplification.md`](docs/decisions/0015_v5_release_tier_simplification.md) for the v5 rationale.
+The v6 tier rule is symmetric: Tier 3 if `ood_joint_flag` (XP-block Mahalanobis input-OOD at p99) or per-element NaN; Tier 2 if `label_extrapolation_flag` (5-D Mahalanobis on the predicted (Teff, log g, [M/H], [α/M], [Mg/H]) vector outside the APOGEE-truth p99 envelope); Tier 1 otherwise. Per-star `ood_mahalanobis_percentile` and `label_mahalanobis_percentile` columns let downstream users pick their own cutoffs. The companion `*.release_tier.json` sidecar records the catalogue schema version, tier counts, and which OOD flags were active at annotation time. See [`docs/CATALOG_SCHEMA.md`](docs/CATALOG_SCHEMA.md) for the full column reference and [`docs/decisions/0016_v6_label_mahalanobis_redesign.md`](docs/decisions/0016_v6_label_mahalanobis_redesign.md) for the v5 → v6 redesign rationale (the `prediction_sigma_inflated__<element>`, `kin_ood_flag`, and `mode_ambiguous_flag` columns are still emitted but are diagnostic-only as of v6).
 
 ---
 
@@ -165,7 +165,7 @@ where `STREAM` is `2` or `3`. The inference driver reads the corresponding proce
 
 ## Quickstart: run the release-tier annotation on a fresh inference parquet
 
-If you have produced a fresh prediction parquet via `scripts/run_pipeline1_inference.py`, attach the v5 release-tier columns with:
+If you have produced a fresh prediction parquet via `scripts/run_pipeline1_inference.py`, attach the v6 release-tier columns with:
 
 ```python
 from pathlib import Path
@@ -175,7 +175,7 @@ summary = annotate_parquet(Path("path/to/predictions.parquet"))
 print(summary)  # {"n_rows": ..., "counts": {1: ..., 2: ..., 3: ...}}
 ```
 
-`annotate_parquet` is idempotent: it can be re-run after a schema bump and will overwrite the per-element tier columns and sidecar in place. The function emits structured logs at INFO level on entry and exit; configure logging in your driver to capture them.
+`annotate_parquet` is idempotent: it can be re-run after a schema bump and will overwrite the per-element tier columns and sidecar in place. The function emits structured logs at INFO level on entry and exit; configure logging in your driver to capture them. As of v6, `assign_per_element_release_tier` requires the upstream parquet to carry `label_extrapolation_flag`; the call raises `ValueError` if the column is absent so stale parquets cannot silently promote Tier 2 stars to Tier 1.
 
 ---
 

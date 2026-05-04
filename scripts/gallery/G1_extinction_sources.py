@@ -33,11 +33,11 @@ from _common import apply_style, save_fig  # noqa: E402
 FEAT = REPO / "data/processed/pipeline1_features_stream1_kiel.parquet"
 OUT = REPO / "reports/gallery/G_extinction"
 SOURCES = (
-    ("av_edenhofer",   "Edenhofer+2024 (d ≲ 1.25 kpc)"),
-    ("av_lallement",   "Lallement+2022 (1.25-3 kpc)"),
-    ("av_sfd",         "SFD/SF2011 (d ≳ 3 kpc)"),
+    ("av_edenhofer", "Edenhofer+2024 (d ≲ 1.25 kpc)"),
+    ("av_lallement", "Lallement+2022 (1.25-3 kpc)"),
+    ("av_sfd", "SFD/SF2011 (d ≳ 3 kpc)"),
     ("av_nbhd_median", "nbhd-median composite"),
-    ("ag_gspphot",     "Gaia GSP-Phot $A_G$"),
+    ("ag_gspphot", "Gaia GSP-Phot $A_G$"),
 )
 
 
@@ -49,8 +49,7 @@ def main() -> int:
 
     n_src = len(SOURCES)
     fig, axes = plt.subplots(n_src, n_src, figsize=(20, 20))
-    plt.subplots_adjust(wspace=0.30, hspace=0.30,
-                        top=0.95, bottom=0.04, left=0.05, right=0.97)
+    plt.subplots_adjust(wspace=0.30, hspace=0.30, top=0.95, bottom=0.04, left=0.05, right=0.97)
 
     for i in range(n_src):
         for j in range(n_src):
@@ -65,30 +64,55 @@ def main() -> int:
                 # Diagonal: histogram of this source.
                 vals = x[ok]
                 if vals.size:
-                    ax.hist(vals[vals < 6], bins=80, range=(0, 6),
-                            color="#3a6ea5", edgecolor="white", linewidth=0.4,
-                            alpha=0.85)
+                    ax.hist(
+                        vals[vals < 6],
+                        bins=80,
+                        range=(0, 6),
+                        color="#3a6ea5",
+                        edgecolor="white",
+                        linewidth=0.4,
+                        alpha=0.85,
+                    )
                     med = float(np.nanmedian(vals))
-                    ax.axvline(med, color="#e07b00", lw=1.6, ls="--",
-                                label=f"med={med:.2f}")
+                    ax.axvline(med, color="#e07b00", lw=1.6, ls="--", label=f"med={med:.2f}")
                     ax.legend(fontsize=8, loc="upper right")
                 ax.set_xlim(0, 6)
                 ax.set_xlabel(rf"$A_V$  {xn}", fontsize=8)
                 ax.set_title(xn, fontsize=9, color="#15355f")
             else:
                 if ok.sum() >= 50:
-                    ax.hexbin(x[ok], y[ok], gridsize=60,
-                                extent=(0, 6, 0, 6),
-                                mincnt=1, bins="log", cmap="viridis")
-                    ax.plot([0, 6], [0, 6], color="#e07b00", lw=1.2, ls="--",
-                            alpha=0.85)
-                    ax.text(0.05, 0.95, f"n={int(ok.sum()):,}",
-                            transform=ax.transAxes, ha="left", va="top",
-                            fontsize=8, color="white", fontweight="bold")
+                    ax.hexbin(
+                        x[ok],
+                        y[ok],
+                        gridsize=60,
+                        extent=(0, 6, 0, 6),
+                        mincnt=1,
+                        bins="log",
+                        cmap="viridis",
+                    )
+                    ax.plot([0, 6], [0, 6], color="#e07b00", lw=1.2, ls="--", alpha=0.85)
+                    ax.text(
+                        0.05,
+                        0.95,
+                        f"n={int(ok.sum()):,}",
+                        transform=ax.transAxes,
+                        ha="left",
+                        va="top",
+                        fontsize=8,
+                        color="white",
+                        fontweight="bold",
+                    )
                 else:
-                    ax.text(0.5, 0.5, f"n={int(ok.sum())}\n(too sparse)",
-                            transform=ax.transAxes, ha="center", va="center",
-                            fontsize=10, color="gray")
+                    ax.text(
+                        0.5,
+                        0.5,
+                        f"n={int(ok.sum())}\n(too sparse)",
+                        transform=ax.transAxes,
+                        ha="center",
+                        va="center",
+                        fontsize=10,
+                        color="gray",
+                    )
                 ax.set_xlim(0, 6)
                 ax.set_ylim(0, 6)
                 ax.set_aspect("equal")
@@ -104,7 +128,9 @@ def main() -> int:
         f"n = {n:,})\n"
         "Diagonal = single-source histogram with median.  "
         "Off-diagonal = pairwise hexbin (orange = 1:1 line).",
-        fontsize=12, fontweight="semibold", y=0.985,
+        fontsize=12,
+        fontweight="semibold",
+        y=0.985,
     )
     save_fig(fig, OUT / "G1_extinction_sources", tight=False)
     return 0

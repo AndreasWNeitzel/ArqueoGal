@@ -228,7 +228,9 @@ def main() -> None:
     # one row-group (~1 GB with corrected_flux) plus the accumulator
     # (the survivors, ~5 GB total for ~330k matched rows).
     import gc
+
     import pyarrow.parquet as _pq
+
     s1_ids_arr = s1["source_id"].to_numpy()
     s1_ids = pa.array(s1_ids_arr)
     s1_ids_set = pa.compute.SetLookupOptions(value_set=s1_ids)
@@ -241,8 +243,11 @@ def main() -> None:
     # row-group streaming filter; build only needs source_id, ye2024_flag,
     # and a_v_sfd here.
     XP_KEEP_COLS = ["source_id", "ye2024_flag", "a_v_sfd"]
-    logger.info("streaming %s row-groups, projection=%s, filtering to Stream 1 source_ids",
-                xp_path, XP_KEEP_COLS)
+    logger.info(
+        "streaming %s row-groups, projection=%s, filtering to Stream 1 source_ids",
+        xp_path,
+        XP_KEEP_COLS,
+    )
     xp_pf = _pq.ParquetFile(xp_path)
     n_rg = xp_pf.metadata.num_row_groups
     survivor_batches: list = []
@@ -260,7 +265,10 @@ def main() -> None:
         if (rg_idx + 1) % 5 == 0 or rg_idx == n_rg - 1:
             logger.info(
                 "  row-group %d/%d: kept %d / %d total",
-                rg_idx + 1, n_rg, n_kept, n_seen,
+                rg_idx + 1,
+                n_rg,
+                n_kept,
+                n_seen,
             )
         gc.collect()
     xp_table = pa.concat_tables(survivor_batches)

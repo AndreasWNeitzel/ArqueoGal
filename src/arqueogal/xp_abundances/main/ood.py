@@ -133,8 +133,7 @@ def fit_mahalanobis_ood(
     # so score_percentile_mahalanobis_ood can compute per-star empirical
     # percentile against the training distribution at inference time.
     # Sorted ascending; searchsorted gives the percentile directly.
-    object.__setattr__(bundle, "training_distances_sorted",
-                        np.sort(dists).astype(np.float64))
+    object.__setattr__(bundle, "training_distances_sorted", np.sort(dists).astype(np.float64))
     return bundle
 
 

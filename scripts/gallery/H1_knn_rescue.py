@@ -76,7 +76,9 @@ def main(argv: list[str] | None = None) -> int:
     holdout_idx = data["max_sigma"].idxmax()
     holdout = data.iloc[[holdout_idx]]
 
-    print(f"[H1] Selected example star (source_id={holdout['source_id'].iloc[0]}) with max_sigma={holdout['max_sigma'].iloc[0]:.2f}")
+    print(
+        f"[H1] Selected example star (source_id={holdout['source_id'].iloc[0]}) with max_sigma={holdout['max_sigma'].iloc[0]:.2f}"
+    )
     print("[H1] Rendering single-example kNN rescue mechanism")
     OUT.mkdir(parents=True, exist_ok=True)
 
@@ -98,19 +100,33 @@ def main(argv: list[str] | None = None) -> int:
         # Real kNN summary band: shaded ± 1 std around median (green) — these
         # are the on-disk summary statistics from K=50 neighbour values
         # computed at training time; per-neighbour values are NOT stored.
-        ax.axvspan(med_val - std_val, med_val + std_val,
-                   color="#2ca02c", alpha=0.18, label=f"kNN median ± std (std={std_val:.3f})")
-        ax.axvline(med_val, color="#2ca02c", lw=2.0, ls="-",
-                   label=f"kNN median: {med_val:.3f}")
+        ax.axvspan(
+            med_val - std_val,
+            med_val + std_val,
+            color="#2ca02c",
+            alpha=0.18,
+            label=f"kNN median ± std (std={std_val:.3f})",
+        )
+        ax.axvline(med_val, color="#2ca02c", lw=2.0, ls="-", label=f"kNN median: {med_val:.3f}")
         ax.axvline(p25_val, color="#2ca02c", lw=1.0, ls=":", alpha=0.7)
-        ax.axvline(p75_val, color="#2ca02c", lw=1.0, ls=":", alpha=0.7,
-                   label=f"kNN p25/p75: [{p25_val:.3f}, {p75_val:.3f}]")
+        ax.axvline(
+            p75_val,
+            color="#2ca02c",
+            lw=1.0,
+            ls=":",
+            alpha=0.7,
+            label=f"kNN p25/p75: [{p25_val:.3f}, {p75_val:.3f}]",
+        )
 
         # Regressor prediction band (red): pred ± 1 sigma
-        ax.axvspan(pred_val - sigma_val, pred_val + sigma_val,
-                   color="#d62728", alpha=0.15, label=f"Regressor ± σ (σ={sigma_val:.3f})")
-        ax.axvline(pred_val, color="#d62728", lw=2.0, ls="--",
-                   label=f"Regressor: {pred_val:.3f}")
+        ax.axvspan(
+            pred_val - sigma_val,
+            pred_val + sigma_val,
+            color="#d62728",
+            alpha=0.15,
+            label=f"Regressor ± σ (σ={sigma_val:.3f})",
+        )
+        ax.axvline(pred_val, color="#d62728", lw=2.0, ls="--", label=f"Regressor: {pred_val:.3f}")
 
         x_lo = min(p25_val, pred_val - sigma_val) - 0.05 * abs(med_val - pred_val + 1e-3)
         x_hi = max(p75_val, pred_val + sigma_val) + 0.05 * abs(med_val - pred_val + 1e-3)

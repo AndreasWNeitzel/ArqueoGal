@@ -37,8 +37,7 @@ LABELS_PRETTY = (r"$T_{\rm eff}$", r"$\log g$", "[M/H]", r"[$\alpha$/M]", "[Mg/H
 def _draw_lower_tri(ax, mat, *, cmap, vlim, title, label_cells=False):
     n = mat.shape[0]
     masked = np.where(np.tril(np.ones_like(mat), 0) > 0, mat, np.nan)
-    im = ax.imshow(masked, cmap=cmap, vmin=-vlim, vmax=vlim,
-                   origin="upper")
+    im = ax.imshow(masked, cmap=cmap, vmin=-vlim, vmax=vlim, origin="upper")
     ax.set_xticks(range(n))
     ax.set_yticks(range(n))
     ax.set_xticklabels(LABELS_PRETTY, fontsize=11)
@@ -47,10 +46,16 @@ def _draw_lower_tri(ax, mat, *, cmap, vlim, title, label_cells=False):
     if label_cells:
         for i in range(n):
             for j in range(i + 1):
-                ax.text(j, i, f"{mat[i, j]:+.2f}",
-                        ha="center", va="center",
-                        fontsize=10, color="white",
-                        fontweight="bold")
+                ax.text(
+                    j,
+                    i,
+                    f"{mat[i, j]:+.2f}",
+                    ha="center",
+                    va="center",
+                    fontsize=10,
+                    color="white",
+                    fontweight="bold",
+                )
     plt.colorbar(im, ax=ax, fraction=0.046, pad=0.02)
 
 
@@ -59,31 +64,40 @@ def main() -> int:
 
     # Load enough of Stream 1 to assemble a sample covariance from the cov_*
     # diagonal columns + a synthesised L matrix from one star (illustrative).
-    cov_cols = [
-        "cov_0_0", "cov_0_1", "cov_0_2", "cov_0_3", "cov_0_4",
-        "cov_1_1", "cov_1_2", "cov_1_3", "cov_1_4",
-        "cov_2_2", "cov_2_3", "cov_2_4",
-        "cov_3_3", "cov_3_4", "cov_4_4",
-    ]
     # cov_* columns only live in the hybrid release; the bare predictions
     # parquet has σ but not the full cov. Fall back gracefully.
-    pred_cols = ["source_id", "teff_pred", "logg_pred", "mh_pred",
-                 "alpha_m_pred", "mg_h_pred",
-                 "teff_sigma", "logg_sigma", "mh_sigma",
-                 "alpha_m_sigma", "mg_h_sigma"]
+    pred_cols = [
+        "source_id",
+        "teff_pred",
+        "logg_pred",
+        "mh_pred",
+        "alpha_m_pred",
+        "mg_h_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+    ]
     pred = pd.read_parquet(PRED_S1, columns=pred_cols).drop_duplicates("source_id")
     feat = pd.read_parquet(
-        FEAT_S1, columns=["source_id",
-                          "teff_apogee", "logg_apogee", "mh_apogee",
-                          "alpha_m_apogee", "mg_h_apogee"],
+        FEAT_S1,
+        columns=[
+            "source_id",
+            "teff_apogee",
+            "logg_apogee",
+            "mh_apogee",
+            "alpha_m_apogee",
+            "mg_h_apogee",
+        ],
     ).drop_duplicates("source_id")
     df = feat.merge(pred, on="source_id", how="inner")
 
     # Assemble an empirical 5x5 correlation matrix from residuals.
     keys = ("teff", "logg", "mh", "alpha_m", "mg_h")
-    deltas = np.column_stack([
-        df[f"{k}_pred"].to_numpy() - df[f"{k}_apogee"].to_numpy() for k in keys
-    ])
+    deltas = np.column_stack(
+        [df[f"{k}_pred"].to_numpy() - df[f"{k}_apogee"].to_numpy() for k in keys]
+    )
     ok = np.isfinite(deltas).all(axis=1)
     deltas = deltas[ok]
     # Standardise per-label so the off-diagonals are correlations.
@@ -100,12 +114,22 @@ def main() -> int:
     ax_s = fig.add_subplot(gs[0, 1])
     ax_e = fig.add_subplot(gs[0, 2])
 
-    _draw_lower_tri(ax_l, L_show, cmap="RdBu_r", vlim=1.0,
-                    title=r"$L_{\rm chol}$ — what the head emits",
-                    label_cells=True)
-    _draw_lower_tri(ax_s, corr, cmap="RdBu_r", vlim=1.0,
-                    title=r"$\Sigma = L\,L^{\!\top}$  — full covariance",
-                    label_cells=True)
+    _draw_lower_tri(
+        ax_l,
+        L_show,
+        cmap="RdBu_r",
+        vlim=1.0,
+        title=r"$L_{\rm chol}$ — what the head emits",
+        label_cells=True,
+    )
+    _draw_lower_tri(
+        ax_s,
+        corr,
+        cmap="RdBu_r",
+        vlim=1.0,
+        title=r"$\Sigma = L\,L^{\!\top}$  — full covariance",
+        label_cells=True,
+    )
 
     # Empirical 2D residual scatter [M/H] vs [α/M] with eigenvector ellipse.
     d_mh = z[:, 2]
@@ -113,8 +137,9 @@ def main() -> int:
     # Subsample.
     rng = np.random.default_rng(0)
     idx = rng.choice(len(d_mh), size=min(8000, len(d_mh)), replace=False)
-    ax_e.scatter(d_mh[idx], d_am[idx], s=4, alpha=0.3,
-                 color=PALETTE["navy_light"], edgecolor="none")
+    ax_e.scatter(
+        d_mh[idx], d_am[idx], s=4, alpha=0.3, color=PALETTE["navy_light"], edgecolor="none"
+    )
     # Eigenvalue/eigenvector overlay of the empirical covariance.
     cov2 = np.cov(np.column_stack([d_mh, d_am]).T)
     vals, vecs = np.linalg.eigh(cov2)
@@ -122,18 +147,26 @@ def main() -> int:
     for n_sig in (1.0, 2.0):
         w = 2 * n_sig * np.sqrt(vals[1])
         h = 2 * n_sig * np.sqrt(vals[0])
-        e = mpatches.Ellipse((0, 0), w, h, angle=angle,
-                              fill=False, edgecolor=PALETTE["accent"],
-                              lw=2.2, ls="-" if n_sig == 1 else "--",
-                              label=rf"{n_sig:.0f}$\sigma$")
+        e = mpatches.Ellipse(
+            (0, 0),
+            w,
+            h,
+            angle=angle,
+            fill=False,
+            edgecolor=PALETTE["accent"],
+            lw=2.2,
+            ls="-" if n_sig == 1 else "--",
+            label=rf"{n_sig:.0f}$\sigma$",
+        )
         ax_e.add_patch(e)
     ax_e.set_xlim(-4, 4)
     ax_e.set_ylim(-4, 4)
     ax_e.set_aspect("equal")
     ax_e.set_xlabel(r"$\Delta$[M/H] / $\sigma$")
     ax_e.set_ylabel(r"$\Delta$[$\alpha$/M] / $\sigma$")
-    ax_e.set_title(r"Why a block — residuals correlate $\rightarrow$ tilted ellipse",
-                   color=PALETTE["navy"])
+    ax_e.set_title(
+        r"Why a block — residuals correlate $\rightarrow$ tilted ellipse", color=PALETTE["navy"]
+    )
     ax_e.legend(loc="upper right")
 
     headline(

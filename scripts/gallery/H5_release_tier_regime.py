@@ -40,6 +40,7 @@ sys.path.insert(0, str(REPO / "scripts" / "gallery"))
 sys.path.insert(0, str(REPO / "src"))
 
 from _common import apply_style, save_fig  # noqa: E402
+
 from arqueogal.xp_abundances.main.release import assign_release_tier  # noqa: E402
 
 OUT = REPO / "reports/gallery/H_hybrid_release"
@@ -71,10 +72,18 @@ def _load_stream(stream_id: int) -> pd.DataFrame:
     if not pred_path.exists():
         raise FileNotFoundError(pred_path)
     needed = [
-        "source_id", "teff_pred", "logg_pred",
-        "mh_pred", "alpha_m_pred", "mg_h_pred",
-        "teff_sigma", "logg_sigma", "mh_sigma",
-        "alpha_m_sigma", "mg_h_sigma", "ood_joint_flag",
+        "source_id",
+        "teff_pred",
+        "logg_pred",
+        "mh_pred",
+        "alpha_m_pred",
+        "mg_h_pred",
+        "teff_sigma",
+        "logg_sigma",
+        "mh_sigma",
+        "alpha_m_sigma",
+        "mg_h_sigma",
+        "ood_joint_flag",
         "label_extrapolation_flag",
     ]
     try:
@@ -152,8 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         # 2 rows × ncol: Kiel + chemistry per tier subgroup. Bar plots dropped
         # 2026-05-03 — with σ-thresholds gone, mean-σ per tier is no longer
         # the load-bearing diagnostic. Suptitle dropped per same edit.
-        fig, axes = plt.subplots(2, ncol, figsize=(5.5 * ncol, 9.5),
-                                 squeeze=False)
+        fig, axes = plt.subplots(2, ncol, figsize=(5.5 * ncol, 9.5), squeeze=False)
 
         # Row 0: Kiel hex per subgroup.
         for j, name in enumerate(cols):
@@ -162,16 +170,19 @@ def main(argv: list[str] | None = None) -> int:
             n = int(len(sub))
             if n > 0:
                 hb = ax.hexbin(
-                    sub["teff_pred"], sub["logg_pred"],
-                    gridsize=KIEL_GRID, cmap="viridis", mincnt=1,
-                    bins="log", extent=KIEL_EXTENT,
+                    sub["teff_pred"],
+                    sub["logg_pred"],
+                    gridsize=KIEL_GRID,
+                    cmap="viridis",
+                    mincnt=1,
+                    bins="log",
+                    extent=KIEL_EXTENT,
                 )
                 plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N")
             ax.set_xlabel(r"$T_{\rm eff}$ (K)")
             if j == 0:
                 ax.set_ylabel(r"$\log g$ (dex)")
-            ax.set_title(f"Stream {sid} — {_column_label(name)}  n={n:,}",
-                         fontsize=11)
+            ax.set_title(f"Stream {sid} — {_column_label(name)}  n={n:,}", fontsize=11)
             ax.invert_xaxis()
             ax.invert_yaxis()
             ax.grid(alpha=0.3)
@@ -183,9 +194,13 @@ def main(argv: list[str] | None = None) -> int:
             n = int(len(sub))
             if n > 0:
                 hb = ax.hexbin(
-                    sub["mh_pred"], sub["alpha_m_pred"],
-                    gridsize=CHEM_GRID, cmap="viridis", mincnt=1,
-                    bins="log", extent=CHEM_EXTENT,
+                    sub["mh_pred"],
+                    sub["alpha_m_pred"],
+                    gridsize=CHEM_GRID,
+                    cmap="viridis",
+                    mincnt=1,
+                    bins="log",
+                    extent=CHEM_EXTENT,
                 )
                 plt.colorbar(hb, ax=ax, label=r"log$_{10}$ N")
             ax.axhline(0.15, color="white", lw=0.6, ls=":", alpha=0.7)

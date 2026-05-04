@@ -18,8 +18,14 @@ OUT = REPO / "reports" / "gallery" / "Y_presentation"
 
 # Okabe-Ito palette per STYLE_GUIDE.md.
 OKABE_ITO = [
-    "#0072B2", "#D55E00", "#009E73", "#CC79A7",
-    "#E69F00", "#56B4E9", "#F0E442", "#000000",
+    "#0072B2",
+    "#D55E00",
+    "#009E73",
+    "#CC79A7",
+    "#E69F00",
+    "#56B4E9",
+    "#F0E442",
+    "#000000",
 ]
 
 # Slide chrome + tier semantic mapping. Tier colours pulled from Okabe-Ito
@@ -28,25 +34,25 @@ OKABE_ITO = [
 # tier3 because the tier semantic chain T1-T2-T3 reads better with three
 # distinct hues than green/vermilion/black).
 PALETTE: dict[str, str] = {
-    "ink":     "#2B2D42",
-    "subink":  "#5C6378",
-    "mist":    "#D0D3DC",
-    "paper":   "#F8F9FB",
-    "white":   "#FFFFFF",
-    "title":   OKABE_ITO[0],   # title accent = blue
-    "accent":  OKABE_ITO[1],   # highlight accent = vermilion
+    "ink": "#2B2D42",
+    "subink": "#5C6378",
+    "mist": "#D0D3DC",
+    "paper": "#F8F9FB",
+    "white": "#FFFFFF",
+    "title": OKABE_ITO[0],  # title accent = blue
+    "accent": OKABE_ITO[1],  # highlight accent = vermilion
     # Tier mapping (H5/H6/H7/H8/H10).
-    "tier1": OKABE_ITO[2],     # green = science-grade
-    "tier2": OKABE_ITO[1],     # vermilion = label-Mahalanobis caution
-    "tier3": OKABE_ITO[3],     # red-purple = XP-Mahalanobis hard reject
+    "tier1": OKABE_ITO[2],  # green = science-grade
+    "tier2": OKABE_ITO[1],  # vermilion = label-Mahalanobis caution
+    "tier3": OKABE_ITO[3],  # red-purple = XP-Mahalanobis hard reject
     # Comparison rows (F6 narrative).
-    "ours":    OKABE_ITO[0],
+    "ours": OKABE_ITO[0],
     "gspspec": OKABE_ITO[3],
-    "apogee":  OKABE_ITO[2],
+    "apogee": OKABE_ITO[2],
     # Legacy aliases used by older Y scripts.
-    "navy":         OKABE_ITO[0],
-    "navy_light":   "#56B4E9",
-    "ash":          "#5C6378",
+    "navy": OKABE_ITO[0],
+    "navy_light": "#56B4E9",
+    "ash": "#5C6378",
     "accent_light": "#FFB14E",
 }
 
@@ -56,7 +62,7 @@ def apply_style() -> None:
     mpl.rcParams.update(
         {
             "axes.prop_cycle": cycler(color=OKABE_ITO),
-            "image.cmap":      "viridis",
+            "image.cmap": "viridis",
             "text.usetex": False,
             "mathtext.fontset": "dejavusans",
             "mathtext.default": "it",
@@ -103,7 +109,6 @@ def apply_style() -> None:
             "figure.facecolor": "white",
             "axes.facecolor": "white",
             "axes.unicode_minus": False,
-            "image.cmap": "viridis",
         }
     )
 
@@ -117,8 +122,11 @@ def stamp(fig: plt.Figure, text: str = "ArqueoGal | Pipeline 1") -> None:
 
 
 def headline(
-    fig: plt.Figure, title: str, subtitle: str | None = None,
-    *, top: float = 0.86,
+    fig: plt.Figure,
+    title: str,
+    subtitle: str | None = None,
+    *,
+    top: float = 0.86,
 ) -> None:
     """Big headline title spanning the figure, optional subtitle below.
 
@@ -129,13 +137,24 @@ def headline(
     """
     fig.subplots_adjust(top=top)
     fig.suptitle(
-        title, fontsize=22, fontweight="bold", color=PALETTE["ink"],
-        x=0.02, y=0.985, ha="left", va="top",
+        title,
+        fontsize=22,
+        fontweight="bold",
+        color=PALETTE["ink"],
+        x=0.02,
+        y=0.985,
+        ha="left",
+        va="top",
     )
     if subtitle:
         fig.text(
-            0.02, 0.945, subtitle,
-            ha="left", va="top", fontsize=14, color=PALETTE["ash"],
+            0.02,
+            0.945,
+            subtitle,
+            ha="left",
+            va="top",
+            fontsize=14,
+            color=PALETTE["ash"],
         )
 
 

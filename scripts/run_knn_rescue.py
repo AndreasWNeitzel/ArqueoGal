@@ -155,6 +155,7 @@ def main() -> None:
     fs_blob = members[args.member].blob.get("feature_scaler")
     if fs_blob is not None:
         from arqueogal.xp_abundances.main.data import FeatureScaler
+
         feature_scaler = FeatureScaler(
             mean=np.asarray(fs_blob["mean"], dtype=np.float32),
             scale=np.asarray(fs_blob["scale"], dtype=np.float32),

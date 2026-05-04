@@ -46,13 +46,11 @@ def main(n_stars: int | None = None) -> None:
     if n_stars is not None and n_stars < len(data):
         data = data.sample(n=n_stars, random_state=42)
 
-    Yt_test = data[[
-        "teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apogee"
-    ]].values
+    Yt_test = data[
+        ["teff_apogee", "logg_apogee", "mh_apogee", "alpha_m_apogee", "mg_h_apogee"]
+    ].values
 
-    Yp_test = data[[
-        "teff_pred", "logg_pred", "mh_pred", "alpha_m_pred", "mg_h_pred"
-    ]].values
+    Yp_test = data[["teff_pred", "logg_pred", "mh_pred", "alpha_m_pred", "mg_h_pred"]].values
 
     labels_info = [
         ("Teff", r"$T_{\rm eff}$ [K]", (3500, 6500), "K", ".0f"),
@@ -64,13 +62,13 @@ def main(n_stars: int | None = None) -> None:
 
     # 2x5: top row pred-vs-truth (existing), bottom row residual-vs-truth
     # with bias line and ±1σ shaded band.
-    fig, axes = plt.subplots(2, 5, figsize=(18.0, 8.4),
-                             gridspec_kw={"height_ratios": [1.4, 1.0]})
+    fig, axes = plt.subplots(2, 5, figsize=(18.0, 8.4), gridspec_kw={"height_ratios": [1.4, 1.0]})
     fig.suptitle(
         "Stream 1 (APOGEE DR19) - pred vs truth (holdout test set)\n"
         r"top: pred vs truth, hex = $\log_{10}$ N.  "
         r"bottom: residual vs truth, white line = bias, shaded = $\pm 1\sigma$.",
-        fontsize=10, y=0.995,
+        fontsize=10,
+        y=0.995,
     )
 
     Yt = Yt_test
@@ -84,20 +82,31 @@ def main(n_stars: int | None = None) -> None:
 
         # --- top: pred vs truth.
         ax.hexbin(
-            Yt[finite, c], Yp[finite, c],
-            gridsize=40, mincnt=3, cmap="viridis", bins="log",
-            extent=[lim[0], lim[1], lim[0], lim[1]], edgecolors="face",
+            Yt[finite, c],
+            Yp[finite, c],
+            gridsize=40,
+            mincnt=3,
+            cmap="viridis",
+            bins="log",
+            extent=[lim[0], lim[1], lim[0], lim[1]],
+            edgecolors="face",
         )
         ax.plot(lim, lim, color="red", lw=0.6, ls="--", zorder=10)
-        ax.set_xlim(lim); ax.set_ylim(lim); ax.set_aspect("equal")
+        ax.set_xlim(lim)
+        ax.set_ylim(lim)
+        ax.set_aspect("equal")
         ax.set_xlabel(f"truth {label_str}", fontsize=9)
         ax.set_ylabel(f"pred {label_str}", fontsize=9)
         if not np.isnan(rmse):
-            txt = (f"n={n:,}\nRMSE={rmse:{fmt}} {unit}\n"
-                   f"bias={bias:+{fmt}}\nstd={std:{fmt}}")
+            txt = f"n={n:,}\nRMSE={rmse:{fmt}} {unit}\nbias={bias:+{fmt}}\nstd={std:{fmt}}"
             ax.text(
-                0.05, 0.95, txt, transform=ax.transAxes,
-                fontsize=7, ha="left", va="top",
+                0.05,
+                0.95,
+                txt,
+                transform=ax.transAxes,
+                fontsize=7,
+                ha="left",
+                va="top",
                 bbox=dict(facecolor="white", edgecolor="0.7", alpha=0.9, pad=2),
             )
         ax.tick_params(labelsize=7)
@@ -112,20 +121,28 @@ def main(n_stars: int | None = None) -> None:
             r_half = 1.0
         rlim = (-r_half, r_half)
         ax_r.hexbin(
-            Yt[finite, c], resid,
-            gridsize=40, mincnt=3, cmap="plasma", bins="log",
+            Yt[finite, c],
+            resid,
+            gridsize=40,
+            mincnt=3,
+            cmap="plasma",
+            bins="log",
             extent=[lim[0], lim[1], rlim[0], rlim[1]],
             edgecolors="face",
         )
-        ax_r.axhline(0, color="white", lw=0.5, ls="--", alpha=0.4,
-                     zorder=4)
+        ax_r.axhline(0, color="white", lw=0.5, ls="--", alpha=0.4, zorder=4)
         # Bias line + ±1σ shaded band.
-        ax_r.axhspan(bias - std, bias + std, color="white", alpha=0.20,
-                     zorder=3,
-                     label=fr"bias $\pm 1\sigma$  ({bias:+{fmt}}, $\sigma={std:{fmt}}$)")
-        ax_r.axhline(bias, color="white", lw=1.4, ls="-", alpha=0.95,
-                     zorder=5)
-        ax_r.set_xlim(lim); ax_r.set_ylim(rlim)
+        ax_r.axhspan(
+            bias - std,
+            bias + std,
+            color="white",
+            alpha=0.20,
+            zorder=3,
+            label=rf"bias $\pm 1\sigma$  ({bias:+{fmt}}, $\sigma={std:{fmt}}$)",
+        )
+        ax_r.axhline(bias, color="white", lw=1.4, ls="-", alpha=0.95, zorder=5)
+        ax_r.set_xlim(lim)
+        ax_r.set_ylim(rlim)
         ax_r.set_xlabel(f"truth {label_str}", fontsize=9)
         ax_r.set_ylabel(f"residual {unit}", fontsize=8)
         ax_r.legend(fontsize=6, loc="upper right", framealpha=0.85)

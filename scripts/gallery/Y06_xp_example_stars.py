@@ -45,11 +45,12 @@ def main() -> int:
     # giants in the same Teff/log g window in that case.
     miss = [sid for sid in TARGET_IDS if sid not in df.index]
     if miss:
-        near = df[(df["teff_apogee"].between(4600, 4750))
-                  & (df["logg_apogee"].between(2.4, 2.55))].copy()
+        near = df[
+            (df["teff_apogee"].between(4600, 4750)) & (df["logg_apogee"].between(2.4, 2.55))
+        ].copy()
         # closest by [M/H] to (-0.65, -0.05, +0.32) for the missing slots.
         targets = {-0.65: 0, -0.05: 1, 0.32: 2}
-        for mh_target, slot in list(targets.items())[:len(miss)]:
+        for mh_target, slot in list(targets.items())[: len(miss)]:
             best = (near["mh_apogee"] - mh_target).abs().idxmin()
             TARGET_IDS[slot] = best
     sub = df.loc[TARGET_IDS]
@@ -66,7 +67,7 @@ def main() -> int:
 
     colors = [PALETTE["navy"], PALETTE["accent"], PALETTE["tier3"]]
     labels = []
-    for (sid, row), color in zip(sub.iterrows(), colors):
+    for (_sid, row), color in zip(sub.iterrows(), colors):
         bp = row[bp_cols].to_numpy(dtype=float)
         rp = row[rp_cols].to_numpy(dtype=float)
         # Standardise per-star to remove the absolute-flux level — the
@@ -74,12 +75,28 @@ def main() -> int:
         # vector across stars, not its overall scale.
         bp_z = (bp - np.nanmedian(bp)) / (np.nanstd(bp) or 1.0)
         rp_z = (rp - np.nanmedian(rp)) / (np.nanstd(rp) or 1.0)
-        ax_bp.plot(np.arange(len(bp_z)), bp_z, "-", color=color,
-                   lw=2.0, marker="o", ms=3.5, alpha=0.85,
-                   label=f"[M/H] = {row['mh_apogee']:+.2f}")
-        ax_rp.plot(np.arange(len(rp_z)), rp_z, "-", color=color,
-                   lw=2.0, marker="o", ms=3.5, alpha=0.85,
-                   label=f"[M/H] = {row['mh_apogee']:+.2f}")
+        ax_bp.plot(
+            np.arange(len(bp_z)),
+            bp_z,
+            "-",
+            color=color,
+            lw=2.0,
+            marker="o",
+            ms=3.5,
+            alpha=0.85,
+            label=f"[M/H] = {row['mh_apogee']:+.2f}",
+        )
+        ax_rp.plot(
+            np.arange(len(rp_z)),
+            rp_z,
+            "-",
+            color=color,
+            lw=2.0,
+            marker="o",
+            ms=3.5,
+            alpha=0.85,
+            label=f"[M/H] = {row['mh_apogee']:+.2f}",
+        )
         labels.append(f"[M/H] = {row['mh_apogee']:+.2f}")
 
     for ax, name, n in [(ax_bp, "BP", len(bp_cols)), (ax_rp, "RP", len(rp_cols))]:

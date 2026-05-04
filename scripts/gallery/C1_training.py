@@ -18,7 +18,6 @@ What it reads:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -98,11 +97,11 @@ def main() -> None:
         return np.array([h[key] for h in history], dtype=float)
 
     components = [
-        ("loss",   "Total joint loss"),
-        ("nll",    r"$\beta$-NLL"),
+        ("loss", "Total joint loss"),
+        ("nll", r"$\beta$-NLL"),
         ("supcon", "SupCon"),
         ("barlow", "Barlow Twins"),
-        ("ari",    "soft-ARI ([α/M] contamination)"),
+        ("ari", "soft-ARI ([α/M] contamination)"),
     ]
 
     for idx, (key, title) in enumerate(components):
@@ -114,10 +113,24 @@ def main() -> None:
             ep = arr(h, "epoch")
             tr = arr(h, f"train_{key}")
             va = arr(h, f"val_{key}")
-            ax.plot(ep, tr, "-", color=color, lw=1.0, alpha=0.65,
-                    label=f"seed {sid} train" if idx == 0 else None)
-            ax.plot(ep, va, "--", color=color, lw=1.2, alpha=0.85,
-                    label=f"seed {sid} val" if idx == 0 else None)
+            ax.plot(
+                ep,
+                tr,
+                "-",
+                color=color,
+                lw=1.0,
+                alpha=0.65,
+                label=f"seed {sid} train" if idx == 0 else None,
+            )
+            ax.plot(
+                ep,
+                va,
+                "--",
+                color=color,
+                lw=1.2,
+                alpha=0.85,
+                label=f"seed {sid} val" if idx == 0 else None,
+            )
             best_ep = runs[sid]["best_epoch"]
             ax.axvline(best_ep, color=color, lw=0.5, ls=":", alpha=0.4)
         ax.set_xlabel("epoch", fontsize=9)
@@ -134,8 +147,15 @@ def main() -> None:
         if not h:
             continue
         ep = arr(h, "epoch")
-        ax.plot(ep, arr(h, "train_grad_norm_max"), "-", color=color, lw=1.0,
-                alpha=0.7, label=f"seed {sid}")
+        ax.plot(
+            ep,
+            arr(h, "train_grad_norm_max"),
+            "-",
+            color=color,
+            lw=1.0,
+            alpha=0.7,
+            label=f"seed {sid}",
+        )
     ax.axhline(4000, color="black", lw=0.7, ls="--", alpha=0.6, label="abort threshold (4000)")
     ax.set_xlabel("epoch", fontsize=9)
     ax.set_ylabel(r"$\max |\nabla|$", fontsize=9)
@@ -161,14 +181,24 @@ def main() -> None:
     ax.set_axis_off()
     rows = ["Per-seed best validation loss", "─" * 32]
     for sid in sorted(runs.keys()):
-        rows.append(f"seed {sid}: {runs[sid]['best_val_loss']:.4f} at epoch {runs[sid]['best_epoch']}")
+        rows.append(
+            f"seed {sid}: {runs[sid]['best_val_loss']:.4f} at epoch {runs[sid]['best_epoch']}"
+        )
     rows.append("")
     best_vals = [runs[s]["best_val_loss"] for s in runs if runs[s]["history"]]
     if best_vals:
         rows.append(f"Ensemble mean: {np.mean(best_vals):.4f}")
         rows.append(f"Ensemble spread (max−min): {max(best_vals) - min(best_vals):.4f}")
-    ax.text(0.0, 1.0, "\n".join(rows), transform=ax.transAxes,
-            fontsize=9, ha="left", va="top", family="monospace")
+    ax.text(
+        0.0,
+        1.0,
+        "\n".join(rows),
+        transform=ax.transAxes,
+        fontsize=9,
+        ha="left",
+        va="top",
+        family="monospace",
+    )
 
     # Pull the actual loss weights from the run's _best.pt config_yaml so the
     # suptitle reflects what the model was *actually* trained with — no more
@@ -182,23 +212,30 @@ def main() -> None:
         cy = ck.get("config_yaml", "")
         # config_yaml is a dataclass-asdict YAML string; pull the weights via regex.
         import re
+
         def _get(k):
             m = re.search(rf"\b{k}:\s*([-\d.eE]+)", cy)
             return float(m.group(1)) if m else None
+
         wb = _get("beta_nll")
         ws = _get("supcon")
         wba = _get("barlow")
         wa = _get("ari")
         parts = []
-        if ws is not None: parts.append(f"SupCon={ws:g}")
-        if wb is not None: parts.append(rf"$\beta$-NLL={wb:g}")
-        if wba is not None: parts.append(f"Barlow={wba:g}")
-        if wa is not None: parts.append(f"ARI={wa:g}")
+        if ws is not None:
+            parts.append(f"SupCon={ws:g}")
+        if wb is not None:
+            parts.append(rf"$\beta$-NLL={wb:g}")
+        if wba is not None:
+            parts.append(f"Barlow={wba:g}")
+        if wa is not None:
+            parts.append(f"ARI={wa:g}")
         if parts:
             weights_str = "joint " + " + ".join(parts)
         m = ck.get("training_metrics", {})
-        n_epochs_run = (max(h["epoch"] for h in m.get("history", [])) + 1
-                        if m.get("history") else "?")
+        n_epochs_run = (
+            max(h["epoch"] for h in m.get("history", [])) + 1 if m.get("history") else "?"
+        )
 
     fig.suptitle(
         "C1. Stream 1 single-seed fine-tune history "
@@ -206,7 +243,8 @@ def main() -> None:
         r"$\log g \in [1.0, 3.5]$, $T_{\rm eff} \in [4000, 5500]$ K, 5-label)."
         "\n"
         f"{weights_str}.  Real per-epoch metrics.",
-        fontsize=10, fontweight="semibold",
+        fontsize=10,
+        fontweight="semibold",
     )
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     save_fig(fig, OUT / "C1_training")

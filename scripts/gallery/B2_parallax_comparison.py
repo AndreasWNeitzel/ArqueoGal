@@ -101,7 +101,7 @@ def main() -> None:
     # and must be divided by 1000 before comparison.
     r_inv_raw = 1.0 / s2["parallax"].clip(lower=0.001)
     r_inv_corr = 1.0 / s2["parallax_corr"].clip(lower=0.001)
-    r_bj = s2["r_med_photogeo"] / 1000.0   # pc -> kpc
+    r_bj = s2["r_med_photogeo"] / 1000.0  # pc -> kpc
 
     diag = np.linspace(0, 6, 2)
 
