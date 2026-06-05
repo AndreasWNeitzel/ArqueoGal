@@ -58,7 +58,12 @@ PALETTE: dict[str, str] = {
 
 
 def apply_style() -> None:
-    """Set matplotlib rcParams to slide-grade defaults per STYLE_GUIDE.md."""
+    """Set matplotlib rcParams to v1.2-deck defaults per docs/STYLE_GUIDE.md.
+
+    Per the v1.2 brief: 300-DPI savefig, pad_inches=0.15, 12-pt body /
+    13-pt axes title / 14-pt subtitle. Non-bold axes titles (the brief
+    bans bold panel titles). Inter / DejaVu Sans fallback.
+    """
     mpl.rcParams.update(
         {
             "axes.prop_cycle": cycler(color=OKABE_ITO),
@@ -67,45 +72,47 @@ def apply_style() -> None:
             "mathtext.fontset": "dejavusans",
             "mathtext.default": "it",
             "font.family": "sans-serif",
-            "font.sans-serif": ["DejaVu Sans", "Arial", "Helvetica"],
-            "font.size": 14.0,
-            "axes.titlesize": 18.0,
-            "axes.titleweight": "bold",
-            "axes.titlepad": 12.0,
-            "axes.labelsize": 14.0,
+            "font.sans-serif": ["Inter", "DejaVu Sans", "Arial", "Helvetica"],
+            "font.size": 12.0,
+            "axes.titlesize": 13.0,
+            "axes.titleweight": "regular",
+            "axes.titlepad": 6.0,
+            "axes.labelsize": 12.0,
             "axes.labelweight": "regular",
             "axes.labelcolor": PALETTE["ink"],
             "axes.edgecolor": PALETTE["ink"],
-            "axes.linewidth": 1.2,
+            "axes.linewidth": 1.0,
             "axes.spines.top": True,
             "axes.spines.right": True,
             "axes.grid": True,
             "axes.axisbelow": True,
-            "grid.color": PALETTE["mist"],
-            "grid.alpha": 0.45,
-            "grid.linewidth": 0.7,
+            "grid.color": "#D0D3DC",
+            "grid.alpha": 0.6,
+            "grid.linewidth": 0.5,
             "grid.linestyle": "-",
             "xtick.color": PALETTE["ink"],
             "ytick.color": PALETTE["ink"],
-            "xtick.labelsize": 12.0,
-            "ytick.labelsize": 12.0,
+            "xtick.labelsize": 11.0,
+            "ytick.labelsize": 11.0,
             "xtick.direction": "in",
             "ytick.direction": "in",
             "xtick.top": True,
             "ytick.right": True,
             "xtick.minor.visible": True,
             "ytick.minor.visible": True,
-            "xtick.major.width": 1.2,
-            "ytick.major.width": 1.2,
-            "xtick.major.size": 5.0,
-            "ytick.major.size": 5.0,
+            "xtick.major.width": 1.0,
+            "ytick.major.width": 1.0,
+            "xtick.major.size": 4.5,
+            "ytick.major.size": 4.5,
             "legend.frameon": False,
-            "legend.fontsize": 12.0,
-            "legend.title_fontsize": 12.0,
-            "lines.linewidth": 1.8,
+            "legend.fontsize": 11.0,
+            "legend.title_fontsize": 11.0,
+            "lines.linewidth": 1.6,
             "lines.markersize": 6.0,
-            "figure.dpi": 110,
-            "savefig.dpi": 220,
+            "figure.dpi": 150,
+            "savefig.dpi": 300,
+            "savefig.bbox": "tight",
+            "savefig.pad_inches": 0.15,
             "figure.facecolor": "white",
             "axes.facecolor": "white",
             "axes.unicode_minus": False,
@@ -136,36 +143,43 @@ def headline(
     with no axes.
     """
     fig.subplots_adjust(top=top)
+    # v1.2 brief: lighter weight (semibold), smaller, sentence case left
+    # to the caller. y=0.99 keeps the suptitle inside the canvas so
+    # bbox_inches="tight" + pad_inches=0.15 does not clip it.
     fig.suptitle(
         title,
-        fontsize=22,
-        fontweight="bold",
+        fontsize=18,
+        fontweight="semibold",
         color=PALETTE["ink"],
         x=0.02,
-        y=0.985,
+        y=0.99,
         ha="left",
         va="top",
     )
     if subtitle:
         fig.text(
             0.02,
-            0.945,
+            0.95,
             subtitle,
             ha="left",
             va="top",
-            fontsize=14,
+            fontsize=12,
             color=PALETTE["ash"],
         )
 
 
 def save(fig: plt.Figure, name: str) -> None:
-    """Save the figure to OUT/{name}.png with a stamp.
-
-    PDF emission was frozen 2026-05-03; gallery is review-only at this stage.
-    """
+    """Save the figure to OUT/{name}.png and figs/v1_2/{name}.png at 300 DPI."""
     OUT.mkdir(parents=True, exist_ok=True)
     stamp(fig)
     path = OUT / f"{name}.png"
-    fig.savefig(path, bbox_inches="tight", facecolor="white", format="png")
+    fig.savefig(path, bbox_inches="tight", pad_inches=0.15,
+                facecolor="white", format="png", dpi=300)
+    v12 = OUT / "figs" / "v1_2"
+    v12.mkdir(parents=True, exist_ok=True)
+    fig.savefig(v12 / f"{name}.png", bbox_inches="tight", pad_inches=0.15,
+                facecolor="white", format="png", dpi=300)
+    fig.savefig(v12 / f"{name}.pdf", bbox_inches="tight", pad_inches=0.15,
+                facecolor="white", format="pdf")
     print(f"[Y] wrote {path.relative_to(REPO)}")
     plt.close(fig)
