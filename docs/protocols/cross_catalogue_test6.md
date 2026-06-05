@@ -1,7 +1,14 @@
 # Protocol: cross-catalogue consistency (test 6 of §3.3)
 
-**Status:** Scoped. Deferred to D-Cat-d (February 2027).
-**Authoring trigger:** external_peer_review.md CRITICAL #3; META_META §8 P1-9.
+**Status:** **Implemented (2026-04-28).** Framework lives in
+`src/arqueogal/xp_abundances/main/cross_catalogue.py` (statistics) and
+`cross_catalogue_plots.py` (seven diagnostic-plot families); CLI driver is
+`scripts/run_cross_catalogue_validation.py`. Outstanding work is the
+catalogue-cross-match step (each external catalogue requires a different
+TAP/VizieR ingestion before this driver can be run end-to-end against the
+production release).
+**Authoring trigger:** external_peer_review.md CRITICAL #3; META_META §8 P1-9;
+domain-reviewer 2026-04-28 SOTA-viability finding 1.
 
 ## 1 Why this protocol
 
@@ -72,32 +79,49 @@ Test 6 PASS:
 Test 6 FAIL: any of the above violated. Document with explicit per-
 element-per-catalog notes.
 
-## 5 Why this is deferred
+## 5 Implementation map (2026-04-28)
 
-Two reasons:
+The framework is shipped; only the cross-match step is per-catalogue work.
 
-1. **Stream 3 inference must complete first.** Until Stream 3 is run
-   at full scale (1.5 M sources), the overlap subsets with each
-   comparison catalog are too small for statistically meaningful
-   per-magnitude-bin breakdowns.
+- `arqueogal.xp_abundances.main.cross_catalogue.compute_cross_catalogue_report`
+  takes the Pipeline-1 release frame plus a dict of already-cross-matched
+  reference frames and returns a :class:`CrossCatalogueReport` carrying:
+  per-(label, catalogue, mag-bin) Bland-Altman cells (bias, scatter,
+  σ-ratio, MAD-robust scatter, 68/95/99 % coverage, Pearson, n);
+  per-(label, catalogue) trend curves vs ArqueoGal [M/H] and Teff;
+  per-(label, catalogue) Teff×log g cell heatmaps; pass/fail map under the
+  §3.3 acceptance gate.
+- `cross_catalogue_plots.render_all` emits the seven plot families
+  (Bland-Altman scatter facets, residual histogram + N(0,1) overlay,
+  metallicity-dependent bias trend, Teff-dependent bias trend, Teff×log g
+  heatmap, coverage curve, rank-summary heatmap) as PDF (paper-grade) +
+  PNG (gallery) into a per-slice subdirectory.
+- `scripts/run_cross_catalogue_validation.py` is the CLI driver. It also
+  provides the matched-σ-subsample diagnostic (`--matched-sigma-quantile`)
+  that controls for the σ-inflation Tier-2 demotion selection bias
+  documented in `release.py`.
+- Bindings between ArqueoGal label keys and external-catalogue column
+  names live in `configs/main/cross_catalogue_bindings.yaml`. Five
+  catalogues are pre-bound (AspGap, SHBoost, Guiglion+2024, Andrae+2023,
+  Zhang+2023, GALAH DR4); add new entries as needed.
 
-2. **The compute is non-trivial.** Cross-matching Stream 3 against
-   five comparison catalogs at full scale is a multi-day pyvo / ADQL
-   operation. Bland-Altman per element × catalog × magnitude bin
-   produces ~150 figures; aggregating to a small Methods-paper
-   figure requires careful summary.
+The remaining work is the cross-match itself: each reference catalogue
+needs a TAP/VizieR ingestion script that emits a parquet of overlap rows
+1:1-aligned with the Pipeline-1 release. That work is per-catalogue and
+not in scope for this protocol document.
 
-Defer to D-Cat-d (February 2027) per META_META §10 user decision 2.
-The methods paper at submission cites test 6 as "deferred to D-Cat-d
-release per the timeline in `docs/plan/03_stream3_inference.md`".
+## 6 Effort estimate (revised 2026-04-28)
 
-## 6 Effort estimate
-
-2–3 weeks once Stream 3 inference is complete.
+- Framework: shipped.
+- Per-catalogue cross-match: 1-2 days each (5 catalogues × 1.5 days ≈
+  2 weeks).
+- Methods-paper figure consolidation from the seven plot families: 2-3
+  days.
 
 ## 7 Outcome contract
 
-When complete, test 6 moves from STUBBED_TESTS in `tier_promotion.py`.
-the methods-paper §3.3 promotion narrative becomes 6/6 coverage, and
-the catalog v1.2 release publishes the cross-catalogue Bland-Altman
-results as a supplementary appendix.
+When the cross-matches are done, the framework moves test 6 from
+STUBBED_TESTS in `tier_promotion.py` to PASSED, the methods-paper §3.3
+promotion narrative becomes 6/6 coverage, and the catalogue release
+publishes the seven plot families plus the long-form CSV as a
+supplementary appendix.

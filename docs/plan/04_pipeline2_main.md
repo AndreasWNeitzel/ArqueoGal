@@ -48,9 +48,10 @@ review.
 ## FIRE-2 method validation
 
 The FIRE-2 hare-and-hounds validation (Subtask 5.1) follows Starfold, not
-this repo. The "No FIRE-2 for real-data science" invariant still applies
-to anything that imports Pipeline 1 predictions, but the synthetic-data-
-on-simulation work itself is now Starfold's concern.
+this repo. Production Pipeline 1 consumes only real observational data;
+validation is conducted on real hold-out splits and external catalogue
+cross-matches. Historical: synthetic-data method-validation in early prototypes
+has been discontinued in favour of real-data validation.
 
 ## What stays in this repo
 

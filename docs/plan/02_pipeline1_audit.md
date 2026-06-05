@@ -1,7 +1,8 @@
 # Phase 02, §9.2 information-content audit
 
-**Status: Partial. 5 of 6 tests done; tier decisions ratified for all 5 labels. Test 6
-(cross-catalogue consistency) blocked on Stream 3 inference.**
+**Status: Framework complete. 5 of 6 tests run end-to-end on Stream 1; Test 6
+(cross-catalogue consistency) framework shipped 2026-04-28 and awaits the
+per-catalogue cross-match step against the Stream 3 release.**
 
 ## Goal
 
@@ -21,7 +22,13 @@ of the 5 Pipeline 1 labels, and convert the evidence into final tier assignments
    absorb [α/M] variance). Shipped.
 5. `reports/pipeline1/audit/pca_cmi_all_labels.json`. PCA-CMI across all 5 labels
    confirming 2-D summary is biased (ADR-0009). Shipped.
-6. Test 6 (cross-catalogue consistency) report card. **pending Stream 3 inference**.
+6. Test 6 (cross-catalogue consistency) report card. **Framework shipped
+   2026-04-28** in `arqueogal.xp_abundances.main.cross_catalogue` +
+   `cross_catalogue_plots`; CLI driver
+   `scripts/run_cross_catalogue_validation.py`. Pending: per-catalogue
+   cross-match against Stream 3 (AspGap, SHBoost, Guiglion+2024,
+   Andrae+2023, Zhang+2023, GALAH DR4); see
+   `docs/protocols/cross_catalogue_test6.md` §5.
 
 ## Tier decisions (Option 2, ratified 2026-04-19)
 
@@ -41,15 +48,19 @@ of the 5 Pipeline 1 labels, and convert the evidence into final tier assignments
 4. Shuffled-spectrum null (within (Teff, log g) cell permutation).
 5. Conditional MI (Kraskov KSG) with PCA summary (7 components, 95.8% var). 2-D summary
    deprecated. ADR-0009.
-6. Cross-catalogue consistency. **PENDING** Stream 3 inference overlap with
-   AspGap / Guiglion+2024 / SHBoost.
+6. Cross-catalogue consistency. **Framework SHIPPED** 2026-04-28; per-catalogue
+   cross-match still pending (AspGap / Guiglion+2024 / SHBoost / Andrae+2023 /
+   Zhang+2023 / GALAH DR4). The framework is fully test-covered on real
+   hold-out data.
 
 ## Acceptance criteria
 
 - All 5 labels have report cards, met.
 - Tier decisions for all 5 labels are ratified with documented evidence, met.
 - Release-statement text is verbatim-pinned in `SUMMARY.md`, met.
-- Test 6 closes the audit. **pending Phase 03 completion**.
+- Test 6 closes the audit. **Framework complete; awaits cross-match step.**
+  When the per-catalogue cross-matches are produced, the audit promotes from
+  partial to complete and the methods-paper §3.3 narrative becomes 6/6.
 
 ## Methodology notes for methods paper
 

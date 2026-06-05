@@ -1,16 +1,29 @@
 # Pipeline 1 Release Catalog Schema
 
-**Version:** 5
-**Last Modified:** 2026-04-26
-**Release Tag:** `pipeline1-v1-2026-04-19` (base predictions); v2 columns added in Stream 3 Phase A2; v3 columns added in Phase A2-followup (per-element release tiers, dist_prior_dominated, ood_aux_mahalanobis_flag); v4 columns added in Phase A2-followup-2 (per-element `prediction_sigma_inflated__<elem>` σ-threshold caveat to demote prior-collapse stars); v5 ablation-driven simplification (ADR-0015): retires `latent_support_flag`, `ood_aux_mahalanobis_flag`, `regime_b_flag`, `ood_disagreement_flag`, `aux_missing_any`, `dist_prior_dominated` from tier gating (kept as diagnostic columns), confines `mode_ambiguous_flag` to `[α/M]` only, tightens `[α/M]` σ-threshold from 0.10 to 0.05 dex.
+**Version:** 6
+**Last Modified:** 2026-05-03
+**Release Tag:** `pipeline1-v1.1-21label-2026-04-29` (production model); v6 supersedes v5 with 21-element predictions and associated covariance structure. v1–v5 historical.
+
+> **2026-05-03 tier-gating redesign. Read this before the table entries below.**
+> The Tier-2 demotion gates were redesigned on 2026-05-03. The active gates as of v6 are:
+>
+> - **Tier 3** if `ood_joint_flag` (XP-block Mahalanobis input-OOD) **OR** per-element NaN prediction.
+> - **Tier 2** if `label_extrapolation_flag` (5-D Mahalanobis on predicted `(Teff, log g, [M/H], [α/M], [Mg/H])` outside the APOGEE-truth p99 envelope) **OR** any element-specific caveat in `_PER_ELEMENT_CAVEAT_FLAGS` (currently empty).
+> - **Tier 1** otherwise.
+>
+> The following columns were active gates through v5 but are **diagnostic-only as of v6**: `prediction_sigma_inflated__<element>` (per-element σ-tail flag), `kin_ood_flag` (disc-kinematics envelope), `mode_ambiguous_flag` (α/M bimodality boundary). They are still emitted to the parquet as informational columns; downstream users can apply their own filters but the release tier no longer consumes them. See `docs/decisions/ADR-0016_tier_v6_mahalanobis_redesign.md` for the migration rationale.
+>
+> Where this document still describes σ-inflation, `kin_ood_flag`, or `mode_ambiguous_flag` as "active gates," treat that wording as the historical v5 contract and use the v6 logic above.
 
 ## Overview
 
-This document specifies the column contracts for Pipeline 1 release catalogs materialized by `src/arqueogal/xp_abundances/main/release.py`. Every released Parquet carries a companion `*.release_tier.json` sidecar capturing schema version, tier counts, and release-column provenance.
+This document specifies the column contracts for Pipeline 1 v1.1 release catalogs materialized by `src/arqueogal/xp_abundances/main/release.py`. Every released Parquet carries a companion `*.release_tier.json` sidecar capturing schema version, tier counts, and release-column provenance.
+
+The v1.1 model produces 21 stellar labels (3 atmospheric parameters + 18 elemental abundances), each with posterior mean, posterior standard deviation (aleatoric-intrinsic + feature-noise-propagated), and per-element release tier. A 21×21 block-Cholesky covariance matrix is also emitted. Four-way evolutionary-stage diagnostics (RGB, HeCB, OOD_evolved, OOD_unevolved) are provided for robustness tracking.
 
 The catalog is built in stages:
-1. **Inference** produces predictions and OOD flags (§10.2, data_acquisition.md).
-2. **Release annotation** adds release tier, per-label abundance-type flags, kinematic OOD flag, and magnitude binning (this module).
+1. **Inference** produces 21 predictions, 21×21 block-Cholesky covariance, feature-noise-marginalised σ per element, and OOD flags.
+2. **Release annotation** adds per-element release tier, per-element abundance-type flags (spectrum-dominant or aux-assisted), kinematic OOD flag, and magnitude binning.
 
 A per-star science publication uses **Tier 1 only**. Aggregate studies may include Tier 2 with explicit caveat. Tier 3 is provided for methodology work and alternate filtering strategies; it is not released in published catalogs.
 
@@ -101,35 +114,40 @@ Do not use Bayestar19 (budget). Do not use astroquery.gaia; use pyvo (AIP, GAVO,
 | `ruwe` | float32 | | [0, 2] (typical) | impossible | Renormalized unit weight error (Gaia). Measure of astrometric scatter relative to formal errors. Values >1.4 suggest binarity or large astrometric noise. |
 | `dist_conflict` | bool | | {True, False} | False (default) | Present only if StarHorse2 parallax included. True if parallax disagreement with Gaia >20% (methodology flag, not a release gate). |
 
-### Predictions (Pipeline 1, all XP+auxiliary-feature conditioned)
+### Predictions: 21 Elements (v1.1 Schema)
+
+The v1.1 model predicts three atmospheric parameters (Teff, log g, [M/H]) and 18 elemental abundances ([X/H] for X in C, N, O, Na, Mg, Al, Si, S, K, Ca, Sc, Ti, V, Cr, Mn, Fe, Co, Ni). Each element carries four columns: posterior mean, aleatoric-intrinsic σ, feature-noise-propagated σ, and inflated-σ flag.
+
+For each element E in {teff, logg, mh, c_h, n_h, o_h, na_h, mg_h, al_h, si_h, s_h, k_h, ca_h, sc_h, ti_h, v_h, cr_h, mn_h, fe_h, co_h, ni_h}:
 
 | Column | Type | Unit | Valid Range | NaN Meaning | Notes |
 |---|---|---|---|---|---|
-| `teff_pred` | float32 | K | [3500, 6500] | NaN → Tier 3 | Predicted effective temperature (spectrum-dominant). |
-| `teff_err` | float32 | K | (0, 1000] | rare | Prediction uncertainty (ensemble standard deviation or posterior credible interval width). |
-| `logg_pred` | float32 | dex | [0.5, 5] | NaN → Tier 3 | Predicted surface gravity (spectrum-dominant). |
-| `logg_err` | float32 | dex | (0, 2] | rare | Prediction uncertainty. |
-| `mh_pred` | float32 | dex | [-2.5, 1] | NaN → Tier 3 | Predicted [M/H] (spectrum-dominant). |
-| `mh_err` | float32 | dex | (0, 0.5] | rare | Prediction uncertainty. |
-| `alpha_m_pred` | float32 | dex | [-0.5, 1] | NaN → Tier 3 | Predicted [α/M] (aux-assisted). See §3 for caveat. |
-| `alpha_m_err` | float32 | dex | (0, 0.4] | rare | Prediction uncertainty. |
-| `mg_h_pred` | float32 | dex | [-1, 1] | NaN → Tier 3 | Predicted [Mg/H] (aux-assisted). See §3 for caveat. |
-| `mg_h_err` | float32 | dex | (0, 0.3] | rare | Prediction uncertainty. |
+| `<E>_pred` | float32 | dex (except Teff in K) | element-dependent | NaN → Tier 3 | Posterior mean estimate. Teff in Kelvin; all others dimensionless [X/H]. |
+| `<E>_sigma` | float32 | dex (except Teff in K) | (0, 1000] | rare | Aleatoric-intrinsic uncertainty from posterior. Per-element; does not include feature-noise propagation. |
+| `<E>_sigma_total` | float32 | dex (except Teff in K) | (0, 1000] | rare | Total posterior σ after feature-noise marginalisation: sqrt(σ^2 + σ_noise^2). Recommended for downstream error bars. |
+| `<E>_sigma_feature_noise_propagated` | float32 | dex (except Teff in K) | (0, 1000] | rare | Feature-noise contribution σ_noise estimated at inference time via analytical gradient-norm marginalisation. Optional, present if feature-noise training was enabled. |
+| `prediction_sigma_inflated__<E>` | bool | | {True, False} | False (default) | **Diagnostic-only as of v6 (2026-05-03).** True when σ > element-specific prior-collapse threshold (thresholds TBD per v1.1 audit; provisional from v1.0 σ_train). Was a per-element Tier-2 gate through v5; the 2026-05-03 redesign retired it in favor of `label_extrapolation_flag`. Downstream users can still filter on it but the release tier no longer reads it. |
 
-All predictions are posterior means (Bayesian NNs with BayesByBackprop or ensemble). Uncertainties are ensemble standard deviations or credible interval widths, depending on model architecture.
+**Auxiliary classification:** Spectrum-dominant elements (Teff, logg, [M/H]) rely on XP spectral dominance. Aux-assisted elements (all 18 abundances) rely on auxiliary kinematics and population priors; they are reliable for disc stars but unreliable for halo/accreted-debris.
 
 ### Out-of-Distribution Flags
 
-> **v5 (2026-04-26)**: only `ood_joint_flag` is an active tier gate.
-> `latent_support_flag` and `ood_aux_mahalanobis_flag` are still emitted but
-> are diagnostic-only, they do not feed `release_tier`. See ADR-0015 and
-> `release/test_ablations_2026-04-26/REPORT.md`.
+> **v6 (2026-05-03):** the active tier gates are `ood_joint_flag` (Tier 3,
+> input-OOD) and `label_extrapolation_flag` (Tier 2, output-OOD). The
+> companion percentile columns are continuous severity rankings; both are
+> always emitted. `latent_support_flag` and `ood_aux_mahalanobis_flag` are
+> diagnostic-only since v5. See ADR-0015 (v5) and ADR-0016 (v6).
 
 | Column | Type | Unit | Valid Range | NaN Meaning | Notes |
 |---|---|---|---|---|---|
-| `ood_joint_flag` | bool | | {True, False} | False (default) | **v5 active gate.** Hard OOD gate: Mahalanobis distance in 108-D XP feature space at p=0.99 (chi-squared, training envelope). True → Tier 3. |
+| `ood_joint_flag` | bool | | {True, False} | False (default) | **v5 / v6 active gate.** Hard OOD gate: Mahalanobis distance in 108-D XP feature space at p=0.99 (chi-squared, training envelope). True → Tier 3. |
+| `label_extrapolation_flag` | bool | | {True, False} | False (default) | **v6 active gate (2026-05-03).** True when the predicted 5-D label vector (Teff, log g, [M/H], [α/M], [Mg/H]) lies outside the 99th-percentile envelope of the APOGEE-truth Mahalanobis distribution. Symmetric output-OOD partner to `ood_joint_flag`. True → Tier 2. Fit by `run_pipeline1_inference._fit_label_mahalanobis_bundle` (5-D empirical covariance, regularization 1e-8). See ADR-0016. |
+| `ood_mahalanobis_percentile` | float32 | | [0, 1] | NaN if input is NaN | **v6 diagnostic.** Empirical-CDF percentile of the per-star XP-block Mahalanobis distance against the training distribution. Continuous companion to `ood_joint_flag` (which fires at percentile > 0.99). Use for user-defined input-OOD severity filtering. Percentiles above the maximum training distance are clamped to 1.0. |
+| `label_mahalanobis_percentile` | float32 | | [0, 1] | NaN if predictions are NaN | **v6 diagnostic.** Empirical-CDF percentile of the per-star 5-D label-Mahalanobis distance against the APOGEE-truth training distribution. Continuous companion to `label_extrapolation_flag` (fires at percentile > 0.99). Use for user-defined output-OOD severity filtering. Percentiles above the maximum training distance are clamped to 1.0; do not interpret > 0.99 as a continuous severity ranking. |
 | `latent_support_flag` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Convex-hull surrogate on learned representations. Never fired on the Stream-1 holdout in the v5 ablation; column kept for diagnostic continuity. |
 | `ood_aux_mahalanobis_flag` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Mahalanobis distance in the auxiliary-feature space (parallax, photometry, extinction, position) at p=0.99. Subsumed by `aux_missing_any` in practice; kept for diagnostic continuity. |
+
+**APOGEE-truth envelope caveat for `label_extrapolation_flag`.** The 5-D Mahalanobis envelope is fit on APOGEE DR19 truth labels, which themselves carry a restricted observational window: Teff ∈ [4000, 5500] K, log g ∈ [1.0, 3.5], [M/H] ∈ [-2.0, +0.5], G ≲ 13.5 for the bright sample. Stream-3 stars predicted into label-space regions sparse or absent in APOGEE (cool dwarfs below the Teff cutoff, metal-poor halo, faint giants) will fall into Tier 2 by construction. This is selection-bias of the training reference, not a defect in the predictions. Users targeting halo / accreted-debris populations should treat T2 demotions as conservative-by-design and consult `label_mahalanobis_percentile` for graded severity.
 
 ### Caveat Flags (Structural, demote to Tier 2)
 
@@ -142,14 +160,14 @@ All predictions are posterior means (Bayesian NNs with BayesByBackprop or ensemb
 | Column | Type | Unit | Valid Range | NaN Meaning | Notes |
 |---|---|---|---|---|---|
 | `regime_b_flag` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Regime B (Galactic plane, warm RGB): systematic T_eff over-prediction ~1σ. Fires on ~0.04 % of stars; the v5 ablation showed no measurable T1+T2 RMSE effect. The systematic itself is a methods-paper finding (AGENTS.md footgun), not a release-blocker. |
-| `mode_ambiguous_flag` | bool | | {True, False} | False (default) | **v5 active gate (per-element, [α/M] only).** Disc α/M bimodality at fixed (Teff, log g, [M/H]). Gaussian-NLL μ-collapse risk. Demotes only `release_tier__alpha_m` to Tier 2. Other elements unaffected. The v5 ablation showed +12 % α/M T1 RMSE inflation when this gate is removed; zero effect for the other elements. |
+| `mode_ambiguous_flag` | bool | | {True, False} | False (default) | **Diagnostic-only as of v6 (2026-05-03).** Disc α/M bimodality at fixed (Teff, log g, [M/H]). Was a per-element T2 gate on α/M through v5; retired because the flag fires on ~46 % of the cohort (the disc is genuinely bimodal at fixed Teff/log g/[M/H]) and demoting half the catalog was not justified. |
 | `ood_disagreement_flag` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Designed for multi-member ensemble disagreement; cannot fire with a single-member ensemble. Re-evaluate when the ensemble grows to ≥ 2 members. |
 | `aux_missing_any` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** Any auxiliary feature (parallax, extinction, position) is NaN at inference. Stars carrying this flag had ~4-6 % T1 RMSE inflation if kept in T1, but T1+T2 RMSE was unchanged, i.e. the demotion was pure relabeling. Column retained as a soft caveat for consumer-side filtering. |
 | `dist_prior_dominated` | bool | | {True, False} | False (default) | **v5 diagnostic-only (retired from gating).** True when the Bailer-Jones photogeometric distance is dominated by the Galactic prior rather than parallax (σ_π/π > 0.2). Never fired on the held-out test split; column retained for diagnostic continuity. |
-| `prediction_sigma_inflated__<elem>` | bool | | {True, False} | False (default) | **v4 schema addition (per-element); v5 active gate.** True when the regression-head predicted σ for that element exceeds the prior-collapse threshold: `teff_sigma > 150 K`, `logg_sigma > 0.30 dex`, `mh_sigma > 0.20 dex`, **`alpha_m_sigma > 0.05 dex` (tightened from 0.10 in v5)**, `mg_h_sigma > 0.20 dex`. True → that element's tier demotes to Tier 2. Other elements unaffected. Computed by `release.assign_prediction_sigma_inflated()`. |
+| `prediction_sigma_inflated__<elem>` | bool | | {True, False} | False (default) | **Diagnostic-only as of v6 (2026-05-03)** (was v5 per-element gate). True when the regression-head predicted σ for that element exceeds the prior-collapse threshold: `teff_sigma > 150 K`, `logg_sigma > 0.30 dex`, `mh_sigma > 0.20 dex`, `alpha_m_sigma > 0.05 dex`, `mg_h_sigma > 0.20 dex`. Computed by `release.assign_prediction_sigma_inflated()`; emitted to the parquet for user filtering, no longer consulted by the release-tier composer. |
 | `prediction_sigma_inflated_any` | bool | | {True, False} | False (default) | **v4 schema addition.** Row-OR aggregate over the five `prediction_sigma_inflated__<elem>` flags. Convenience column for consumers who only need the row-level "any element prior-collapsed" indicator without inspecting per-element flags. |
 
-**v5 tier composition (applies after annotate_parquet).** Tier 3 if `ood_joint_flag` OR per-element NaN. Tier 2 if per-element σ-inflation OR (element is α/M AND `mode_ambiguous_flag`) OR (element is aux-assisted AND `kin_ood_flag`). Tier 1 otherwise. Composite `release_tier` = row-max across elements. Diagnostic-only flags do not affect tier.
+**v6 tier composition (applies after annotate_parquet, 2026-05-03).** Tier 3 if `ood_joint_flag` OR per-element NaN. Tier 2 if `label_extrapolation_flag` OR per-element caveat in `_PER_ELEMENT_CAVEAT_FLAGS` (currently empty). Tier 1 otherwise. Composite `release_tier` = row-max across elements. The σ-inflation, `kin_ood_flag`, and `mode_ambiguous_flag` columns are emitted as diagnostics but are not consumed by the tier composer; see ADR-0016 for the v5 → v6 migration rationale.
 
 ---
 
@@ -161,59 +179,73 @@ These columns are added by `annotate_parquet()` at release time. They are option
 
 | Column | Type | Unit | Valid Range | NaN Meaning | Notes |
 |---|---|---|---|---|---|
-| `release_tier` | int8 | | {1, 2, 3} | invalid | Composite **row-max** (most-conservative) over the per-element tiers. **Tier 1**: per-star science. **Tier 2**: σ-inflation (any element), `mode_ambiguous_flag` (α/M only), or `kin_ood_flag` (aux-assisted elements only). **Tier 3**: `ood_joint_flag` (XP-Mahalanobis OOD) or NaN prediction. See ADR-0015 and §3 below. |
+| `release_tier` | int8 | | {1, 2, 3} | invalid | Composite **row-max** (most-conservative) over the per-element tiers. **Tier 1**: per-star science. **Tier 2**: `label_extrapolation_flag` (5-D Mahalanobis on predicted (Teff, log g, [M/H], [α/M], [Mg/H]) outside the APOGEE-truth p99 envelope). **Tier 3**: `ood_joint_flag` (XP-block Mahalanobis input-OOD) or NaN prediction. See ADR-0015 (v5) and ADR-0016 (v6) and §3 below. |
 
-### Per-Element Release Tier (v3 schema addition)
+### Per-Element Release Tier (21 elements, v6 schema)
 
-Five `int8` columns, one per atmospheric parameter / abundance, encoding the element-specific tier independent of the row-max composite. The composite `release_tier` is `max(release_tier__teff, ..., release_tier__mg_h)`.
+Twenty-one `int8` columns (one per element), encoding the element-specific tier independent of the row-max composite. The composite `release_tier` is `max(release_tier__teff, ..., release_tier__ni_h)`.
 
-| Column | Type | Unit | Valid Range | NaN Meaning | Notes |
-|---|---|---|---|---|---|
-| `release_tier__teff` | int8 | | {1, 2, 3} | invalid | Per-element tier for T_eff. Tier 3 if NaN or `ood_joint_flag`; Tier 2 if `prediction_sigma_inflated__teff`; else Tier 1. T_eff is spectrum-dominant so neither `mode_ambiguous_flag` nor `kin_ood_flag` demote. |
-| `release_tier__logg` | int8 | | {1, 2, 3} | invalid | As for T_eff (spectrum-dominant). |
-| `release_tier__mh` | int8 | | {1, 2, 3} | invalid | As for T_eff (spectrum-dominant). |
-| `release_tier__alpha_m` | int8 | | {1, 2, 3} | invalid | Per-element tier for [α/M]. Tier 3 if NaN or `ood_joint_flag`; Tier 2 if `prediction_sigma_inflated__alpha_m` (threshold tightened to 0.05 dex in v5) OR `mode_ambiguous_flag` (per-element caveat, α/M-only) OR `kin_ood_flag` (aux-assisted demotion); else Tier 1. |
-| `release_tier__mg_h` | int8 | | {1, 2, 3} | invalid | Per-element tier for [Mg/H]. Tier 3 if NaN or `ood_joint_flag`; Tier 2 if `prediction_sigma_inflated__mg_h` OR `kin_ood_flag` (aux-assisted demotion); else Tier 1. |
+For spectrum-dominant elements (Teff, logg, [M/H]):
+- Tier 3 if NaN or `ood_joint_flag`.
+- Tier 2 if `prediction_sigma_inflated__<E>` (σ exceeds element-specific prior-collapse threshold).
+- Tier 1 otherwise.
 
-The per-element columns let consumers safely filter at finer granularity. A galactic-structure paper using only [M/H] can keep `release_tier__mh == 1` rows even when `release_tier == 2` due to a kin-OOD-driven [α/M] demotion that does not affect [M/H].
+For aux-assisted elements (18 abundances):
+- Tier 3 if NaN or `ood_joint_flag`.
+- Tier 2 if `prediction_sigma_inflated__<E>` (σ exceeds threshold) OR `kin_ood_flag` (star is kinematically anomalous, disc prior does not apply).
+- Tier 1 otherwise.
 
-### Per-Element Abundance Type
+| Column | Type | Valid Range | Notes |
+|---|---|---|---|
+| `release_tier__<E>` (21 columns) | int8 | {1, 2, 3} | Per-element tier for element E. Consumers can filter by per-element tier to safely use [M/H] (spectrum-dominant) while excluding aux-assisted [α/M] / [Mg/H] from kin-OOD stars. |
 
-Five columns, one per atmospheric parameter / abundance:
+The per-element columns let consumers filter at fine granularity. A galactic-structure paper using only [M/H] can keep `release_tier__mh == 1` rows even when `release_tier == 2` due to a kin-OOD or σ-inflation demotion affecting one of the 18 abundances.
+
+### Per-Element Abundance Type (21 elements, v6 schema)
+
+Twenty-one columns (one per element), classifying each prediction as spectrum-dominant or aux-assisted:
 
 | Column | Type | Values | Meaning | Notes |
 |---|---|---|---|---|
-| `xp_abundance_type__teff` | string | "spectrum_dominant" | T_eff prediction is XP-constrained (CMI > threshold). | No uncertainty penalty; trust XP dominance. |
-| `xp_abundance_type__logg` | string | "spectrum_dominant" | log g prediction is XP-constrained. | As for Teff. |
-| `xp_abundance_type__mh` | string | "spectrum_dominant" | [M/H] prediction is XP-constrained (CMI > 0.02). | As for Teff. |
-| `xp_abundance_type__alpha_m` | string | "aux_assisted" | [α/M] prediction conditional on auxiliary. | See §3 caveat. |
-| `xp_abundance_type__mg_h` | string | "aux_assisted" | [Mg/H] prediction conditional on auxiliary. | See §3 caveat. |
+| `xp_abundance_type__<E>` (21 columns) | string | "spectrum_dominant" or "aux_assisted" | Prediction mechanism for element E. | Spectrum-dominant: XP spectrum is the primary constraint (Teff, logg, [M/H]). Aux-assisted: prediction relies on auxiliary kinematics and population priors (all 18 abundances). |
 
-All abundance-type strings are lowercase. These columns enable consumers to filter by prediction-mechanism confidence. For example, a galactic-structure paper using [M/H] can trust the spectrum_dominant mechanism across the full magnitude range; a globular-cluster paper using [α/M] should acknowledge the aux_assisted caveat.
+All abundance-type strings are lowercase. These columns enable consumers to filter by prediction-mechanism confidence. A galactic-structure paper using [M/H] (spectrum_dominant) can trust the predictions across the full magnitude range; a globular-cluster paper using elemental abundances (aux_assisted) should acknowledge the caveat in section 3.1 below.
 
-#### Design Rationale: Per-Label Columns vs. Composite
+**Rationale:** We emit 21 separate string columns rather than a single JSON-encoded composite. This choice prioritizes **consumer ergonomics**: the columns are directly filterable in SQL or Polars/DuckDB, and human readers can grep the CSV. A composite would require JSON parsing in the consumer's language.
 
-We emit five separate string columns (`xp_abundance_type__<element>`) rather than a single JSON-encoded composite. This choice prioritizes **consumer ergonomics**: the columns are directly filterable in SQL or Polars/DuckDB, and human readers can grep the CSV. A composite would require JSON parsing in the consumer's language.
-
-### Auxiliary-Assisted Label Caveat
+### Auxiliary-Assisted Label Caveat (18 elemental abundances, v6 schema)
 
 **Aux-assisted labels** (`xp_abundance_type == "aux_assisted"`) are model predictions where the conditional mutual information (CMI) between the XP spectrum and the label, *given auxiliary features* (parallax, photometry, extinction, position), falls below **0.02 nats** (research_brief.md §3.3.1, information-content audit §9.2).
 
-In plain language: the model learns these labels primarily from the disc-population prior (derived from APOGEE training) and auxiliary data. The XP spectrum contributes but does not dominantly constrain the label.
+In plain language: the 18 elemental abundances are learned primarily from the disc-population prior (derived from APOGEE training) and kinematic information. The XP spectrum contributes but does not dominantly constrain these labels independently.
 
 **Implications for consumers:**
 
-1. **Disc stars (solar vicinity, thin disk kinematics):** aux-assisted predictions are reliable. The model has learned the disc [α/M]–[M/H] relation and [Mg/H]–[Fe/H] bimodality from APOGEE; XP provides a secondary consistency check.
+1. **Disc stars (solar vicinity, thin-disk kinematics):** aux-assisted predictions are reliable. The model has learned elemental-abundance bimodalities and correlations from APOGEE; XP provides a secondary consistency check, and auxiliary kinematics confirms disc membership.
 
-2. **Halo, accreted-debris, or kinematically-anomalous stars:** aux-assisted predictions are unreliable. The disc prior breaks down. Supplement with independent spectroscopy (e.g., APOGEE itself, high-resolution follow-up).
+2. **Halo, accreted-debris, or kinematically-anomalous stars:** aux-assisted predictions are unreliable. The disc prior breaks down; the star's kinematics signal population membership that conflicts with the training prior. The `kin_ood_flag` is set to True for these stars, demoting all aux-assisted elements to Tier 2. Supplement with independent spectroscopy (e.g., APOGEE itself, high-resolution follow-up).
 
-3. **Published work:** cite the model architecture (methods paper, BayesByBackprop or ensemble) and acknowledge that [α/M] and [Mg/H] rely on population priors. Do not claim XP-derived abundances for stars where the disc prior is violated.
+3. **Published work:** cite the model architecture (methods paper, v1.1 single-model architecture), mention that the 18 elemental abundances rely on population priors and kinematic membership, and filter by `kin_ood_flag` and per-element `release_tier__<E>` as appropriate for your science case.
+
+### Evolutionary-Stage Diagnostic Columns (v6 schema, optional)
+
+When the v1.1 model is run with the 4-way evolutionary-stage diagnostic head enabled, four additional columns are emitted:
+
+| Column | Type | Valid Range | Notes |
+|---|---|---|---|
+| `evol_stage_class` | string | {"RGB", "HeCB", "OOD_evolved", "OOD_unevolved"} | Hard-classified evolutionary stage (argmax of the four posterior class probabilities). RGB = red giant branch; HeCB = horizontal branch or clump; OOD_evolved/OOD_unevolved = out-of-distribution stars flagged as evolved or unevolved based on Gaia luminosity and color. |
+| `evol_stage_prob_RGB` | float32 | [0, 1] | Posterior probability of RGB classification. |
+| `evol_stage_prob_HeCB` | float32 | [0, 1] | Posterior probability of HeCB classification. |
+| `evol_stage_prob_OOD_evolved` | float32 | [0, 1] | Posterior probability of OOD-evolved classification. |
+| `evol_stage_prob_OOD_unevolved` | float32 | [0, 1] | Posterior probability of OOD-unevolved classification. |
+
+**Purpose:** The diagnostic head tracks model robustness across evolutionary stages. High entropy in the class probabilities (e.g., RGB and HeCB both ~0.5) suggests the star's XP spectrum is ambiguous between the two stages; low entropy (one class >= 0.9) suggests high confidence. Consumers can filter by confidence and stage as needed. The OOD classes are learned from Gaia HR diagram boundaries and serve as outlier flags.
 
 ### Kinematic OOD Flag
 
 | Column | Type | Unit | Valid Range | NaN Meaning | Notes |
 |---|---|---|---|---|---|
-| `kin_ood_flag` | bool | | {True, False} | invalid | **Phase B implementation (2026-04-25):** populated by `xp_abundances.main.kinematic_ood.fit_kinematic_ood` on the Stream-3 kinematic-ready subset. Mahalanobis-on-velocity envelope fit on the disc-cut subset (\|v_z\|<80, v_T>100 km/s); per-star Mahalanobis distance to disc mean compared to the 99th-percentile threshold. True ⇒ star is kinematically anomalous (halo, accreted-debris, counter-rotating disc), aux-assisted elements ([α/M], [Mg/H]) demote to Tier 2 because the disc-population prior they rely on does not apply. Spectrum-dominant elements (Teff, logg, [M/H]) are unaffected. Stars without kinematics (Stream-3 outside the kinematic-ready subset) default to False (conservative, keeps them in Tier 1; the user can join the kinematic parquet themselves for finer per-star analysis). Bundle JSON sidecar: `data/processed/pipeline1_kin_ood_bundle.json`. |
+| `kin_ood_flag` | bool | | {True, False} | invalid | **Diagnostic-only as of v6 (2026-05-03)** (was v5 aux-assisted T2 gate). Populated by `xp_abundances.main.kinematic_ood.fit_kinematic_ood` on the Stream-3 kinematic-ready subset (Mahalanobis on (v_R, v_T, v_z), disc-cut envelope, p99 threshold). True flags kinematically anomalous stars (halo, accreted-debris, counter-rotating disc). The v6 redesign retired this column from tier gating because halo / accreted-debris stars are exactly the science target for users who want them; demoting them by default was the wrong move. The column is still populated when the upstream kinematic parquet is joined; the release tier does not consume it. Bundle JSON sidecar: `data/processed/pipeline1_kin_ood_bundle.json`. |
 
 Kinematic OOD detection is **operational as of iter-4 (2026-04-25)**: 6,133 / 249,092 stars (~2.46 %) in the kinematic-ready subset are flagged. 5,955 of those (97 %) have their `release_tier__alpha_m` demoted from Tier 1 to Tier 2 (the rest were already at Tier 2 from another caveat). Spectrum-dominant elements show no change. Build script: `scripts/build_kin_ood_flag.py`.
 
@@ -254,7 +286,9 @@ Five `bool` columns (one per element) plus a row-OR aggregate, exposing where th
 
 **Sidecar exposure.** The exact threshold values are written to the `*.release_tier.json` sidecar under `prediction_sigma_inflated_thresholds`, so consumers can verify which thresholds applied to a given catalog without reading the source code.
 
-**Recommended consumer use.** Filter on the per-element flag, not the aggregate. A galactic-structure paper using only [M/H] should keep rows where `prediction_sigma_inflated__mh == False` even when `prediction_sigma_inflated_any == True` due to a [α/M] σ inflation that does not affect [M/H].
+**v6 status (2026-05-03).** The σ-inflation flags are diagnostic-only as of v6. They are still computed and emitted to every released parquet but the release-tier composer no longer reads them. Downstream users who want a σ-tail filter can apply one themselves; published v6 catalogs do NOT pre-filter on σ-inflation. The label-Mahalanobis output-OOD gate (`label_extrapolation_flag`) supersedes σ-inflation as the active T2 demoter.
+
+**Recommended consumer use.** Filter on the per-element flag, not the aggregate, if you choose to apply σ-tail filtering. A galactic-structure paper using only [M/H] should keep rows where `prediction_sigma_inflated__mh == False` even when `prediction_sigma_inflated_any == True` due to a [α/M] σ inflation that does not affect [M/H].
 
 ### Hybrid Composer Columns (v5 schema addition)
 
@@ -357,9 +391,10 @@ When the release pipeline is run with the hybrid composer (`build_hybrid_release
 
 ```python
 import pandas as pd
+import numpy as np
 
 # Load full catalog (all tiers)
-cat = pd.read_parquet("pipeline1_predictions_v1.parquet")
+cat = pd.read_parquet("pipeline1_predictions_v1.1_21label.parquet")
 
 # Tier 1 only (per-star science)
 tier1 = cat[cat["release_tier"] == 1].copy()
@@ -367,22 +402,35 @@ tier1 = cat[cat["release_tier"] == 1].copy()
 # Tier 1 + 2, with caveat
 tier12 = cat[cat["release_tier"] <= 2].copy()
 
-# Filter by abundance type (trust spectrum-dominant [M/H])
-mh_reliable = tier1[tier1["xp_abundance_type__mh"] == "spectrum_dominant"]
+# Filter by per-element tier: spectrum-dominant [M/H] in Tier 1
+mh_reliable = tier1[tier1["release_tier__mh"] == 1]
 
-# [α/M] in disk (aux-assisted OK; caveat noted)
-disk = tier1[(tier1["xp_abundance_type__alpha_m"] == "aux_assisted") &
+# Elemental abundances in disc stars (aux-assisted, but kinematically safe)
+disc = tier1[(tier1["xp_abundance_type__fe_h"] == "aux_assisted") &
              (tier1["kin_ood_flag"] == False)]
+
+# Access elemental abundances (all 18)
+elem_list = ["c_h", "n_h", "o_h", "na_h", "mg_h", "al_h", "si_h", "s_h",
+             "k_h", "ca_h", "sc_h", "ti_h", "v_h", "cr_h", "mn_h", "fe_h",
+             "co_h", "ni_h"]
+for elem in elem_list:
+    disc[f"{elem}_pred"]          # posterior mean
+    disc[f"{elem}_sigma"]         # aleatoric-intrinsic σ
+    disc[f"{elem}_sigma_total"]   # total σ (post-feature-noise marginalization)
 
 # Bright stars only
 bright = tier1[tier1["g_mag_bin"] == "bright"]
 
+# Evolutionary-stage diagnostics
+rgb_stars = cat[cat["evol_stage_class"] == "RGB"]
+hb_stars = cat[cat["evol_stage_class"] == "HeCB"]
+
 # Check release-tier sidecar for schema version
 import json
 sidecar = json.loads(
-    open("pipeline1_predictions_v1.release_tier.json").read()
+    open("pipeline1_predictions_v1.1_21label.release_tier.json").read()
 )
-print(f"Schema version: {sidecar['catalog_schema_version']}")
+print(f"Schema version: {sidecar['catalog_schema_version']}")  # Should be 6
 print(f"Tier 1: {sidecar['counts']['1']}, Tier 2: {sidecar['counts']['2']}, Tier 3: {sidecar['counts']['3']}")
 ```
 
@@ -391,38 +439,52 @@ print(f"Tier 1: {sidecar['counts']['1']}, Tier 2: {sidecar['counts']['2']}, Tier
 ```python
 import polars as pl
 
-cat = pl.read_parquet("pipeline1_predictions_v1.parquet")
+cat = pl.read_parquet("pipeline1_predictions_v1.1_21label.parquet")
 
 # Tier 1, [M/H] spectrum-dominant
 mh_t1 = (
     cat
-    .filter(pl.col("release_tier") == 1)
+    .filter(pl.col("release_tier__mh") == 1)
     .filter(pl.col("xp_abundance_type__mh") == "spectrum_dominant")
+)
+
+# Elemental abundances: Fe/H in disc stars
+fe_reliable = (
+    cat
+    .filter(pl.col("release_tier__fe_h") == 1)
+    .filter(pl.col("kin_ood_flag") == False)
+    .select(["source_id", "fe_h_pred", "fe_h_sigma_total"])
 )
 
 # Per-magnitude bin reliability study
 bright = cat.filter(pl.col("g_mag_bin") == "bright")
 stats_by_bin = (
-    cat
+    bright
     .group_by("g_mag_bin")
     .agg([
-        pl.col("teff_pred").std().alias("teff_scatter").
-        pl.col("mh_pred").std().alias("mh_scatter").
+        pl.col("teff_pred").std().alias("teff_scatter"),
+        pl.col("fe_h_pred").std().alias("fe_h_scatter"),
     ])
 )
+
+# Evolutionary-stage class distribution
+evol_stage_dist = cat.group_by("evol_stage_class").agg(pl.len().alias("count"))
 ```
 
 ### SQL (DuckDB)
 
 ```sql
--- Load Parquet directly
+-- Load Parquet directly; example filtering by per-element tier
 SELECT
-  source_id, teff_pred, mh_pred, alpha_m_pred, release_tier, g_mag_bin.
-  xp_abundance_type__mh, xp_abundance_type__alpha_m
-FROM read_parquet('pipeline1_predictions_v1.parquet')
-WHERE release_tier = 1
-  AND xp_abundance_type__mh = 'spectrum_dominant'
-ORDER BY mh_pred DESC
+  source_id, teff_pred, teff_sigma_total, fe_h_pred, fe_h_sigma_total,
+  release_tier, release_tier__fe_h, evol_stage_class, kin_ood_flag
+FROM read_parquet('pipeline1_predictions_v1.1_21label.parquet')
+WHERE release_tier__mh = 1
+  AND release_tier__fe_h = 1
+  AND xp_abundance_type__fe_h = 'aux_assisted'
+  AND kin_ood_flag = false
+  AND evol_stage_class IN ('RGB', 'HeCB')
+ORDER BY fe_h_pred DESC
 LIMIT 100;
 ```
 
@@ -504,7 +566,7 @@ Example `*.release_tier.json` (v5):
     "alpha_m": 0.05.
     "mg_h": 0.20
   }.
-  "tier_gating_logic": "Tier 3 if ood_joint_flag (XP-Mahalanobis OOD) OR per-element NaN. Tier 2 if (per-element σ exceeds prediction_sigma_inflated threshold) OR (element is alpha_m AND mode_ambiguous_flag) OR (element is aux-assisted AND kin_ood_flag). Tier 1 otherwise. Composite release_tier = row-max across elements. Simplified 2026-04-26 (v5 schema) per release/test_ablations_2026-04-26/REPORT.md and ADR-0015."
+  "tier_gating_logic": "v6 schema (2026-05-03). Tier 3 if ood_joint_flag (XP-block Mahalanobis input-OOD) OR per-element NaN. Tier 2 if label_extrapolation_flag (5-D Mahalanobis on predicted (Teff, log g, [M/H], [α/M], [Mg/H]) outside the APOGEE-truth p99 envelope) OR per-element caveat in _PER_ELEMENT_CAVEAT_FLAGS (currently empty). Tier 1 otherwise. Composite release_tier = row-max across elements. σ-inflation thresholds, kin_ood_flag, and mode_ambiguous_flag are diagnostic-only in v6; see ADR-0016."
 }
 ```
 
@@ -525,65 +587,34 @@ Cite the methods paper (under review) and the release catalog DOI (pending Vizie
 ## Frequently Asked Questions
 
 **Q: Can I use Tier 2 in my paper?**  
-A: Yes, if you explicitly state which caveat applies and justify why it does not affect your science. Example: "We use Tier 2 [M/H] for Galactic-structure analysis (regime-B caveat); systematic T_eff bias does not impact metallicity inference."
+A: Yes, if you explicitly state which caveat applies and justify why it does not affect your science. Example: "We use Tier 2 [M/H] for Galactic-structure analysis (σ-inflation caveat); the element's prediction is the training prior, not spectrum-driven, but this does not impact metallicity-based galactic-structure statistics."
 
-**Q: Why are [α/M] and [Mg/H] aux-assisted but [M/H] is not?**  
-A: The XP spectrum is poor at constraining [α/M] and [Mg/H] independently (CMI < 0.02 nats). The model learns these from APOGEE training and disc kinematics; XP provides a consistency check. [M/H] has higher CMI due to XP's sensitivity to iron-group absorption lines.
+**Q: Why are all 18 elemental abundances aux-assisted?**  
+A: The XP spectrum carries weak individual-element constraints for most of the 18 abundances (CMI < 0.02 nats per element). The model learns these primarily from the APOGEE training-set bimodalities and elemental correlations; XP provides a secondary consistency check. The three atmospheric parameters (Teff, logg, [M/H]) have higher XP sensitivity and are spectrum-dominant.
+
+**Q: What is feature-noise marginalisation?**  
+A: During v1.1 training, we inject controlled noise on XP coefficients (100 epochs of Gaussian noise) to estimate sensitivity to spectral noise. At inference, we analytically compute the expected noise propagation via gradient norms, yielding σ_noise. The total posterior σ_total is then sqrt(σ_intrinsic^2 + σ_noise^2). This gives consumers a more realistic uncertainty that accounts for spectral-quality variation.
 
 **Q: What if I find a star with conflicting Tier assignments?**  
-A: Report it to the ArqueoGal team (andreaswneitzel@astro.up.pt). Tier-3 demotions are conservative; re-running `assign_release_tier()` with updated flag logic should justify any reclassification.
+A: Report it to the ArqueoGal team (andreaswneitzel@astro.up.pt). Tier-3 demotions are conservative (OOD or NaN only); Tier-2 demotions are caveat-driven (σ-inflation or kin-OOD). Per-element tiers allow fine-grained filtering; consult `release_tier__<E>` for your specific element if the composite tier differs from what you expect.
 
 **Q: Can I use Tier 3 for anything?**  
 A: Yes, in methodology and ablation studies. If you relax OOD criteria or omit caveat gates, you must justify the change and report the resulting tier distributions. Tier 3 is not suitable for published science catalogs.
 
-**Q: When will kinetic OOD flag be populated?**  
-A: Populated as of iter-4 (2026-04-25). 6,133 / 249,092 (2.46 %) stars in the kinematic-ready subset are flagged; the other 365k stars (no kinematics) default to False.
+**Q: When was the 21-label v1.1 model trained?**  
+A: Training began 2026-04-29. Convergence gates must be cleared before release. Provisional release target is August 2026 (D-Cat-b).
 
 ---
 
-**Last Updated:** 2026-04-26
-**Schema Version:** 5
+**Last Updated:** 2026-04-29
+**Schema Version:** 6
 **Contact:** andreaswneitzel@astro.up.pt
 
 ## Schema version history
 
-- **v1** (2026-04-19): original release schema for the pipeline1-v1-2026-04-19 tag.
-- **v2** (2026-04-24, Phase A2): added per-row `xp_abundance_type__<element>`, `kin_ood_flag` (placeholder), and `g_mag_bin` columns.
-- **v3** (2026-04-25, Phase A2-followup): added per-element `release_tier__<element>` (5 columns), `dist_prior_dominated` caveat flag, `ood_aux_mahalanobis_flag` joint OOD flag. The composite `release_tier` is now `max` across the five `release_tier__<element>` columns. Aux-assisted elements ([α/M], [Mg/H]) demote to Tier 2 when `kin_ood_flag == True` (population-prior reliability gate); spectrum-dominant elements are unaffected.
-- **v4** (2026-04-25, Phase A2-followup-2): added per-element `prediction_sigma_inflated__<element>` (5 columns) and the `prediction_sigma_inflated_any` aggregate. When the regression-head σ for an element exceeds the prior-collapse threshold (Teff: 150 K; logg: 0.30 dex; [M/H], [Mg/H]: 0.20 dex; [α/M]: 0.10 dex), that element demotes to Tier 2. The thresholds are exposed in the sidecar under `prediction_sigma_inflated_thresholds`. Motivation and threshold provenance: HIGH_SIGMA_RESCUE_REPORT.md (2026-04-25); the v4 caveat removes the 74,615-star prior-collapse spike at ([M/H], [α/M]) ≈ (-1.05, +0.10) without affecting in-distribution Tier 1 stars.
-- **v5** (2026-04-26, per-cell-gate ablation): simplified release-tier gating after the Stream-1 ablation study (`release/test_ablations_2026-04-26/REPORT.md`). Active gates reduced to `ood_joint_flag` (Tier 3); per-element σ-inflation (Tier 2); `mode_ambiguous_flag` on [α/M] only (Tier 2, per-element caveat); `kin_ood_flag` on aux-assisted elements (Tier 2). The flags `latent_support_flag`, `ood_aux_mahalanobis_flag`, `regime_b_flag`, `ood_disagreement_flag`, `aux_missing_any`, `dist_prior_dominated` are retired from gating and reclassified as diagnostic-only, still emitted by `annotate_parquet`, no longer feed `release_tier`. The [α/M] σ-threshold tightens 0.10 → 0.05 dex (≈ 0.5×σ_train). Stream 1 holdout: T1 fraction goes 47.6 % → 92.6 % on Teff/log g/[M/H]/[Mg/H] with T1+T2 RMSE preserved; α/M T1 RMSE goes 0.043 → 0.034 dex with T1 fraction 47.9 % → 36.1 %. Rationale: ADR-0015.
-
-### Iter-3 (2026-04-25), bimodality grid edge shift + convergence retrain
-
-The mode-ambiguous grid edges in `xp_abundances/main/bimodality.py:fit_bimodality_grid`
-were shifted on the [M/H] axis from `np.arange(-3.0, 0.501, 0.20)` to
-`np.arange(-2.9, 0.401, 0.20)`. The original placement put a cell boundary
-at exactly [M/H] = 0.0 dex, which sits at the disc peak of the APOGEE
-training distribution; per-cell bimodal-coverage statistics differ sharply
-across that boundary (data-rich cells just below 0 vs sparse cells just above).
-which produced a tier-filter cliff: 65 % of stars at [M/H] = -0.005 dex were
-flagged `mode_ambiguous_flag`, vs 0 % at [M/H] = +0.005 dex. The shift puts
-0.0 dex in the middle of the [-0.1, +0.1] cell; post-fix the rate is 24.2 %
-just below 0 vs 24.5 % just above (smooth). The Teff and logg axes were
-audited for analogous artefacts; their visible cell-edge effects track the
-underlying physical α-sequence transitions in the training data and are
-expected (not artefacts).
-
-The strong-contrastive-v2 ensemble was retrained with convergence-tuned
-loss weights (SupCon 1.0 → 0.3, Barlow 0.5 → 0.8, τ_init 0.10 → 0.15) to
-close a widening train/val gap on the SupCon component. The
-2026-04-26 long-train rerun (30 epochs) produced
-`models/main/xp_abundances/20260425_6b96c06_cd1cbb9_ensemble_5label/`.
-which is the current production checkpoint pointed to by
-`scripts/run_pipeline1_inference.py:DEFAULT_ENSEMBLE_DIR` and the gallery
-plots. The earlier `models/main/xp_abundances/strong_contrastive_2026-04-25/`
-directory is retained for methodology comparison; do not consume it for
-release artefacts. Best val_loss 2.715 → 0.983 (2.8× lower) on the v2
-recipe, then 0.888 best at epoch 29/30 on the convergence rerun.
-Stress battery 7/7 PASSED on the converged model.
-
-Tier-1 count went from 212,656 to 209,917 (−1.3 %); the full trustworthy
-catalog (Tier 1 + Tier 2) is unchanged at 491,756 stars. Structure-
-preservation metrics regressed marginally (ARI 0.566 → 0.558, macro-F1
-0.819 → 0.815, both within the production gate); centroid drift on the
-test split improved 19 % (0.033 → 0.027 dex).
+- **v1** (2026-04-19): original 5-label release schema for the pipeline1-v1-2026-04-19 tag. 5 atmospheric/abundance predictions per star.
+- **v2** (2026-04-24): added per-row `xp_abundance_type__<element>` (5 columns), `kin_ood_flag` (placeholder), and `g_mag_bin`.
+- **v3** (2026-04-25): added per-element `release_tier__<element>` (5 columns), `dist_prior_dominated` flag, `ood_aux_mahalanobis_flag`. Composite `release_tier` = `max` across elements. Aux-assisted elements demote to Tier 2 when `kin_ood_flag`.
+- **v4** (2026-04-25): added per-element `prediction_sigma_inflated__<element>` (5 columns). Prior-collapse thresholds: Teff 150 K, logg 0.30 dex, [M/H] 0.20, [α/M] 0.10, [Mg/H] 0.20. Removes 74,615-star spike at ([M/H], [α/M]) ≈ (-1.05, +0.10).
+- **v5** (2026-04-26): simplified release-tier gating per ADR-0015 ablation study. Active gates: `ood_joint_flag` (Tier 3), per-element σ-inflation (Tier 2), `kin_ood_flag` on aux-assisted only (Tier 2). Tightens [α/M] σ-threshold 0.10 → 0.05 dex. Diagnostic-only flags (no longer feed tier): `latent_support_flag`, `ood_aux_mahalanobis_flag`, `regime_b_flag`, `ood_disagreement_flag`, `aux_missing_any`, `dist_prior_dominated`.
+- **v6** (2026-04-29): **21-label single-model architecture.** Replaces v5's 5-label ensemble. Adds 18 elemental abundances (C, N, O, Na, Mg, Al, Si, S, K, Ca, Sc, Ti, V, Cr, Mn, Fe, Co, Ni) alongside Teff, logg, [M/H]. Each element carries: `<E>_pred`, `<E>_sigma`, `<E>_sigma_total` (post-feature-noise marginalisation), `<E>_sigma_feature_noise_propagated`, `prediction_sigma_inflated__<E>`. 21×21 block-Cholesky covariance matrix emitted (per-label posteriors not scalar σ). Four-way evolutionary-stage diagnostic head (RGB, HeCB, OOD_evolved, OOD_unevolved) with class probabilities. Feature-noise marginalisation: training-time Gaussian noise injection (100 epochs) + inference-time analytical gradient-norm propagation. Loss design: SupCon 0.3 + Barlow 0.8 + ARI contamination 0.1 (preserves disc bimodality). Single model (not ensemble) for simplicity and gradient availability. Per-element release tiers for all 21 elements; provisional σ-thresholds from v1.1 σ_train (refined pending §3.3 audit). Mészáros+2025 baseline training-label corrections applied (arXiv:2501.xxxxx).
